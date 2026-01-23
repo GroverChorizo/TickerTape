@@ -1,8 +1,4 @@
-# TickerTape
-## Hyperliquid Quant Terminal
-### Institutional Research Platform
-
-### an homage to the world's first stock data stream.
+# Hyperliquid Quant Terminal — Institutional Research Platform
 
 ## Repository Scope
 This repository contains the full codebase, documentation, and supporting infrastructure for the Hyperliquid Quant Terminal. It is designed as an institutional-grade, local-first quantitative research environment for crypto market analysis, backtesting, and data visualization. All code, data, and research artifacts remain local to the user's machine.
@@ -29,8 +25,8 @@ This repository contains the full codebase, documentation, and supporting infras
 4. **Data Integrity Gate:** Final check before merge/release.
 
 ## Canonical Specifications
-- **Backend:** `WhaleWatch/QuanTT/BtheVision_v1_5_5.txt`
-- **Frontend:** `WhaleWatch/QuanTT/FtheVision_v1_5_5.txt`
+- **Backend:** `WhaleWatch/TickerTape/BtheVision_v1_5_5.txt`
+- **Frontend:** `WhaleWatch/TickerTape/FtheVision_v1_5_5.txt`
 - **Core Values:** `AGENTS.md`
 - **Role Playbooks:** `/playbooks/`
 - **PR Template & Data Integrity Gate:** See `/tools/` and `/tests/`
@@ -59,3 +55,41 @@ Commercial licenses are available for entities wishing to:
 - distribute modified versions without open-sourcing changes
 
 For commercial licensing inquiries, contact: elias@osgrovesolutions.com
+
+## Secrets & Local Configuration (recommended) 🔐
+
+- Recommended default (example only - do not treat as a real absolute path):
+  - POSIX (Linux / macOS): `~/.tickertape/secrets/HLdontShare.env`
+  - Windows (PowerShell / CMD): `%USERPROFILE%\.tickertape\secrets\HLdontShare.env`
+
+- Loading order (safe & repeatable):
+  1. Environment variables (explicit values or a path to a secrets file via `HL_DONT_SHARE_PATH` or `TICKERTAPE_SECRETS_PATH`)
+  2. A secrets file located at the default external path shown above (outside the repository)
+
+Note: The file above is an example pattern only. Do not commit real secrets into the repository; always keep `HLdontShare.env` outside the repo and/or load secrets via environment variables.
+
+---
+
+## How to run the Data Integrity Gate & tests (nested workspace)
+
+- Run the gate (CI mode, scanning `TickerTape`):
+
+```
+python tools/data_integrity_gate.py --ci --root TickerTape
+```
+
+- Run the gate + tests (recommended canonical sequence from workspace root):
+
+```
+python tools/data_integrity_gate.py --ci --root TickerTape && (cd TickerTape && pytest -q)
+```
+
+- Or run from within the TickerTape directory:
+
+```
+python ../tools/data_integrity_gate.py --ci --root . && pytest -q
+```
+
+These commands run the gate only against the `TickerTape` project subtree (src/, tests/, docs/ and top-level files) and then run the test suite for the project.
+
+**CI enforcement:** The `Data Integrity Gate` runs as part of the repository GitHub Actions CI and blocks merges on failures via the `data_integrity_gate.yml` workflow for `WhaleWatch/TickerTape`.

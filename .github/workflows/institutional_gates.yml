@@ -1,0 +1,28 @@
+name: Institutional Gates
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal deps (pytest)
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Data Integrity Gate (standalone)
+        run: python tools/data_integrity_gate.py --ci
+
+      - name: Pytest (includes integrity test)
+        run: pytest -q
