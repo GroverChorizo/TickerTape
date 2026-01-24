@@ -28,7 +28,7 @@ jobs:
 
       - name: Run Data Integrity Gate
         run: |
-          python tools/data_integrity_gate.py --ci --root WhaleWatch/TickerTape
+          python tools/data_integrity_gate.py --ci --root .
 
       - name: Run tests (TickerTape)
         run: |
