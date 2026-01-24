@@ -15,6 +15,7 @@ __pycache__/
 *.pyd
 
 # Data caches and research artifacts (local-only)
+local_cache/
 *.csv
 *.parquet
 *.feather

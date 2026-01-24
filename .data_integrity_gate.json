@@ -18,8 +18,8 @@
     ".toml",
     ".json"
   ],
-  "required_gitignore_patterns": ["HLdontShare.env", "secrets/", "local_cache/", ".venv/", "*.parquet", "*.csv"],
-  "required_files": ["WhaleWatch/TickerTape/requirements.txt"],
+  "required_gitignore_patterns": ["HLdontShare.env", "LOCAL_SECRETS_SETUP.md", ".tickertape/", "secrets/", "local_cache/"],
+  "required_files": ["requirements.txt"],
   "forbidden_files": ["WhaleWatch/TickerTape/HLdontShare.env"],
   "scan_roots": [
     "WhaleWatch/TickerTape"
