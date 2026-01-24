@@ -10,6 +10,14 @@
       "category": "synthetic_or_fake_data",
       "pattern_contains": "np\\.random",
       "reason": "Randomness allowed in tests only; must be seeded."
+    },
+    {
+      "file": "PRD.md",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "synthetic data",
+      "reason": "Documentation policy wording; not executable code."
     }
+
+
   ]
 }
