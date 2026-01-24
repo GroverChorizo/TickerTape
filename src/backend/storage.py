@@ -64,22 +64,26 @@ def write_parquet(records: Iterable[Dict[str, Any]], output_path: Path) -> None:
 
     If pyarrow is not installed, write NDJSON fallback with .ndjson suffix.
     """
+    # Always ensure parent dirs exist (parquet OR fallback)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     try:
-        import pyarrow as pa
-        import pyarrow.parquet as pq
-    except Exception as e:
-        # Fallback: write NDJSON
-        out_ndjson = output_path.with_suffix(output_path.suffix + ".ndjson")
-        with out_ndjson.open("w", encoding="utf-8") as f:
-            for rec in records:
-                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
-        logger.warning({"event": "pyarrow_missing", "msg": str(e), "wrote": str(out_ndjson)})
+        import pyarrow as pa  # type: ignore
+        import pyarrow.parquet as pq  # type: ignore
+
+        table = pa.Table.from_pylist(list(records))
+        pq.write_table(table, output_path)
         return
 
-    tbl = pa.Table.from_pylist(list(records))
-    _ensure_dir(output_path.parent)
-    pq.write_table(tbl, str(output_path))
-    logger.info({"event": "parquet_written", "path": str(output_path), "rows": tbl.num_rows})
+    except ModuleNotFoundError:
+        # Fallback: NDJSON beside intended parquet path
+        out_ndjson = output_path.with_suffix(output_path.suffix + ".ndjson")
+        out_ndjson.parent.mkdir(parents=True, exist_ok=True)
+
+        with out_ndjson.open("w", encoding="utf-8") as f:
+            for r in records:
+                f.write(json.dumps(r, ensure_ascii=False) + "\n")
+        return
 
 
 def partition_and_write(dataset: str, timeframe: str, window_start_ts: int, records: Iterable[Dict[str, Any]], registry: DatasetRegistry) -> Path:
