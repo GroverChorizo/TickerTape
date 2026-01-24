@@ -1,2 +1,11 @@
-httpx>=0.23.0
+httpx>=0.23
 pytest>=7.0
+
+requests
+rich
+python-dotenv
+pandas
+
+# AI Swarm Agent (requires OPENROUTER_API_KEY in .env)
+openai
+termcolor
