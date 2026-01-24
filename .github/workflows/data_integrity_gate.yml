@@ -1,9 +1,9 @@
-name: 'TickerTape Integrity Gate'
+name: "TickerTape Integrity Gate"
 
 on:
   pull_request:
     paths:
-      - 'WhaleWatch/TickerTape/**'
+      - "**"
   push:
     branches:
       - main
@@ -12,25 +12,26 @@ jobs:
   gate:
     name: Data Integrity Gate (TickerTape)
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f WhaleWatch/TickerTape/requirements.txt ]; then pip install -r WhaleWatch/TickerTape/requirements.txt; fi
+          # Install repo dependencies from repo root
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run Data Integrity Gate
         run: |
           python tools/data_integrity_gate.py --ci --root .
 
-      - name: Run tests (TickerTape)
+      - name: Run tests
         run: |
-          cd WhaleWatch/TickerTape
           pytest -q
