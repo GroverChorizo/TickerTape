@@ -1,23 +1,54 @@
 {
-  "scan_roots": ["src", "tests", "docs"],
+  "exclude_dirs": [
+    "sandbox",
+    "examples",
+    "WhaleWatch/Quant_TT",
+    "WhaleWatch/hypeDataLayer_1/HL_WatchDog",
+    "WhaleWatch/hypeDataLayer_1",
+    "StratSearch",
+    "Bootcamp",
+    "Data"
+  ],
+  "include_exts": [
+    ".py",
+    ".md",
+    ".txt",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".json"
+  ],
+  "required_gitignore_patterns": ["HLdontShare.env", "secrets/", "local_cache/", ".venv/", "*.parquet", "*.csv"],
+  "required_files": ["WhaleWatch/TickerTape/requirements.txt"],
+  "forbidden_files": ["WhaleWatch/TickerTape/HLdontShare.env"],
+  "scan_roots": [
+    "WhaleWatch/TickerTape"
+  ],
   "default_external_secrets_path": "~/.tickertape/secrets/HLdontShare.env",
-  "required_gitignore_patterns": ["HLdontShare.env", "LOCAL_SECRETS_SETUP.md", ".tickertape/", "secrets/"],
-  "required_files": ["requirements.txt"],
-  "forbidden_files": ["HLdontShare.env"],
   "allowlist": [
     {
       "file": "tests/",
       "category": "synthetic_or_fake_data",
-      "pattern_contains": "np\\.random",
+      "pattern_contains": "np.random",
       "reason": "Randomness allowed in tests only; must be seeded."
     },
     {
-      "file": "PRD.md",
+      "file": "WhaleWatch/TickerTape/tests/",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "random.uniform",
+      "reason": "Randomness allowed in tests only; must be seeded."
+    },
+    {
+      "file": "WhaleWatch/TickerTape/PRD.md",
       "category": "synthetic_or_fake_data",
       "pattern_contains": "synthetic data",
-      "reason": "Documentation policy wording; not executable code."
+      "reason": "PRD documentation is allowed to mention synthetic data."
+    },
+    {
+      "file": "WhaleWatch/TickerTape/tools/.data_integrity_gate.json",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "synthetic data",
+      "reason": "Config file may reference synthetic data patterns."
     }
-
-
   ]
 }
