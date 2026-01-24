@@ -34,6 +34,16 @@ This repository contains the full codebase, documentation, and supporting infras
 ---
 This README is intentionally lightweight. For implementation details, see the Vision files and supporting documentation.
 
+Quick commands:
+
+- Emit snapshots once (liquidations dashboard):
+
+    python tools/run_ingestion.py --profile liquidations_dashboard --once
+
+- Start example alert client:
+
+    python examples/alert_client.py
+
 
 ## Support the Project
 
