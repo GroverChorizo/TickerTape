@@ -45,7 +45,6 @@ Quick commands:
     python examples/alert_client.py
 
 
-
 ## Support the Project
 
 If you find this project useful, you may support its continued development via:

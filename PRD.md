@@ -1,3 +1,4 @@
+---
 # Product Requirements Document (PRD)
 
 ## 1. Problem Statement
@@ -44,4 +45,6 @@ Quantitative researchers require a local-first, institutional-grade environment 
 - Synthetic data generation or modification
 
 ---
+
+For implementation details, see BtheVision_v1_5_5.txt, FtheVision_v1_5_5.txt, AGENTS.md, and playbooks.
 For implementation details, see BtheVision_v1_5_5.txt, FtheVision_v1_5_5.txt, AGENTS.md, and playbooks.

@@ -32,4 +32,5 @@ This document provides a technical breakdown of the native backtest and Monte Ca
 - All limitations are documented; see Vision and playbooks for details
 
 ---
+
 For further details, see BtheVision_v1_5_5.txt, AGENTS.md, and playbooks.

@@ -268,3 +268,10 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+=======
+        # ...existing content from canonical script...
+    ],
+}
+
+# ...rest of canonical script from AlgoStuff/tools/data_integrity_gate.py...
+>>>>>>> 8916a1bc64f4660b3f870b4b9b310ce7086fe31e

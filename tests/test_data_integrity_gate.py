@@ -1,26 +1,24 @@
-from pathlib import Path
-import subprocess
-import sys
+from __future__ import annotations
 
 from pathlib import Path
 import subprocess
 import sys
 
-def find_repo_root(start: Path) -> Path:
-    p = start.resolve()
-    for candidate in [p] + list(p.parents):
-        if (candidate / ".git").exists():
-            return candidate
-        if (candidate / "requirements.txt").exists() or (candidate / "pyproject.toml").exists() or (candidate / ".data_integrity_gate.json").exists():
-            return candidate
-    raise RuntimeError(f"Could not find repo root from {start}")
 
 def test_data_integrity_gate_scoped_to_tickertape() -> None:
-    root = find_repo_root(Path(__file__))
-    gate_path = root / "tools" / "data_integrity_gate.py"
+    """
+    Ensure the integrity gate only scans inside the TickerTape repo root,
+    even if this repo is nested inside a larger directory (AlgoStuff).
+    """
+    tickertape_root = Path(__file__).resolve().parents[1]  # .../TickerTape
+    gate_path = tickertape_root / "tools" / "data_integrity_gate.py"
+
+    # If your gate is at repo root instead, change this to tickertape_root / "data_integrity_gate.py"
     assert gate_path.exists(), f"Gate not found at {gate_path}"
-    cmd = [sys.executable, str(gate_path), "--ci", "--root", str(root)]
+
+    cmd = [sys.executable, str(gate_path), "--ci", "--root", str(tickertape_root)]
     proc = subprocess.run(cmd, capture_output=True, text=True)
+
     if proc.returncode != 0:
         raise AssertionError(
             "Data Integrity Gate failed.\n\nSTDOUT:\n"

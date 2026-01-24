@@ -39,4 +39,5 @@ This guide explains how users integrate their own Python research logic into the
 - Interface mismatch: Missing required columns or outputs
 
 ---
+
 For implementation details, see BtheVision_v1_5_5.txt, AGENTS.md, and playbooks.
