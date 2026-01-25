@@ -8,6 +8,37 @@ import sys
 from pathlib import Path
 from typing import Dict, List
 
+def _coerce_log_extra(kwargs: dict) -> dict:
+    extra = dict(kwargs.pop("extra", {}))
+    extra.update(kwargs)
+    return extra
+
+
+def _log_system(self: logging.Logger, message: str = "", *args, **kwargs) -> None:
+    extra = _coerce_log_extra(kwargs)
+    self.info(message or "", *args, extra=extra)
+
+
+def _log_call(self: logging.Logger, message: str = "", *args, **kwargs) -> None:
+    extra = _coerce_log_extra(kwargs)
+    self.info(message or "", *args, extra=extra)
+
+
+def _adapter_system(self: logging.LoggerAdapter, message: str = "", *args, **kwargs) -> None:
+    extra = _coerce_log_extra(kwargs)
+    self.logger.info(message or "", *args, extra=extra)
+
+
+def _adapter_call(self: logging.LoggerAdapter, message: str = "", *args, **kwargs) -> None:
+    extra = _coerce_log_extra(kwargs)
+    self.logger.info(message or "", *args, extra=extra)
+
+
+logging.Logger.system = _log_system  # type: ignore[attr-defined]
+logging.Logger.__call__ = _log_call  # type: ignore[assignment]
+logging.LoggerAdapter.system = _adapter_system  # type: ignore[attr-defined]
+logging.LoggerAdapter.__call__ = _adapter_call  # type: ignore[assignment]
+
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Input, Static

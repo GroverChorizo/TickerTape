@@ -1,13 +1,11 @@
 """Wallet selection and detail panels."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Dict, Iterable, List
 
 from rich.text import Text
 from textual.message import Message
-from textual.widgets import OptionList
-from textual.widgets.option_list import Option
+from textual.widgets import Label, ListItem, ListView
 
 from .panel_base import PanelBase
 
@@ -26,30 +24,41 @@ class WalletSelected(Message):
         self.source = source
 
 
-class WalletPanel(OptionList):
+class WalletPanel(ListView):
     def __init__(self) -> None:
         super().__init__()
         self.border_title = "Wallets"
         self._sources: Dict[str, str] = {}
-        self._set_empty()
+        self._pending_addresses: List[str] | None = []
+        self._pending_source: str = "unknown"
+
+    def on_mount(self) -> None:
+        if self._pending_addresses:
+            self.update_wallets(self._pending_addresses, self._pending_source)
+            self._pending_addresses = None
+        else:
+            self._set_empty()
 
     def _set_empty(self) -> None:
-        self.clear_options()
-        self.add_option(Option(Text("No wallet addresses available"), id="empty"))
-        self.disable_option("empty")
+        self.clear()
+        self.append(ListItem(Label(Text("No wallet addresses available")), id="empty"))
 
     def update_wallets(self, addresses: Iterable[str], source: str) -> None:
         unique = list(dict.fromkeys(addr for addr in addresses if addr))
+        if not self.is_attached:
+            self._pending_addresses = unique
+            self._pending_source = source
+            return
         if not unique:
             self._set_empty()
             return
-        self.clear_options()
+        self.clear()
         for addr in unique:
             self._sources[addr] = source
-            self.add_option(Option(Text(addr), id=addr))
+            self.append(ListItem(Label(Text(addr)), id=addr))
 
-    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        address = str(event.option.id)
+    def on_list_view_selected(self, event: ListView.Selected) -> None:
+        address = str(event.item.id)
         if address == "empty":
             return
         source = self._sources.get(address, "unknown")
