@@ -6,7 +6,7 @@ from typing import Dict, List
 
 from textual.reactive import reactive
 
-from ..backend.snapshots import get_latest_snapshot
+from ..backend.snapshots import get_latest_snapshot_with_path
 from ..backend.registry import get_registry
 from ..state.datasets import load_datasets
 from .panel_base import PanelBase
@@ -28,8 +28,9 @@ class LiquidationsPanel(PanelBase):
         timeframes = available.timeframes if available and available.timeframes else []
         combined = list(dict.fromkeys(timeframes + DEFAULT_TIMEFRAMES))
         for tf in combined:
-            snap = get_latest_snapshot(registry, "feed=liquidations_snapshots", tf)
+            snap, path = get_latest_snapshot_with_path(registry, "feed=liquidations_snapshots", tf)
             if snap:
+                snap["_partition_path"] = path
                 self.snapshots[tf] = snap
         self.update_text(self._render_snapshots(combined))
 
@@ -38,7 +39,7 @@ class LiquidationsPanel(PanelBase):
         for tf in timeframes:
             snap = self.snapshots.get(tf)
             if not snap:
-                lines.append(f"[{tf}] No snapshot data available.")
+                lines.append(f"[{tf}] No snapshot data available. Run /ingest or complete setup wizard.")
                 continue
             total = snap.get("total_notional", 0.0)
             count = snap.get("count", 0)
@@ -46,9 +47,14 @@ class LiquidationsPanel(PanelBase):
             velocity = snap.get("velocity_score", 0.0)
             computed = snap.get("computed_at_ts_ms")
             computed_str = self._fmt_ts(computed)
+            age = self._age_seconds(computed)
+            run_id = snap.get("run_id", "unknown")
+            partition_path = snap.get("_partition_path") or "unknown"
             lines.append(
-                f"[{tf}] count={count} total=${total:,.0f} cascade={cascade} velocity={velocity:.2f} computed={computed_str}"
+                f"[{tf}] count={count} total=${total:,.0f} cascade={cascade} velocity={velocity:.2f} "
+                f"computed={computed_str} age={age} run_id={run_id}"
             )
+            lines.append(f"    Partition: {partition_path}")
             top_symbols = snap.get("top_symbols", [])
             if top_symbols:
                 top_fmt = ", ".join(
@@ -69,3 +75,12 @@ class LiquidationsPanel(PanelBase):
             return "unknown"
         dt = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    @staticmethod
+    def _age_seconds(ts_ms: int | None) -> str:
+        if not ts_ms:
+            return "unknown"
+        now = datetime.now(timezone.utc)
+        then = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
+        seconds = int((now - then).total_seconds())
+        return f"{seconds}s"

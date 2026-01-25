@@ -18,7 +18,7 @@ class FundingPanel(PanelBase):
         registry = get_registry()
         datasets = load_datasets(registry)
         if "feed=funding_rates" not in datasets:
-            self.update_text("Funding feed unavailable (stub or missing).")
+            self.update_text("Not implemented yet — tracked as TODO — press p for plan.")
             return
         snap = get_latest_snapshot(registry, "feed=funding_rates", "1h")
         if not snap:

@@ -1,6 +1,7 @@
 """TickerTape TUI application."""
 from __future__ import annotations
 
+import argparse
 import asyncio
 import logging
 import shlex
@@ -49,6 +50,11 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from .backend.registry import get_registry
+from .bootstrap import bootstrap_data
+from .config import TuiConfig, config_needs_setup, ensure_data_root, load_config, save_config
+from .diagnostics import collect_diagnostics
+from .wizard import StartupWizard
+from .roadmap import RoadmapScreen
 from .state.alerts import AlertStream
 from .state.datasets import load_datasets
 from .state.profiles import get_profile
@@ -76,12 +82,16 @@ class TickerTapeApp(App):
         ("ctrl+5", "toggle_panel('alerts')", "Toggle alerts"),
         ("ctrl+6", "toggle_panel('research')", "Toggle research"),
         ("r", "refresh_panels", "Refresh panels"),
+        ("p", "open_plan", "Open roadmap"),
     ]
 
-    def __init__(self) -> None:
+    def __init__(self, config: TuiConfig) -> None:
         super().__init__()
+        self.config = config
         self.registry = get_registry()
         self.session_state = load_session_state()
+        if self.config.profile:
+            self.session_state.active_profile = self.config.profile
         self.alert_stream = AlertStream()
         self.research_queue = ResearchQueue()
         self._panels: Dict[str, Static] = {}
@@ -139,6 +149,8 @@ class TickerTapeApp(App):
         self.set_interval(5, self.refresh_panels)
         self.set_interval(2, self.refresh_status)
         self.apply_profile(self.session_state.active_profile)
+        if getattr(self, "_show_wizard", False):
+            self.call_later(self._open_wizard)
 
     def refresh_panels(self) -> None:
         liquidations = self._panels.get("liquidations")
@@ -177,7 +189,10 @@ class TickerTapeApp(App):
                 panel.update(f"Panel error. Press R to retry. ({type(exc).__name__})")
 
     def refresh_status(self) -> None:
-        status = self.query_one(StatusBar)
+        try:
+            status = self.query_one(StatusBar)
+        except Exception:
+            return
         datasets = load_datasets(self.registry)
         backend_ok = bool(datasets)
         status.update_status(
@@ -259,7 +274,36 @@ class TickerTapeApp(App):
             if args[0] == "toggle" and len(args) > 1:
                 self.action_toggle_panel(args[1])
                 return
+        if cmd == "diag":
+            self._show_diagnostics()
+            return
+        if cmd == "ingest":
+            self._run_ingest_once()
+            return
+        if cmd == "plan":
+            self._open_roadmap()
+            return
         self.notify("Unknown command", severity="warning")
+
+    def _show_diagnostics(self) -> None:
+        data = collect_diagnostics(self.config, self.registry)
+        lines = [f"{k}: {v}" for k, v in data.items()]
+        self.console.print("\n".join(lines))
+        self.notify("Diagnostics printed to console.")
+
+    def _run_ingest_once(self) -> None:
+        self.notify("Running ingestion once...")
+        asyncio.create_task(asyncio.to_thread(bootstrap_data, self.config))
+
+    def _open_wizard(self) -> None:
+        wizard = StartupWizard(self.config.config_path)
+        self.push_screen(wizard)
+
+    def action_open_plan(self) -> None:
+        self._open_roadmap()
+
+    def _open_roadmap(self) -> None:
+        self.push_screen(RoadmapScreen())
 
     def handle_research_command(self, job_type: str, args: List[str]) -> None:
         if not args:
@@ -334,8 +378,40 @@ class TickerTapeApp(App):
         return parsed
 
 
+def _parse_args(argv: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="TickerTape TUI")
+    parser.add_argument("--setup", action="store_true", help="Run setup wizard")
+    parser.add_argument("--profile", help="Start in profile")
+    parser.add_argument("--data-root", help="Override data root")
+    parser.add_argument("--offline", action="store_true", help="Force offline mode")
+    return parser.parse_args(argv)
+
+
 def run() -> None:
-    app = TickerTapeApp()
+    args = _parse_args(sys.argv[1:])
+    overrides = {}
+    if args.profile:
+        overrides["profile"] = args.profile
+    if args.data_root:
+        overrides["data_root"] = args.data_root
+    if args.offline:
+        overrides["mode"] = "offline_demo"
+    config = load_config(overrides)
+    ensure_data_root(config)
+    if args.profile:
+        config.profile = args.profile
+        save_config(config)
+    if args.data_root:
+        save_config(config)
+    try:
+        from backend import storage as storage_module
+
+        storage_module.BASE_PARQUET_ROOT = config.data_root
+        storage_module.REGISTRY_PATH = config.data_root / "_registry.json"
+    except Exception:
+        pass
+    app = TickerTapeApp(config)
+    app._show_wizard = args.setup or config_needs_setup(config)
     app.run()
 
 
