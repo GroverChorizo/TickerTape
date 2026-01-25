@@ -1,8 +1,5 @@
 """Implementation for run_ingestion CLI used in tests and CI."""
 from __future__ import annotations
-from typing import List
-from pathlib import Path
-from datetime import datetime, timezone
 import logging
 
 import sys

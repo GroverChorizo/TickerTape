@@ -16,6 +16,7 @@ class ProfileConfig:
 
 DEFAULT_PANEL_ORDER = [
     "liquidations",
+    "positions",
     "funding",
     "whales",
     "event_stream",
@@ -50,7 +51,7 @@ PROFILES: Dict[str, ProfileConfig] = {
         name="funding_arbitrage",
         label="Funding Arbitrage",
         description="Funding rate extremes, divergences, and positioning focus.",
-        focus_panels=["funding", "liquidations", "event_stream", "alerts", "research"],
+        focus_panels=["funding", "positions", "liquidations", "event_stream", "alerts", "research"],
         default_panel_order=DEFAULT_PANEL_ORDER,
     ),
 }

@@ -9,7 +9,6 @@ from typing import Any, Dict, Optional
 from pathlib import Path
 import hashlib
 import json
-import datetime
 import re
 
 DEFAULT_CACHE_ROOT = Path("./local_cache")

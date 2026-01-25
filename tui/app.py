@@ -63,12 +63,17 @@ from .state.session import get_profile_state, load_session_state, save_session_s
 from .widgets.alert_panel import AlertPanel
 from .widgets.backtest_panel import BacktestPanel
 from .widgets.event_stream import EventStream
+from .widgets.positions_panel import PositionsPanel
 from .widgets.funding_panel import FundingPanel
 from .widgets.liquidations_panel import LiquidationsPanel
 from .widgets.profile_selector import ProfileSelector, ProfileSelected
 from .widgets.status_bar import StatusBar
 from .widgets.whale_panel import WhalePanel
 from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
+from backend.network import NetworkClient
+from backend.feeds.liquidations_stats import LiquidationsStatsFeed
+from backend.feeds.positions import PositionsFeed
+from .streaming import StreamSupervisor
 
 
 class TickerTapeApp(App):
@@ -94,6 +99,12 @@ class TickerTapeApp(App):
             self.session_state.active_profile = self.config.profile
         self.alert_stream = AlertStream()
         self.research_queue = ResearchQueue()
+        self.streams = StreamSupervisor()
+        self.client = NetworkClient()
+        self.liquidations_stats_feed = LiquidationsStatsFeed(self.client, offline=self.config.mode == "offline_demo")
+        self.positions_feed = PositionsFeed(self.client, offline=self.config.mode == "offline_demo")
+        self.streams.register(self.liquidations_stats_feed)
+        self.streams.register(self.positions_feed)
         self._panels: Dict[str, Static] = {}
         self._last_snapshot_ts: int | None = None
         self._logger = logging.getLogger(__name__)
@@ -113,12 +124,14 @@ class TickerTapeApp(App):
                 )
             with Vertical(id="center"):
                 liquidations = LiquidationsPanel()
+                positions = PositionsPanel()
                 funding = FundingPanel()
                 whales = WhalePanel()
                 events = EventStream()
                 research = BacktestPanel(self.research_queue)
                 self._panels = {
                     "liquidations": liquidations,
+                    "positions": positions,
                     "funding": funding,
                     "whales": whales,
                     "event_stream": events,
@@ -151,6 +164,14 @@ class TickerTapeApp(App):
         self.apply_profile(self.session_state.active_profile)
         if getattr(self, "_show_wizard", False):
             self.call_later(self._open_wizard)
+        self.streams.start()
+
+    def on_shutdown(self) -> None:
+        self.streams.stop()
+        try:
+            self.client.close()
+        except Exception:
+            pass
 
     def refresh_panels(self) -> None:
         liquidations = self._panels.get("liquidations")
@@ -162,6 +183,10 @@ class TickerTapeApp(App):
             )
             latest = max((s.get("computed_at_ts_ms") for s in liquidations.snapshots.values()), default=None)
             self._last_snapshot_ts = latest
+        positions = self._panels.get("positions")
+        if isinstance(positions, PositionsPanel):
+            positions.update_payload(self.positions_feed.latest() or {"status": self.positions_feed.state.status})
+            self._safe_refresh(positions, "positions", positions.refresh_panel)
         funding = self._panels.get("funding")
         if isinstance(funding, FundingPanel):
             self._safe_refresh(funding, "funding", funding.refresh_panel)
@@ -282,6 +307,9 @@ class TickerTapeApp(App):
             return
         if cmd == "plan":
             self._open_roadmap()
+            return
+        if cmd == "setup":
+            self._open_wizard()
             return
         self.notify("Unknown command", severity="warning")
 

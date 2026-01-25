@@ -8,10 +8,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 from typing import Optional, Dict, List, Literal
-import json
 
 
-from datetime import timezone, timedelta
+from datetime import timezone
 
 
 def _iso(dt: datetime) -> str:

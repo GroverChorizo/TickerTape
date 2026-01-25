@@ -135,3 +135,7 @@ python ../tools/data_integrity_gate.py --ci --root . && pytest -q
 These commands run the gate only against the `TickerTape` project subtree (src/, tests/, docs/ and top-level files) and then run the test suite for the project.
 
 **CI enforcement:** The `Data Integrity Gate` runs as part of the repository GitHub Actions CI and blocks merges on failures via the `data_integrity_gate.yml` workflow for `WhaleWatch/TickerTape`.
+
+## Hyperliquid example mapping
+
+See `docs/hyperliquid_examples_mapping.md` for the mapping between external examples and TickerTape feeds/panels.
