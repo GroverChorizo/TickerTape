@@ -46,6 +46,7 @@ Use the command bar at the bottom for orchestration:
 - `/ingest` (run a single ingestion cycle)
 - `/diag` (print diagnostics)
 - `/plan` (show roadmap)
+- `/setup` (open setup wizard)
 
 If no backtest runner is configured, jobs are recorded as **blocked** with the explicit reason.
 

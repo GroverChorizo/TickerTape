@@ -1,12 +1,10 @@
 import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
-import pytest
 from pathlib import Path
-from backend.storage import DatasetRegistry, BASE_PARQUET_ROOT
+from backend.storage import DatasetRegistry
 from backend.liquidations_feed import LiquidationsFeed
 from backend.snapshotter import run_once
-import shutil
 
 
 def test_run_once_writes_partition(tmp_path, monkeypatch):

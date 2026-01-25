@@ -5,7 +5,7 @@ Provides a small scheduler to run snapshot emission on configured cadences, and 
 from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
-from typing import Callable, Dict, Any, Optional
+from typing import Dict, Optional
 import logging
 
 from .liquidations_feed import LiquidationsFeed, DEFAULT_CADENCE_SECONDS

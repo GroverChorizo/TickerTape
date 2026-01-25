@@ -9,7 +9,6 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Optional
 import httpx
-import logging
 
 from .logging_config import get_logger
 
@@ -25,6 +24,7 @@ ENDPOINT_PATHS: Dict[str, str] = {
     "liquidations_stats": "/api/liquidations/stats.json",
     "funding": "/api/funding.json",
     "candles": "/api/candleSnapshot",
+    "positions": "/api/positions.json",
     # Add or update paths from Vision only
 }
 

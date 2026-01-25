@@ -1,4 +1,7 @@
-import os, json, urllib.request, sys
+import os
+import json
+import urllib.request
+import sys
 TOKEN = os.environ.get('GHTOKEN')
 if not TOKEN:
     print('Missing token', file=sys.stderr); sys.exit(2)

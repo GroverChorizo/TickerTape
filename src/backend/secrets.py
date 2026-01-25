@@ -15,7 +15,7 @@ to apply the returned secrets into `os.environ` if they wish.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, List, Optional
+from typing import Dict, Iterable, Optional
 import os
 
 _DEFAULT_PATH = Path.home() / ".tickertape" / "secrets" / "HLdontShare.env"

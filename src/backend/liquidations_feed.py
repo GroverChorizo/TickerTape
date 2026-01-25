@@ -5,8 +5,8 @@
 - Export snapshot record dict suitable for Parquet/registry
 """
 from __future__ import annotations
-from typing import List, Dict, Any, Iterable, Optional
-from datetime import datetime, timezone, timedelta
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
 from collections import defaultdict, Counter
 import uuid
 import logging
