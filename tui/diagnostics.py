@@ -20,6 +20,13 @@ def _version(pkg: str) -> str:
         return "unknown"
 
 
+def _path_posix(p: Path | None) -> str | None:
+    if p is None:
+        return None
+    # normalize slashes for stable diagnostics across OS
+    return p.as_posix()
+
+
 def collect_diagnostics(config: TuiConfig, registry: DatasetRegistry) -> Dict[str, Any]:
     datasets = registry.list_datasets()
     dataset_counts = {name: len(meta.get("partitions", [])) for name, meta in datasets.items()}
@@ -28,11 +35,11 @@ def collect_diagnostics(config: TuiConfig, registry: DatasetRegistry) -> Dict[st
         "platform": platform.platform(),
         "textual": _version("textual"),
         "rich": _version("rich"),
-        "data_root": str(config.data_root),
-        "config_path": str(config.config_path),
+        "data_root": _path_posix(config.data_root),
+        "config_path": _path_posix(config.config_path),
         "mode": config.mode,
         "profile": config.profile,
-        "secrets_path": str(config.secrets_path) if config.secrets_path else None,
+        "secrets_path": _path_posix(config.secrets_path),
         "registry_exists": (config.data_root / "_registry.json").exists(),
         "dataset_counts": dataset_counts,
     }
