@@ -2,6 +2,18 @@
 
 This directory contains the production TUI for TickerTape (Textual-based, local-first).
 
+## Runtime Requirements
+
+- Python 3.10+
+- Local virtual environment recommended (conda or venv)
+
+## Setup
+
+```bash
+python -m pip install -U pip
+pip install -r requirements.txt
+```
+
 ## Run
 
 From the repository root:
@@ -28,3 +40,8 @@ If no backtest runner is configured, jobs are recorded as **blocked** with the e
 - Alerts are consumed via the backend alert notifier (default `127.0.0.1:8765`).
 
 TickerTape is research-only: no trading, no execution, no advice.
+
+## Troubleshooting
+
+- **Logger has no attribute `system`:** your Textual/Rich versions are mismatched. Reinstall with
+  `pip install -r requirements.txt` to apply the pinned ranges.
