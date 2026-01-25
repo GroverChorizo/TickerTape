@@ -1,0 +1,96 @@
+Screen {
+    background: #0a0e1a;
+    color: #d6dde6;
+}
+
+#title {
+    dock: top;
+    height: 3;
+    content-align: center middle;
+    background: #0d1117;
+    color: #79b4c4;
+    text-style: bold;
+}
+
+#body {
+    height: 1fr;
+}
+
+#left {
+    width: 24;
+    padding: 1;
+    border: tall #243044;
+}
+
+#center {
+    width: 1fr;
+    padding: 1;
+    border: tall #243044;
+}
+
+#right {
+    width: 32;
+    padding: 1;
+    border: tall #243044;
+}
+
+.section {
+    text-style: bold;
+    padding-bottom: 1;
+    color: #d6dde6;
+}
+
+.help {
+    color: #7a8797;
+}
+
+PanelBase {
+    border: tall #243044;
+    padding: 1;
+    margin-bottom: 1;
+    background: #0d1117;
+}
+
+WalletPanel {
+    border: tall #243044;
+    padding: 1;
+    margin-bottom: 1;
+    background: #0d1117;
+}
+
+WalletDetailPanel {
+    border: tall #243044;
+    padding: 1;
+    margin-bottom: 1;
+    background: #0d1117;
+}
+
+.dim {
+    color: #7a8797;
+}
+
+#footer {
+    dock: bottom;
+    height: 6;
+    border-top: tall #243044;
+    padding: 1;
+}
+
+#command {
+    width: 100%;
+}
+
+#status {
+    width: 100%;
+    padding-top: 1;
+    color: #7a8797;
+}
+
+#wizard {
+    padding: 1;
+    border: tall #243044;
+}
+
+#roadmap_body {
+    padding-top: 1;
+}

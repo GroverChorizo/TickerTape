@@ -1,0 +1,2162 @@
+# FtheVision_v1_5_5
+
+## v1_5_5 Split Notes (ADDED)
+- This file is a *verbatim partition* of the original provided documents.
+- All original content blocks are preserved word-for-word.
+- Any lines in this preface and the SOURCE separators are newly added for navigation only.
+- Core Values enforced everywhere:
+  - Data security first (local-first; exports local only).
+  - Precision in data, accuracy in action (no synthetic/modified data).
+  - Normal people, institutional-grade tools (beautiful responsive TUI).
+  - WE WILL NEVER GIVE FINANCIAL ADVICE AND NO DEFAULT TRADING ALGOS SHOULD EVER BE RUN IN LIVE ENVIRONMENTS. DO YOUR OWN RESEARCH.
+
+
+
+===== SOURCE: v2_theVision.txt (FRONTEND blocks) (verbatim blocks) =====
+
+## 2. When you open this terminal, what do you want to SEE immediately?
+(e.g., "BTC funding + whale flow + my watchlist" or "whatever's on fire right now")
+Grover's Answer: I want to see a dashboard with multiple data streams that configured upon startup based on the trader profile selected (DayTrader, LiquidationHunter, WhaleWatcher, FundingArbitrageur), 
+                with persistence to avoid starting over every time, while still maintaining customization options in a 'Settings' panel that the user can change when I want.
+                For setup make a manual or help page with a setup tutorial available to the user, prompt the user with options to choose during setup of the dashboard
+                (Whale feed, market stats, liquidation feed, funding rate feed, etc... )
+
+## 📊 DATA PRIORITY
+## 3. What do the different profile's dashboards contain?:
+
+### **LiquidationHunter Profile**
+
+ 
+## 4. Do you have a "watchlist" of specific coins, or do you scan everything?
+A) Fixed watchlist (BTC, ETH, SOL, HYPE, etc.)
+B) Scan all, filter by signals
+C) Both - watchlist + anomaly detection
+Grover's Answer: C) Both - watchlist + anomaly detection create a watchlist page with live price data for (BTCUSD, ETHUSD, SOLUSD, XRPUSD, HYPEUSD)
+and build out coin selection function in watchlist panel.
+
+## 8. Do you want persistent zones?
+(e.g., "alerts always bottom-right, main content left, watchlist right")
+Grover's Answer: yes, alerts in the bottom-right, panel menue on the left side, command/status bar at the bottom border, Title of panel top-center.
+
+## 🔔 ALERTS
+## 9. What should interrupt you / make noise?
+Grover's Answer: 
+ Whale trade above $500,000
+ Liquidation cascade starting
+ Funding rate extreme
+ Watchlist coin anomaly
+ HLP z-score threshold
+ Smart money signal
+ Custom conditions
+ all of these should be notification options in the settings menu. Some users may not want all of these notifications, some may want them to make noise, others may prefer text/pop ups.
+
+**Defining these events to implement alerts more accurately:**
+## **1. Whale trade above $500,000**
+## **2. Liquidation cascade** - https://papers.ssrn.com/sol3/Delivery.cfm/5611392.pdf?abstractid=5611392&mirid=1 - a chain reaction in leveraged financial markets—especially common in cryptocurrency—where the forced closure of leveraged positions triggers further price declines, which in turn cause more positions to be liquidated.  This creates a self-reinforcing downward spiral of selling pressure and increasing volatility.
+    Example: Liquidation Cascade Alert System in Python with Textual
+from textual.app import App, ComposeResult
+from textual.widgets import Label, Header, Footer
+from textual.containers import Vertical
+from textual.reactive import reactive
+import asyncio
+import random  # Simulate liquidation data
+
+class CascadeAlertApp(App):
+    CSS = """
+    #alert { color: red; background: white; padding: 2; }
+    #normal { color: green; }
+    """
+    
+    # Reactive attribute to track liquidation state
+    liquidation_volume = reactive(0.0)
+    alert_active = reactive(False)
+
+    def compose(self) -> ComposeResult:
+        yield Header()
+        yield Vertical(Label("Liquidation Cascade Monitor"), id="main")
+        yield Footer()
+
+        # Threshold for cascade alert (e.g., > $300M in 5s)
+        if volume > 300_000_000:
+            if not self.alert_active:
+                self.notify("🚨 LIQUIDATION CASCADE DETECTED!", severity="error")
+                self.alert_active = True
+            self.query_one("#main").border_title = "CASCADE ACTIVE"
+            self.query_one("#main").add_class("error")
+            self.query_one("Label").update(f"[bold red]ALERT: ${volume:,.0f} liquidated![/]")
+        else:
+            self.alert_active = False
+            self.query_one("#main").border_title = "Monitoring"
+            self.query_one("#main").remove_class("error")
+            self.query_one("Label").update(f"Normal: ${volume:,.0f} liquidated (5s)")
+
+if __name__ == "__main__":
+    app = CascadeAlertApp()
+    app.run()
+
+Explanation:
+Uses Textual for a terminal-based UI.
+reactive fields auto-update the UI.
+fetch_liquidation_volume() simulates data (replace with real API).
+check_liquidations() polls every 5 seconds.
+Remove Synthetic data calls and replace with the appropriate Hyperliquid API endpoints. If liquidation volume exceeds threshold → triggers notification and visual alert.
+    
+## **3. Funding rate extreme** - 
+## What Are Funding Rate Extremes?
+
+### On Hyperliquid:
+- Funding is paid **hourly**. 
+- Formula:  
+  `Funding Rate = Average Premium Index + clamp(0.000125 - Premium Index, -0.0005, 0.0005)`  
+  (Fixed interest rate = 0.01% per 8h → ~0.00125% per hour)
+- Capped at **±4% per hour** (extremely rare). 
+- **Positive rate**: Longs pay shorts → bullish bias. 
+- **Negative rate**: Shorts pay longs → bearish bias.
+
+Use the official **Hyperliquid Data Layer API** to fetch real-time funding rates and trigger alerts in your Textualize dashboard. 
+
+### Step 2: Integrate into Textual Alert System
+
+    ```python
+    from textual.app import App, ComposeResult
+    from textual.widgets import Label, Header, Footer
+    from textual.reactive import reactive
+
+    class FundingAlertApp(App):
+        CSS = """
+        #alert { color: red; background: white; padding: 2; }
+        #normal { color: green; }
+        """
+        
+        funding_rate = reactive(0.0)
+        alert_active = reactive(False)
+
+        def compose(self) -> ComposeResult:
+            yield Header()
+            yield Label("Funding Rate Monitor", id="status")
+            yield Footer()
+
+            if abs(self.funding_rate) > EXTREME_THRESHOLD:
+                if not self.alert_active:
+                    self.notify(f"🚨 EXTREME FUNDING: {self.funding_rate:+.4f}%", severity="error")
+                    self.alert_active = True
+                label.update(f"[bold red]ALERT: {self.funding_rate:+.4f}%[/]")
+            else:
+                self.alert_active = False
+                label.update(f"Normal: {self.funding_rate:+.4f}%")
+    ```
+
+
+## **4. Watchlist coin anomaly** - 
+## when we set this up, ask me for my watchlist, and add on an alert for altcoin anomalies (new coins building momentum)
+
+Use live endpoints to feed your **Textualize dashboard**:
+
+```python
+def detect_anomaly(data, history):
+    alerts = []
+
+    # Price spike (5m vs 1h MA)
+    short_ma = data["price"]
+    long_ma = sum(h["price"] for h in history[-12:]) / 12  # 1h
+    if abs(short_ma - long_ma) / long_ma > 0.05:
+        alerts.append("🚨 PRICE SPIKE")
+
+    # Volume surge
+    avg_volume = sum(h["volume"] for h in history[-12:]) / 12
+    if data["volume"] > 3 * avg_volume:
+        alerts.append("🚨 VOLUME SURGE")
+
+    # Funding extreme
+    if abs(data["funding_rate"]) > 0.0001:
+        alerts.append("🚨 EXTREME FUNDING")
+
+    # Liquidity drop
+    prev_bid, prev_ask = history[-1]["bid_depth"], history[-1]["ask_depth"]
+    if prev_bid and (abs(data["bid_depth"] - prev_bid) / prev_bid > 0.5):
+        alerts.append("🚨 BID LIQUIDITY DRAIN")
+    if prev_ask and (abs(data["ask_depth"] - prev_ask) / prev_ask > 0.5):
+        alerts.append("🚨 ASK LIQUIDITY DRAIN")
+
+    return alerts
+```
+
+### Thresholds (Based on Hyperliquid Data):
+| Z-Score | Interpretation |
+|--------|----------------|
+| **|z| > 2.0** | **Anomaly Alert**: Unusual funding pressure |
+| **|z| > 3.0** | **Extreme Alert**: High probability of reversal or squeeze |
+
+## **10. Alert delivery:**
+
+Grover's Answer: pop-ups in the bottom-right corner, color coded for each alert.
+
+## ***🎨 Visual & Design Questions***
+### ***Color Palette & Theme***
+
+Do you want a dark theme only (like the current #050a12), or support light mode too? 
+Grover: "dark themes only"
+What's your preferred accent color beyond the current bright cyan? (e.g., neon green for profits, warning orange, purple for AI signals?) 
+Grover: "Whale info-Cyan, neon green-Profits, Warnings-Orange, Liquidation-red, 
+I really like this theme, these colors would work great although, i would prefer the red background gradient to have the red towards the bottom and the majority dark gray: https://www.reddit.com/r/cyberDeck/comments/1q8dyks/cybrland_cyberpunk_theme_collection_15_themed/"
+
+Should we have preset themes (Dark Pro, Cyberpunk, Minimal, etc.) 
+Grover: "that users can switch between? Yes that would be fine, I noticed that is already integrated so keep it but make my theme, described above, default.
+
+## **Dashboard Priority & Layout**
+
+Which 3-4 panels are your "must-see" core (always visible)? 
+Grover: "reference: D:\Grover\Desktop\AlgoStuff\Data\HypeDataDog\Hyperliquid-Data-Layer-API\examples\22_hip3_dashboard.py - EACH PROFILE SHOULD DISPLAY SPECIFIC DATA PANELS RELATED TO THE PROFILE"
+For the others, should they be:
+Collapsible/expandable in place? 
+Grover: "yes, all users should be able to customize their dashboard with whatever stream available to them through the API by entering the command in the prompt, which will open the stream, there should be a keybinding to add the panel to the Dashboard, opening the editor commands and allowing the user to customize their dashboard. or if they choose, they could make their own profile from the template and import it to the app for their own personal use."
+Swappable tabs (current approach)? 
+Grover: "keep"
+Customizable grid (drag/drop, resize)? 
+Grover: "yes"
+Do you want a sidebar for quick access, or keep it all tabbed? 
+Grover: "build A responsive(clickable) sidebar, keep the key-bindings as-is"
+
+## **Data Visualization**
+
+Based on your TUI styling guide, the ML_WatchDog reference images, and best practices from institutional trading platforms, here's a complete visualization framework optimized for pattern recognition in a terminal interface.
+
+## 📊 **Visualization Matrix: What, Where, Why**
+
+| Data Type | Visualization | Location | Pattern Recognition Goal | Priority |
+|-----------|--------------|----------|-------------------------|----------|
+| **Price Action** | Sparklines | Market Stats, Watchlist | Trend direction, momentum shifts | MVP |
+| **Orderbook Depth** | Bid/Ask Bar Chart | Orderbook Panel | Support/resistance levels, liquidity walls | MVP |
+| **Liquidation Levels** | Progress Bars + Heatmap | Liquidation Panel | Cascade proximity, cluster detection | MVP |
+| **Funding Rates** | 2D Heatmap Grid | Funding Panel | Extreme positioning, mean reversion setups | MVP |
+| **Whale Flows** | Directional Flow Bars | Whale Panel | Accumulation/distribution patterns | MVP |
+| **Volume Profile** | Horizontal Histogram | Volume Panel | High-volume nodes, POC identification | Phase 2 |
+| **Sentiment Scores** | Gauge Charts + Trend | Sentiment Panel | Extreme readings, divergences | MVP |
+| **Volatility** | Mini Area Charts | Volatility Panel | Regime changes, breakout signals | Phase 2 |
+| **Correlations** | Matrix Heatmap | Correlation Panel | Pairs trading, risk management | Phase 3 |
+| **Trade Flow** | Time-series Flow Chart | Trade Flow Panel | Buy/sell pressure imbalance | Phase 2 |
+| **Backtest Results** | Equity Curve + DD Plot | Backtest Panel | Drawdown clusters, return distribution | MVP |
+| **Monte Carlo** | Fan Chart (P5/P50/P95) | Stress Test Panel | Outcome distribution, risk of ruin | MVP |
+
+## 🎯 **Detailed Visualization Specifications**
+
+### **1. Sparklines (Inline Mini-Charts)**
+
+**Where to Use:**
+```
+┌─ Market Stats ────────────────────────────────┐
+│ Asset    Price     24h Chg    7d Trend        │
+│ BTC      68,420    +2.3%   ⠀⠀⡀⠀⡀⢀⠀⡀⣀⣀⠀  ← Sparkline
+│ ETH       3,842    -1.2%   ⣀⠀⢀⠀⡀⠀⡀⠀⢀⠀⠀
+│ SOL         142    +5.7%   ⠀⠀⠀⠀⡀⢀⡀⣀⣄⣆⣇
+│ HYPE         32    +12%    ⠀⠀⠀⡀⢀⣀⣄⣆⣇⣧⣷
+└───────────────────────────────────────────────┘
+```
+
+**Best Libraries:**
+```python
+from rich.console import Console
+from rich.sparkline import Sparkline  # For sparklines
+
+# Or custom implementation:
+def create_sparkline(data: List[float], width: int = 20) -> str:
+    """Generate Unicode Braille sparkline"""
+    # Normalize to 0-7 range for Braille characters
+    normalized = [(x - min(data)) / (max(data) - min(data)) * 7 for x in data]
+    braille_base = 0x2800  # Base Braille Unicode
+    
+    sparkline = ""
+    for val in normalized[-width:]:
+        sparkline += chr(braille_base + int(val))
+    
+    return sparkline
+```
+
+#### A. Liquidation Distance
+```
+┌─ Liquidation Risk ────────────────────────────┐
+│ Asset    Current   Liq Price   Distance       │
+│ BTC-L    68,420    65,199   ████████░░ 4.7%  │
+│ ETH-S     3,842     4,012   ████████░░ 4.4%  │
+│ SOL-L       142       135   ██░░░░░░░░ 4.9%  │
+│ HYPE-L       32        28   ████░░░░░░ 12.5% │
+└───────────────────────────────────────────────┘
+```
+
+**Color Coding:**
+- **Green (████):** >10% away (safe)
+- **Yellow (████):** 5-10% (caution)
+- **Orange (████):** 3-5% (warning)
+- **Red (████):** <3% (danger, flashing)
+
+**Pattern Recognition:**
+- **Clustering:** Multiple positions near liquidation = cascade risk
+- **Outliers:** Single position far from liq = stable
+- **Trend:** Bars shrinking over time = positions getting riskier
+
+### **3. Bid/Ask Bar Charts (Orderbook Visualization)**
+
+**Two Approaches:**
+
+#### A. Traditional Depth Chart (Horizontal Bars)
+```
+┌─ BTC Orderbook Depth (Top 20) ────────────────┐
+│           BIDS          │         ASKS         │
+│ 68,450 ████████████ 12.5│ 68,460 ████████ 8.2 │
+│ 68,440 ██████████    9.8│ 68,470 ██████    6.1│
+│ 68,430 ████████      7.2│ 68,480 ████      3.9│
+│ 68,420 ██████        5.1│ 68,490 ████      3.2│
+│ 68,410 ████          3.0│ 68,500 ██████    5.8│← Wall
+│ 68,400 ███████       6.5│ 68,510 ████      3.1│
+└───────────────────────────────────────────────┘
+```
+
+**Color Coding:**
+- Bids: **Green gradient** (darker = larger size)
+- Asks: **Red gradient**
+- Large walls (>2x average): **Bright glow effect**
+
+#### B. Cumulative Volume Delta (CVD) Chart
+```
+┌─ Orderbook Imbalance (CVD) ───────────────────┐
+│ Price     Bid Vol    Ask Vol    Imbalance     │
+│           (cumulative)                         │
+│ 68,500              ██████████ 145 BTC →→→    │
+│ 68,490           ██████████    98 BTC  →→     │
+│ 68,480        █████████         67 BTC  →     │
+│ 68,470     ████████              42 BTC       │
+│ 68,460  ████                      12 BTC      │
+│ 68,450  ║  (current price)                    │
+│ 68,440  ████                     -15 BTC      │
+│ 68,430     ████████             -48 BTC  ←    │
+│ 68,420        █████████         -72 BTC  ←←   │
+└───────────────────────────────────────────────┘
+```
+
+**Pattern Recognition:**
+- **Buy Wall:** Large bid cluster at specific price = support
+- **Sell Wall:** Large ask cluster = resistance
+- **Imbalance:** CVD heavily one side = directional pressure
+- **Spoofing Detection:** Large wall that disappears suddenly
+
+### **4. Heatmaps (2D Color Grids)**
+
+#### A. Funding Rate Heatmap (Time x Asset)
+```
+┌─ Funding Rate History (% per 8h) ─────────────┐
+│ Asset │ Now │ -8h │-16h │-24h │-3d  │-7d     │
+│ BTC   │🟢0.01│🟢0.02│🟢0.01│🟡0.05│🟢0.02│🟢0.01│
+│ ETH   │🟢0.02│🟢0.01│🟡0.06│🟢0.03│🟢0.02│🟢0.01│
+│ SOL   │🔴-0.15│🔴-0.12│🔴-0.18│🟡-0.08│🟢0.01│🟢0.02│
+│ HYPE  │🔴-0.22│🔴-0.20│🔴-0.25│🔴-0.18│🔴-0.15│🟡-0.08│
+│ MATIC │🟢0.03│🟢0.02│🟢0.01│🟢0.02│🟢0.03│🟢0.02│
+└───────────────────────────────────────────────┘
+
+**Color Scale:**
+- **Green:** -0.05% to +0.05% (neutral)
+- **Yellow:** ±0.05% to ±0.10% (elevated)
+- **Orange:** ±0.10% to ±0.15% (high)
+- **Red:** >±0.15% (extreme, mean reversion opportunity)
+
+**Alternative ASCII Version:**
+```
+┌─ Funding Rate Heatmap (scaled) ───────────────┐
+│       │ -8h │-16h │-24h │-3d  │-7d  │ 7d Avg │
+│ BTC   │  ░  │  ░  │  ▒  │  ░  │  ░  │  +0.02%│
+│ ETH   │  ░  │  ▒  │  ░  │  ░  │  ░  │  +0.02%│
+│ SOL   │  █  │  █  │  ▓  │  ▒  │  ░  │  -0.10%│
+│ HYPE  │  █  │  █  │  █  │  █  │  ▓  │  -0.18%│← Extreme
+└───────────────────────────────────────────────┘
+░ = Normal  ▒ = Elevated  ▓ = High  █ = Extreme
+```
+
+#### B. Liquidation Heatmap (Price x Time)
+```
+┌─ Liquidation Clusters (Last 24h) ─────────────┐
+│ Price  │ 0-4h│ 4-8h│ 8-12h│12-16h│16-20h│20-24h│
+│ 69,000 │  ░  │  ░  │  ░   │  ░   │  ░   │  ░   │
+│ 68,500 │  ▒  │  ░  │  ▒   │  ░   │  ░   │  ░   │
+│ 68,000 │  █  │  ▓  │  █   │  ▒   │  ░   │  ░   │← Cascade
+│ 67,500 │  ▒  │  ▒  │  ░   │  ░   │  ░   │  ░   │
+│ 67,000 │  ░  │  ░  │  ░   │  ░   │  ░   │  ░   │
+└───────────────────────────────────────────────┘
+```
+
+### **5. Directional Flow Charts (Whale/Volume Analysis)**
+
+**Enhancements:**
+- **Arrow density:** More arrows = higher conviction
+- **Bar thickness:** Scaled by absolute size
+- **Color intensity:** Brighter = more recent activity
+- **Magnitude markers:** Use `║` for every $50M increment
+
+**Key Levels:**
+- **POC (Point of Control):** Highest volume node = equilibrium price
+- **VAH (Value Area High):** Top of 70% volume range
+- **VAL (Value Area Low):** Bottom of 70% volume range
+
+### **7. Sentiment Gauge Charts**
+
+**Color Zones:**
+- **-100 to -50:** 🔴 Extreme Fear (contrarian buy)
+- **-50 to -20:** 🟠 Fear
+- **-20 to +20:** ⚪ Neutral
+- **+20 to +50:** 🟡 Greed
+- **+50 to +100:** 🔴 Extreme Greed (contrarian sell)
+
+### **8. Volatility Visualization**
+
+```
+┌─ Realized Volatility (30d) ───────────────────┐
+│ Asset  Current  Regime   30d Chart            │
+│ BTC      45%    ▲High   ⣀⣀⡀⢀⠀⡀⠀⡀⣀⣄⣆⣇⣧ ← Rising
+│ ETH      52%    ▲High   ⡀⢀⣀⣄⣆⣇⣧⣷⣿⣿⣿⣿⣿
+│ SOL      78%    ▲▲Extr  ⠀⠀⠀⡀⣀⣄⣆⣇⣧⣷⣿⣿⣿⣿
+│ HYPE     95%    ▲▲▲Extr ⣀⣄⣆⣇⣧⣷⣿⣿⣿⣿⣿⣿⣿⣿ ← Parabolic
+└───────────────────────────────────────────────┘
+```
+
+### **9. Correlation Matrix Heatmap**
+
+**Color Coding:**
+- **Dark Green:** 0.8-1.0 (high positive correlation)
+- **Light Green:** 0.5-0.8
+- **White:** 0.2-0.5
+- **Light Red:** -0.5 to -0.8
+- **Dark Red:** -0.8 to -1.0 (inverse correlation)
+
+### **10. Backtest Visualization Suite**
+
+### **Color Harmony Rules**
+
+2. **Intensity Encoding:**
+   - Brighter = More recent/important
+   - Darker = Older/less significant
+   - Flashing = Alert condition
+
+3. **Accent Colors (Sparingly):**
+   - Cyan: Headers, important labels
+   - Magenta: Coin tickers, identifiers
+   - Purple: AI insights, special features
+
+4. **Background Contrast:**
+   - Very dark background (#0a0e1a)
+   - Panel background slightly lighter (#0d1117)
+   - Data on lighter gray (#1c2128)
+   - Text on white (#ffffff)
+
+### **Layout Flow**
+
+```
+┌─────────────────────────────────────────────┐
+│ Top: High-level overview (Market Stats)     │← Sparklines
+├─────────────────────────────────────────────┤
+│ Left: Sentiment & Flow Analysis             │← Gauges, Bars
+│ Right: Orderbook & Liquidity                │← Depth Charts
+├─────────────────────────────────────────────┤
+│ Bottom: Detail panels (Whales, Liqs, etc.)  │← Tables, Heatmaps
+└─────────────────────────────────────────────┘
+```
+
+**Information Hierarchy:**
+1. **Glanceable (Sparklines, Gauges):** Quick trend check
+2. **Scannable (Tables, Bars):** Identify anomalies
+3. **Detailed (Heatmaps, Charts):** Deep pattern analysis
+
+### **Phase 1: MVP Visualizations**
+1. ✅ Sparklines (price trends)
+2. ✅ Progress bars (liquidation distance)
+3. ✅ Bid/ask bar charts (orderbook)
+4. ✅ Funding rate heatmap
+5. ✅ Whale flow directional bars
+6. ✅ Sentiment gauges
+
+### **Phase 2: Advanced Visualizations**
+7. Volume profile histogram
+8. CVD orderbook imbalance
+9. Volatility regime charts
+10. Backtest equity curves
+
+## 📚 **Best Libraries for TUI Visualization**
+
+```python
+# Core TUI Framework
+from textual import App, Containers, Widget
+from textual.widgets import DataTable, Static
+
+# Visualization Components
+from rich.console import Console
+from rich.table import Table
+from rich.progress import Progress, BarColumn
+from rich.live import Live
+
+# Custom ASCII Charts (recommended)
+from plotille import Figure, histogram  # Terminal-native plotting
+
+**Why Plotille?**
+- Pure ASCII/Unicode rendering
+- No image conversion needed
+- Directly integrates with Textual
+- Fast updates for real-time data
+
+## 🎯 **Pattern Recognition Assisted by Visualization**
+
+### **What Each Visualization Helps Detect:**
+
+| Visualization | Patterns Detected | Trading Signal |
+|--------------|-------------------|----------------|
+| **Sparklines** | Trend reversals, breakouts | Entry timing |
+| **Orderbook Bars** | Support/resistance, walls | Limit order placement |
+| **Liquidation Heatmap** | Cascade clusters | Risk management |
+| **Funding Heatmap** | Extreme positioning | Mean reversion setups |
+| **Flow Charts** | Accumulation/distribution | Smart money following |
+| **Volume Profile** | Value areas, POC | Support/resistance levels |
+| **Sentiment Gauges** | Contrarian extremes | Reversal signals |
+| **Volatility Charts** | Regime changes | Strategy selection |
+| **Correlation Matrix** | Diversification failure | Portfolio risk |
+| **Equity Curves** | Strategy degradation | Walk-forward validation |
+
+### **Must-Have for MVP:**
+1. **Sparklines everywhere** - Most information-dense, minimal space
+2. **Orderbook depth bars** - Critical for execution
+3. **Funding rate heatmap** - Core alpha source for perps
+4. **Whale flow bars** - Smart money tracking
+5. **Liquidation progress bars** - Risk awareness
+
+**This visualization framework ensures:**
+- ✅ **Information density** without clutter
+- ✅ **Pattern recognition** at a glance
+- ✅ **Visual harmony** (cyberpunk aesthetic)
+- ✅ **Actionable insights** from data
+- ✅ **Scalable architecture** (MVP → Pro features)
+
+The key is to **layer visualizations by priority**: sparklines for trends, bars for magnitude, heatmaps for multi-dimensional patterns. This creates a natural visual hierarchy that guides the eye from overview → detail → action. 🚀
+Grover: "We also want Orderbooks, take some time here to study OpenBB (http://github.com/OpenBB-finance/OpenBB) and what they provide, remember we are building a top tier quant trader dashboard. the more data and visualization abilities, the better. Make sure our MVP is functional first though. once we have the core functions down UX Design should be a breeze. The backend has to be solid so the front end can shine"
+
+## **User Roles / Customization Approach**
+
+## 📐 **Responsive Panel Behavior**
+
+The terminal adapts intelligently based on available screen real estate, prioritizing information density while maintaining usability.
+
+```
+┌─────────────────────────────────────────────────────────┐
+│ ULTRA-WIDE (>160 cols): Full grid, all panels visible   │
+│ WIDE (120-160 cols):    4-panel grid, sidebar visible   │
+│ STANDARD (80-120 cols): 2x2 grid, collapsible sidebar   │
+│ NARROW (60-80 cols):    2x1 grid, sidebar icons only    │
+│ COMPACT (<60 cols):     Single column stack             │
+└─────────────────────────────────────────────────────────┘
+```
+
+### **Layout Transitions by Screen Size**
+
+#### **1. Ultra-Wide Mode (>160 columns)**
+```
+┌──┬────────────────────────────────────────────────────────────┐
+│S │  ┌─────────┬─────────┬─────────┐  ┌─────────┬─────────┐  │
+│I │  │ Sent    │ Whales  │ Funding │  │ OB      │ Liqs    │  │
+│D │  │ Score   │ Flow    │ Heatmap │  │ Depth   │ Cascade │  │
+│E │  └─────────┴─────────┴─────────┘  └─────────┴─────────┘  │
+│B │  ┌─────────────────────────────┐  ┌─────────────────────┐ │
+│A │  │ Backtest Results            │  │ Monte Carlo         │ │
+│R │  │ Equity + Drawdown           │  │ Fan Chart           │ │
+│  │  └─────────────────────────────┘  └─────────────────────┘ │
+└──┴────────────────────────────────────────────────────────────┘
+```
+**Behavior:**
+- All panels visible simultaneously
+- Maximum information density
+- Sidebar fully expanded with labels
+- No scrolling required
+
+#### **2. Wide Mode (120-160 columns)**
+```
+┌──┬──────────────────────────────────────────────────┐
+│S │  ┌────────────┬────────────┐  ┌────────────┐    │
+│I │  │ Sentiment  │ Whales     │  │ Orderbook  │    │
+│D │  │ + Flow     │ + Funding  │  │ Depth      │    │
+│E │  └────────────┴────────────┘  └────────────┘    │
+│B │  ┌────────────┬────────────────────────────┐    │
+│A │  │ Liquidation│ Backtest Results           │    │
+│R │  │ Cascade    │ (Equity + Stats)           │    │
+└──┴──────────────────────────────────────────────────┘
+```
+**Behavior:**
+- 4-6 panels in grid layout
+- Sidebar visible with full labels
+- Related panels may be combined (e.g., Sentiment + Flow)
+- Horizontal scroll for wide tables only
+
+#### **3. Standard Mode (80-120 columns)**
+```
+┌─┬────────────────────────────────────────┐
+│S│  ┌─────────────┬─────────────┐        │
+│I│  │ Sentiment   │ Orderbook   │        │
+│D│  │ Score       │ Depth       │        │
+│E│  └─────────────┴─────────────┘        │
+│ │  ┌─────────────┬─────────────┐        │
+│ │  │ Whales      │ Liquidations│        │
+│ │  │ Flow        │ Cascade     │        │
+└─┴────────────────────────────────────────┘
+```
+**Behavior:**
+- 2x2 grid layout (4 panels visible)
+- Sidebar collapses to icons only (hover for labels)
+- Tab bar at bottom shows hidden panels
+- Click panel header for fullscreen mode
+
+**Panel Priority (which stay visible):**
+1. **Critical:** Orderbook, Liquidations (always visible)
+2. **High:** Sentiment, Whales, Funding
+3. **Medium:** Backtest, Flow Analysis
+4. **Low:** AI Chat, Settings (hidden, accessible via sidebar/tabs)
+
+#### **4. Narrow Mode (60-80 columns)**
+```
+┌┬────────────────────────────────┐
+││  ┌──────────────────────────┐  │
+││  │ Sentiment Score          │  │
+││  │ (Compact Table)          │  │
+││  └──────────────────────────┘  │
+││  ┌──────────────────────────┐  │
+││  │ Orderbook Depth          │  │
+││  │ (Top 10 levels)          │  │
+││  └──────────────────────────┘  │
+│└────────────────────────────────┘
+│ Tabs: [Whales] [Liqs] [Fund] [+]
+```
+**Behavior:**
+- Single column, 2 panels stacked
+- Sidebar becomes icon-only strip (left edge)
+- Bottom tab bar for switching panels
+- Tables truncate columns (show only essential data)
+- Horizontal scroll enabled for wide content
+
+#### **5. Compact Mode (<60 columns)**
+```
+┌────────────────────────────────┐
+│ HL_Terminal  [≡]          [●] │← Minimal header
+├────────────────────────────────┤
+│ ┌──────────────────────────┐  │
+│ │ Active Panel:            │  │
+│ │ SENTIMENT SCORE          │  │
+│ │                          │  │
+│ │ BTC  Bullish    +86     │  │
+│ │ ETH  Bullish    +58     │  │
+│ │ SOL  Bearish    -80     │  │
+│ │                          │  │
+│ │ (scroll for more)        │  │
+│ └──────────────────────────┘  │
+├────────────────────────────────┤
+│ [<] [Sent] [OB] [Whales] [>]  │← Horizontal scroll tabs
+└────────────────────────────────┘
+```
+**Behavior:**
+- **Single panel only** (fullscreen mode)
+- Hamburger menu (≡) for navigation
+- Horizontal swipe gesture to switch panels
+- All non-essential UI hidden
+- Data tables use abbreviated headers
+- Sparklines replace detailed charts
+
+**Mobile-Optimized Features:**
+- Touch-friendly spacing (if running in web terminal)
+- Swipe left/right to change panels
+- Tap header to access quick filters
+- Long-press for context menu
+
+### **Intelligent Panel Stacking**
+
+When stacking vertically, panels follow this priority order:
+
+```
+Priority 1 (Always visible):
+  ├─ Orderbook Depth
+  └─ Liquidation Cascade
+
+Priority 4 (Menu-accessible):
+  ├─ AI Assistant
+  ├─ Settings
+  └─ Help
+```
+
+### **Fullscreen Panel Mode**
+
+**Trigger:**
+- Press `F` while panel is focused
+- Click maximize icon in panel header
+- Double-click panel title bar
+
+**Behavior:**
+```
+┌─ FULLSCREEN MODE ─────────────────────────────────────┐
+│ Orderbook Depth - BTC-PERP              [Restore] [X] │
+├───────────────────────────────────────────────────────┤
+│                                                        │
+│  Enhanced view with MORE data:                        │
+│  - Top 50 levels (vs 20 in normal mode)              │
+│  - Larger visualizations                              │
+│  - Additional columns (timestamp, order count)        │
+│  - Zoom controls for charts                           │
+│                                                        │
+│  ┌──────────────────────────────────────────────┐    │
+│  │  BIDS          │         ASKS                │    │
+│  │  ████████ 12.5 │ 8.2  ████████               │    │
+│  │  ████████  9.8 │ 6.1  ██████                 │    │
+│  │  ... (showing 50 levels)                     │    │
+│  └──────────────────────────────────────────────┘    │
+│                                                        │
+│  [1-10] [11-20] [21-30] ... [41-50]   Depth: [25]   │← Level selector
+└───────────────────────────────────────────────────────┘
+```
+
+**Exit:**
+- Press `Esc` or `F` again
+- Click `[Restore]` button
+- Click outside panel (if modal overlay)
+
+**Fullscreen-Enhanced Panels:**
+- **Orderbook:** Show 50+ levels, cumulative volume, trade history
+- **Backtest:** Full equity curve, all metrics, trade journal
+- **Heatmaps:** Larger grid, more time periods, zoom controls
+- **Charts:** Interactive controls (pan, zoom, crosshair)
+
+**When to Enable:**
+- Terminal width < content width
+- User manually toggles horizontal layout
+- Wide tables with 10+ columns
+
+**Implementation:**
+```
+Normal (fits screen):
+┌─ Whale Tracker ────────────────────────────────┐
+│ Time   Asset  Size      Type   Price    P&L   │
+│ 14:45  BTC    1.2M     Sell   68,420   -122.27│
+└────────────────────────────────────────────────┘
+
+Narrow (requires scroll):
+┌─ Whale Tracker ───────────[◄──scroll──►]──────┐
+│ Time  Asset Size  ║ Type  Price  P&L          │
+│ 14:45 BTC   1.2M ║ Sell  68,420 -122.27       │
+└────────────────────║───────────────────────────┘
+                    └─ Scroll indicator
+```
+
+**Scroll Indicators:**
+- `[◄──scroll──►]` in panel header
+- Column separator `║` shows scroll position
+- Arrow keys or mouse wheel to scroll
+- Auto-scroll to most important columns
+
+### **Multi-Window/Detached Panel Support**
+
+**Concept:** Power users with multiple monitors can detach panels into separate terminal windows.
+
+**Implementation:**
+```bash
+# Terminal 1 (Main Dashboard)
+$ hlterm --main
+
+# Terminal 2 (Detached Orderbook)
+$ hlterm --panel orderbook --follow btc
+
+# Terminal 3 (Detached Whale Feed)
+$ hlterm --panel whales --fullscreen
+```
+
+**Behavior:**
+- Panels communicate via IPC (shared memory or Redis)
+- Data synced in real-time across windows
+- Each window maintains own layout state
+- Close detached window → panel returns to main
+
+**Use Cases:**
+- **Multi-Monitor Setup:** Main dashboard + dedicated orderbook screen
+- **Focus Mode:** Single panel fullscreen on secondary display
+- **Recording/Streaming:** Detach specific panel for screen capture
+
+NEW TRADE APPEARS:
+┌─ Whale Tracker ────────────────────────────┐
+│ 14:46  SOL    2.5M  Sell   142    -88.92  │← FLASH (green glow)
+│ 14:45  BTC    1.2M  Sell   68,420  -122.27│
+│ 14:44  ETH    850K  Buy    3,842   +45.18 │
+└────────────────────────────────────────────┘
+
+**Animation Sequence:**
+```python
+# Textual implementation
+def on_new_whale_trade(self, trade):
+    row = self.create_row(trade)
+    
+    # Insert at top with highlight
+    row.add_class("pulse-green")  # CSS animation
+    self.table.add_row(row, key=trade.id)
+    
+    # Remove highlight after 500ms
+    self.set_timer(0.5, lambda: row.remove_class("pulse-green"))
+```
+
+**CSS Animation:**
+```css
+/* Pulse effect for new rows */
+.pulse-green {
+    background: $success 50%;  /* Semi-transparent green */
+    animate: pulse 500ms ease-out;
+}
+
+**Color Coding:**
+- **Green pulse:** Buy orders, positive events
+- **Red pulse:** Sell orders, liquidations
+- **Cyan pulse:** Important system events
+- **Orange pulse:** Warning conditions
+
+**Behavior:**
+```
+LIQUIDATION CASCADE DETECTED:
+┌─ Liquidation Feed ─────────────────────────┐
+│ ⚠️ CASCADE ALERT ⚠️                        │← Fade in from top
+│ 14:47  BTC  $12.5M  68,000  ████ Cascade  │← Opacity 0 → 100%
+│ 14:47  BTC   $8.2M  67,850  ███  Cascade  │
+│ 14:47  BTC   $5.1M  67,700  ██   Cascade  │
+│ ────────────────────────────────────────── │
+│ 14:45  ETH   $2.1M   3,800  ▌    Single   │
+└────────────────────────────────────────────┘
+```
+
+**Animation Timing:**
+- **0ms:** Cascade alert banner appears (instant)
+- **0-100ms:** First liquidation fades in
+- **100-200ms:** Second liquidation fades in
+- **200-300ms:** Third liquidation fades in
+- **500ms:** All opacity at 100%
+
+**Why Fade-In?**
+- **Reduces jarring jumps** when multiple items appear
+- **Draws attention** to new critical events
+- **Creates visual hierarchy** (newer = more important)
+
+#### **3. Alert Highlights (Extreme Values)**
+
+**Trigger Conditions:**
+```python
+ALERT_THRESHOLDS = {
+    'funding_rate': {'extreme': 0.15, 'high': 0.10},     # ±15% = extreme
+    'liquidation_size': {'whale': 5_000_000, 'mega': 10_000_000},
+    'price_change': {'sharp': 0.05, 'crash': 0.10},      # 5% in 1 min
+    'orderbook_imbalance': {'skewed': 0.70, 'extreme': 0.85},
+    'sentiment_score': {'extreme': 80, 'high': 60},
+}
+```
+
+**Flash Animation:**
+```css
+.alert-extreme {
+    background: $danger;
+    color: $background;
+    text-style: bold reverse;
+    animate: flash-alert 500ms ease-in-out infinite;
+}
+
+@keyframes flash-alert {
+    0%   { opacity: 100%; }
+    50%  { opacity: 40%; }
+    100% { opacity: 100%; }
+}
+```
+
+**Sound Alerts (Optional):**
+- **High:** Single beep (440 Hz, 100ms)
+- **Extreme:** Triple beep (880 Hz, 300ms)
+- User can disable in settings
+
+Frame 2 (50ms):
+│ BTC   68,435  │← Intermediate value (morphing)
+         ▲▲▲    ← Green up arrows appear
+
+```css
+/* Sidebar items */
+.sidebar-item:hover {
+    background: $surface-variant;
+    border-left: solid thick $cyan;
+    transition: all 150ms ease-in;
+}
+
+/* Table rows */
+DataTable > .datatable--row:hover {
+    background: $surface-variant;
+    cursor: pointer;
+}
+
+**Active Panel Border:**
+```
+UNFOCUSED:
+┌─ Whale Tracker ────────────────────────────┐
+│ 14:45  BTC    1.2M  Sell   68,420  -122.27│
+└────────────────────────────────────────────┘
+
+**CSS:**
+```css
+Container:focus-within {
+    border: heavy $cyan;  /* Thicker cyan border */
+}
+```
+
+**Multi-Select in Tables:**
+```
+┌─ Trade Journal ────────────────────────────┐
+│ ☑ Time   Asset  Type   P&L    Duration    │← Header checkbox
+├────────────────────────────────────────────┤
+│ ☑ 14:45  BTC    Long   +$450  2h 15m      │← Selected (green bg)
+│ ☐ 14:30  ETH    Short  -$120  45m         │
+│ ☑ 14:15  SOL    Long   +$890  6h 30m      │← Selected
+│ ☐ 14:00  HYPE   Long   +$125  1h 05m      │
+└────────────────────────────────────────────┘
+
+#### **Contextual Tooltips**
+
+**Implementation:**
+```python
+class FundingRateCell(Static):
+    def on_mouse_move(self, event):
+        if self.is_extreme():
+            tooltip = Tooltip(
+                "Extreme negative = Shorts crowded\n"
+                "Potential mean reversion opportunity"
+            )
+            self.app.show_tooltip(tooltip, position=event.position)
+```
+
+#### **Mode 1: Comfortable (Default)**
+
+**Pros:**
+- 2x more data on screen
+- Professional "trading terminal" aesthetic
+- Faster information scanning for experienced users
+
+**Keyboard Shortcut:**
+- Press `D` to toggle density mode
+- Shows notification: `[Compact Mode ON]` or `[Comfortable Mode ON]`
+
+**Persistent:**
+- Setting saved to user profile
+- Applies globally to all panels
+- Can override per-panel if needed
+
+**Column Manager (Ctrl+H):**
+```
+┌─ Customize Whale Tracker Columns ─────────┐
+│                                            │
+│  Visible Columns:                          │
+│  ☑ Timestamp                               │
+│  ☑ Asset                                   │
+│  ☑ Size (USD)                              │
+│  ☑ Type (Buy/Sell)                         │
+│  ☑ Price                                   │
+│  ☐ Leverage                                │← Hidden
+│  ☐ Wallet Address                          │← Hidden
+│  ☐ Exchange                                │← Hidden
+│  ☑ P&L                                     │
+│                                            │
+│  [Reset to Defaults]  [Apply]  [Cancel]   │
+└────────────────────────────────────────────┘
+```
+
+**Behavior:**
+- Drag to reorder columns
+- Click checkbox to show/hide
+- Changes apply immediately to panel
+- Save as default for future sessions
+
+**Appearance (Modal Overlay):**
+```
+┌─ MAIN DASHBOARD ──────────────────────────────────────┐
+│                                                        │
+│   (Dashboard panels dimmed 50% opacity)               │
+│                                                        │
+│   ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓  │
+│   ┃ COMMAND MODE                                  ┃  │
+│   ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫  │
+│   ┃ ▶ /whales btc|                                ┃  │← User typing
+│   ┣━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┫  │
+│   ┃ Suggestions:                                  ┃  │
+│   ┃   /whales btc --min 100k                     ┃  │
+│   ┃   /whales btc --timeframe 1h                 ┃  │
+│   ┃   /whales [symbol] [options]                 ┃  │
+│   ┃                                               ┃  │
+│   ┃ Recent Commands:                             ┃  │
+│   ┃   /backtest run --data btc_4h.csv            ┃  │
+│   ┃   /funding sol eth matic                     ┃  │
+│   ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛  │
+│                                                        │
+│   ↑↓ Navigate  Tab Autocomplete  Enter Submit  Esc Cancel
+└────────────────────────────────────────────────────────┘
+```
+
+## 🎨 **Putting It All Together: Responsive + Animated + Dense**
+
+### **Example: Whale Trade Appears During Liquidation Cascade**
+
+```
+T=0ms: Normal state (Comfortable mode, Wide layout)
+┌──┬──────────────────────────┬──────────────────────────┐
+│S │ ┌─ Whales ──────────────┐│┌─ Liquidations ─────────┐│
+│I │ │ 14:45 BTC 1.2M Sell   ││││ 14:40 ETH 2.1M 3,800  │││
+│D │ └───────────────────────┘│└─────────────────────────┘│
+└──┴──────────────────────────┴──────────────────────────┘
+
+### **Responsive Behavior**
+- [ ] Breakpoint system (5 screen sizes)
+- [ ] Panel priority ordering
+- [ ] Intelligent vertical stacking
+- [ ] Horizontal scroll for wide tables
+- [ ] Fullscreen mode (F key)
+- [ ] Detached panel support (multi-window)
+
+### **Information Density**
+- [ ] Comfortable mode (default)
+- [ ] Compact mode toggle (D key)
+- [ ] Column visibility manager (Ctrl+H)
+- [ ] Dynamic column hiding (narrow screens)
+- [ ] Preset layouts (Minimal/Standard/Full)
+
+### **Command Interface**
+- [ ] Modal command palette (/ or Ctrl+K)
+- [ ] Tab autocomplete
+- [ ] Syntax highlighting
+- [ ] Command history (Up/Down)
+- [ ] Inline help (/command ?)
+- [ ] Fuzzy matching
+
+**This design creates a terminal that feels alive, responsive, and intelligent—optimized for serious quants who demand maximum information density without sacrificing usability.** 🚀
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    MAIN DASHBOARD AREA                          │
+│                                                                  │
+│  (Panels with live data streaming)                              │
+│                                                                  │
+├─────────────────────────────────────────────────────────────────┤
+│ ◉ Live │ API: ✓ 45ms │ WS: ⚡3 │ Last: 0.2s │ ⬇ 1.2MB │ ⚠ 2  │← Status Bar
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Color Coding:**
+- **Green ✓:** <100ms (excellent)
+- **Yellow ⚠:** 100-500ms (acceptable)
+- **Orange ⚠:** 500-1000ms (slow)
+- **Red ✗:** >1000ms or errors
+
+**Active Streams:**
+- Whale trades
+- Liquidations
+- Funding rate updates
+- Orderbook snapshots (L2)
+- User-specific alerts
+
+**Auto-refresh on click:** Forces data refresh across all panels
+
+#### **6. Alert Counter**
+```
+⚠ 2    - 2 unread alerts (yellow badge)
+⚠ 5+   - 5+ alerts (red badge, flashing)
+✓      - No alerts (green checkmark)
+```
+
+**Click Behavior:** Opens alert sidebar
+```
+┌─ Active Alerts ────────────────────────────┐
+│ ⚠ 14:47  Liquidation cascade on BTC       │
+│ ⚠ 14:45  Whale trade: $2.5M SOL sell      │
+│                                             │
+│ [Clear All] [Settings] [Close]             │
+└─────────────────────────────────────────────┘
+```
+
+**Color:**
+- Progress fill: **Cyan** (brand color)
+- Background: **Dark gray**
+- Text: **White**
+
+### **Visual Markers for Quick Recognition**
+
+#### **Liquidation Severity Markers**
+
+```
+Liquidation         Symbol      Color       Meaning
+───────────────────────────────────────────────────
+Single (<$1M)       ▌           Yellow      Normal
+Cluster ($1M-$5M)   ███         Orange      Cascade forming
+Cascade (>$5M)      █████       Red Flash   Major event
+```
+
+**Cascade Detection Visual:**
+```
+┌─ Liquidation Feed ─────────────────────────┐
+│ ⚠️  CASCADE DETECTED ⚠️                    │← Red banner
+│ 14:47  BTC  $12.5M  68,000  █████████     │← Flashing
+│ 14:47  BTC   $8.2M  67,850  ███████       │
+│ 14:47  BTC   $5.1M  67,700  █████         │
+│ ────────────────────────────────────────── │
+│ Total: $25.8M liquidated in 3 minutes     │
+└────────────────────────────────────────────┘
+```
+
+#### **Alert Priority Icons**
+
+```
+Priority    Icon    Color       Use Case
+─────────────────────────────────────────────
+Info        ℹ️      Cyan        FYI, no action needed
+Success     ✓       Green       Trade executed
+Warning     ⚠       Yellow      Elevated risk
+Critical    ⛔      Red         Immediate attention
+Urgent      🚨      Red Flash   Stop/emergency
+```
+
+**Panel Border Styles:**
+
+#### **Standard Panel (Default)**
+```css
+/* Textual CSS */
+Container {
+    border: solid $cyan;
+    border-title-align: left;
+    corner-radius: 1;  /* Subtle rounding */
+}
+```
+
+**Visual:**
+```
+┌─ Panel Title ──────────────────┐  BEFORE (sharp)
+│ Content here                    │
+└─────────────────────────────────┘
+
+╭─ Panel Title ──────────────────╮  AFTER (beveled)
+│ Content here                    │
+╰─────────────────────────────────╯
+```
+
+#### **Focused Panel (Active State)**
+```css
+Container:focus-within {
+    border: heavy $cyan;
+    corner-radius: 2;  /* More pronounced */
+}
+```
+
+**Visual:**
+```
+╔═ Active Panel ══════════════════╗  Heavy border + larger radius
+║ Content here                     ║
+╚══════════════════════════════════╝
+```
+
+#### **Alert Panel (Critical State)**
+```css
+.alert-panel {
+    border: solid $danger;
+    corner-radius: 1;
+    background: $danger 10%;  /* Subtle red tint */
+}
+```
+
+**Visual:**
+```
+╭─⚠️ Alert ─────────────────────╮  Red border + glow
+│ Cascade detected!             │
+╰───────────────────────────────╯
+```
+
+**Design Philosophy:**
+- **Tight where it matters:** Dense tables, compact metrics
+- **Breathing room for visuals:** Charts, graphs, key insights
+- **Rhythm and alignment:** Consistent spacing creates flow
+
+```python
+# Textual spacing units
+SPACING = {
+    'tight':      0,  # No padding (dense tables)
+    'compact':    1,  # 1 cell padding (default)
+    'comfortable': 2,  # 2 cells padding (focused panels)
+    'spacious':   3,  # 3 cells padding (headers, alerts)
+}
+```
+
+**Application:**
+
+**1. Dense Tables (Compact Mode)**
+```
+┌─ Whale Tracker ────────────────┐
+│Time  Asset Size    Type  P&L   │← No padding
+│14:47 BTC   1.2M   Sell  -122.27│
+│14:45 ETH   850K   Buy   +45.18 │
+│14:40 SOL   2.5M   Sell  -88.92 │
+└────────────────────────────────┘
+```
+
+**2. Comfortable Panels (Default Mode)**
+```
+┌─ Whale Tracker ────────────────┐
+│                                 │← 1 cell top padding
+│ Time   Asset  Size   Type  P&L │
+│                                 │
+│ 14:47  BTC    1.2M  Sell  -122 │
+│ 14:45  ETH    850K  Buy   +45  │
+│ 14:40  SOL    2.5M  Sell  -88  │
+│                                 │← 1 cell bottom padding
+└─────────────────────────────────┘
+```
+
+**3. Focused Panels (Charts/Visuals)**
+```
+┌─ BTC Orderbook Depth ──────────┐
+│                                 │
+│                                 │← 2 cells top
+│      BIDS    │    ASKS          │
+│   ████████ 12.5 │ 8.2 ████████ │
+│   ██████    9.8 │ 6.1 ██████   │
+│   ████      7.2 │ 3.9 ████     │
+│                                 │
+│                                 │← 2 cells bottom
+└─────────────────────────────────┘
+```
+
+```css
+/* Subtle separator */
+.section-divider {
+    height: 1;
+    background: $surface-variant;
+    opacity: 30%;
+}
+```
+
+**Visual:**
+```
+┌─ Multi-Section Panel ──────────┐
+│ Section 1: Market Stats         │
+│ BTC  68,420  +2.3%              │
+├─────────────────────────────────┤← Divider line
+│ Section 2: Volume Profile       │
+│ 24h Volume: $2.3B               │
+└─────────────────────────────────┘
+```
+
+**Use Cases:**
+- Between unrelated data groups
+- Before critical alerts/warnings
+- In long scrolling panels (every 10 rows)
+
+```
+Priority 1: Headers/Titles
+  └─ Line height: 1.5x (bold, larger)
+
+**Example:**
+```
+┌─ Trade Summary ────────────────┐
+│                                 │
+│ TRADE #47 - PROFITABLE         │← 1.5x, bold, large
+│                                 │
+│ Entry:  68,420  14:45:00       │← 1.2x, normal
+│ Exit:   69,150  16:30:00       │
+│ P&L:    +$1,850 (+2.7%)        │
+│                                 │
+│ Duration: 1h 45m                │← 1.0x, compact
+│ Fees: $12.50 (0.02%)           │← Gray, small
+└─────────────────────────────────┘
+```
+
+```
+Ultra Light:  Not used (poor readability in terminal)
+Light:        Not used
+Normal:       Default text, labels, values
+Bold:         Headers, important metrics, alerts
+Heavy:        Critical alerts, warnings only
+```
+
+**CSS:**
+```css
+/* Headers */
+.panel-header {
+    text-style: bold;
+    color: $cyan;
+}
+
+/* Alerts */
+.alert-critical {
+    text-style: bold reverse;  /* Inverted colors */
+    color: $danger;
+}
+
+/* Secondary info */
+.metadata {
+    color: $text-secondary;
+    opacity: 70%;
+}
+```
+
+### **Default Keybindings (Non-Customizable Core)**
+
+**Global Navigation:**
+```
+Key         Action                    Category
+──────────────────────────────────────────────────
+/           Open command palette      Core
+Ctrl+K      Open command palette      Core (alt)
+Ctrl+Q      Quit application          Core
+Esc         Cancel/Close modal        Core
+F1          Help documentation        Core
+```
+
+**Panel Focus:**
+```
+Tab         Next panel                Navigation
+Shift+Tab   Previous panel            Navigation
+Ctrl+1-9    Jump to panel N           Quick access
+F           Fullscreen active panel   View
+```
+
+**Data Actions:**
+```
+R           Refresh active panel      Data
+Ctrl+R      Refresh all panels        Data
+E           Export panel data         Data
+Ctrl+S      Save layout profile       Config
+D           Toggle density mode       View
+```
+
+### **Customizable Keybindings**
+
+# Data Filtering
+filters:
+  search:        '/'      # Search within panel
+  filter:        'shift+f'  # Apply filter
+  clear_filter:  'shift+c'  # Clear filters
+
+# Alert Management
+alerts:
+  mute_all:      'shift+m'  # Mute all alerts
+  clear_all:     'shift+x'  # Clear alert history
+  toggle_sound:  'ctrl+m'   # Toggle audio alerts
+```
+
+### **README Documentation (Keybindings Section)**
+
+**Core Navigation:**
+- `/` or `Ctrl+K` - Open command palette
+- `Ctrl+Q` - Quit application
+- `Esc` - Close modals/cancel actions
+- `F1` - Help documentation
+
+**Panel Management:**
+- `Tab` / `Shift+Tab` - Cycle through panels
+- `Ctrl+1-9` - Jump to panel 1-9
+- `F` - Fullscreen active panel
+- `D` - Toggle compact/comfortable density mode
+
+**Data Actions:**
+- `R` - Refresh active panel
+- `Ctrl+R` - Refresh all panels
+- `E` - Export panel data to CSV
+- `Ctrl+S` - Save current layout
+
+### How to Customize Keybindings
+
+### Keybinding Conflicts
+
+**Reserved Keys (Cannot Customize):**
+- `/`, `Ctrl+K` (command palette)
+- `Ctrl+Q` (quit)
+- `Esc` (cancel)
+- `Tab`, `Shift+Tab` (panel navigation)
+
+**Conflict Resolution:**
+If you assign the same key to multiple panels, the app will:
+1. Warn you on startup
+2. Use the first defined binding
+3. Disable conflicting bindings
+
+Press Tab → --min
+```
+
+### **Visual Markers**
+- [ ] Whale size emoji system (🐟🐋🔥💥)
+- [ ] Liquidation severity bars (▌ ███ █████)
+- [ ] Alert priority icons (ℹ️✓⚠⛔🚨)
+- [ ] Direction indicators (↗↘ with intensity)
+
+### **Typography & Spacing**
+- [ ] Rounded corners (corner-radius: 1-2)
+- [ ] Beveled panel borders (╭╮╰╯)
+- [ ] Spacing system (tight/compact/comfortable)
+- [ ] Section dividers (subtle horizontal rules)
+- [ ] Variable line height (1.0x - 1.5x)
+- [ ] Typography weights (normal/bold/heavy)
+
+**This creates a terminal that feels polished, responsive, and professional—where every visual element serves a functional purpose and the flow-state aesthetic keeps users immersed in their analysis without friction.** 🚀
+
+===== SOURCE: fri_jan_23_2026_ticker_trace_repository_setup_and_documentation.md (FRONTEND blocks) (verbatim blocks) =====
+
+### **C. Missing Visualizations**
+
+WALK-FORWARD SUMMARY:
+  Avg Train Sharpe:  2.41
+  Avg Test Sharpe:   1.98
+  Avg Degradation:   0.43 (acceptable)
+  
+Verdict: PASS (consistent OOS performance)
+```
+2. ✅ Themes & Profiles UX
+Current Status:
+YES, described but needs clarification on cursor visibility and startup wizard flow.
+
+A. What's Already Documented:
+Themes (Line ~516-525):
+
+4 themes: cypherpunk (default), Dark Pro, Matrix, Minimal
+Color palettes defined
+Switching via Settings → Appearance
+Profiles (Lines ~13-93):
+
+4 trading profiles defined:
+Day Trader
+Liquidation Hunter
+Whale Watcher
+Funding Arbitrageur
+Each has specific dashboard layout
+B. What's MISSING - Startup Wizard UX:
+Need to add explicit startup wizard flow:
+
+markdown
+## 🚀 **First-Time Startup Wizard**
+
+#### **Screen 1: Welcome**
+```
+╔════════════════════════════════════════════════════════╗
+║                                                        ║
+║   🎯 HYPERLIQUID QUANT TERMINAL                       ║
+║      Professional Trading Workstation                  ║
+║                                                        ║
+║   Welcome! Let's set up your workspace.               ║
+║                                                        ║
+║   This wizard will guide you through:                 ║
+║   • Selecting your trading profile                    ║
+║   • Choosing your theme                               ║
+║   • Configuring data streams                          ║
+║   • Setting up alerts                                 ║
+║                                                        ║
+║   ⏱ Estimated time: 2-3 minutes                       ║
+║                                                        ║
+║            [Continue] [Skip Wizard]                   ║
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
+
+#### **Screen 2: Profile Selection**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 1/4: Choose Your Trading Profile                ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  ▶ 1. 📊 Day Trader                                   ║← Cursor here
+║     Focus: Price action, momentum, intraday           ║
+║     Data: Ticks, positions, whale trades              ║
+║                                                        ║
+║    2. 🔥 Liquidation Hunter                           ║
+║     Focus: Cascade detection, over-leverage           ║
+║     Data: Liquidations, position risk                 ║
+║                                                        ║
+║    3. 🐋 Whale Watcher                                ║
+║     Focus: Smart money tracking, large orders         ║
+║     Data: Whale trades, wallet analysis               ║
+║                                                        ║
+║    4. 💰 Funding Arbitrageur                          ║
+║     Focus: Funding rate opportunities                 ║
+║     Data: Funding rates, HLP timing                   ║
+║                                                        ║
+║    5. ⚙️  Custom Profile (build your own)             ║
+║                                                        ║
+║  Use ↑↓ to navigate, Enter to select, Esc to back    ║
+╚════════════════════════════════════════════════════════╝
+```
+
+**Cursor Visibility:**
+- **YES, visible cursor** using `▶` character
+- Moves with arrow keys
+- Selected item highlighted with different color
+- Current selection: **Magenta background** + **white text**
+
+#### **Screen 3: Theme Selection**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 2/4: Choose Your Visual Theme                    ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  ▶ 1. 🌃 cypherpunk (Recommended)                      ║
+║     Dark blue-black with magenta accents              ║
+║     Red gradient at bottom, vibrant colors            ║
+║     [Preview] ███ Magenta ███ Cyan ███ Green          ║
+║                                                        ║
+║    2. 🖤 Dark Pro                                      ║
+║     Pure black, muted colors, minimal glow            ║
+║     [Preview] ███ Purple ███ Gray ███ White           ║
+║                                                        ║
+║    3. 💚 Matrix                                        ║
+║     Green-on-black, classic hacker terminal           ║
+║     [Preview] ███ Green ███ Green ███ Green           ║
+║                                                        ║
+║    4. ⚪ Minimal                                       ║
+║     Dark gray, white text, maximum readability        ║
+║     [Preview] ███ White ███ Gray ███ Black            ║
+║                                                        ║
+║  Press 'P' to preview in full screen                  ║
+╚════════════════════════════════════════════════════════╝
+```
+
+#### **Screen 4: Dashboard Customization**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 3/4: Customize Your Dashboard                    ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  Your profile (Day Trader) includes these panels:     ║
+║                                                        ║
+║  ☑ Price Chart (BTC/ETH/SOL)                          ║
+║  ☑ Top Positions (Long/Short ratio)                   ║
+║  ☑ Whale Flow (Last 10 large trades)                  ║
+║  ☑ Liquidation Stats (24h cascade map)                ║
+║                                                        ║
+║  Add additional panels? (optional)                    ║
+║  ☐ Funding Rates                                      ║
+║  ☐ Orderbook Depth                                    ║
+║  ☐ AI Assistant                                       ║
+║  ☐ Backtest Results                                   ║
+║                                                        ║
+║  [Space to toggle, Enter to continue]                 ║
+╚════════════════════════════════════════════════════════╝
+```
+
+#### **Screen 5: Alerts Configuration**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 4/4: Configure Alerts                            ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  Enable alerts for:                                    ║
+║                                                        ║
+║  ☑ Whale trades >$500k                                ║
+║  ☑ Liquidation cascades                               ║
+║  ☑ Funding rate extremes (>±0.15%)                    ║
+║  ☐ Watchlist anomalies                                ║
+║  ☐ HLP z-score thresholds                             ║
+║  ☐ Smart money signals                                ║
+║                                                        ║
+║  Notification method:                                  ║
+║  ▶ Visual (bottom-right popup)                        ║
+║  ☐ Audio (sound alerts)                               ║
+║  ☐ Both                                               ║
+║                                                        ║
+║  [Space to toggle, Enter to finish]                   ║
+╚════════════════════════════════════════════════════════╝
+```
+
+#### **Screen 6: Completion**
+```
+╔════════════════════════════════════════════════════════╗
+║  ✓ Setup Complete!                                     ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  Your workspace is ready:                             ║
+║                                                        ║
+║  Profile: Day Trader 📊                               ║
+║  Theme:   cypherpunk 🌃                                ║
+║  Panels:  4 core + 2 additional                       ║
+║  Alerts:  3 enabled                                   ║
+║                                                        ║
+║  This configuration has been saved and will load      ║
+║  automatically next time you start the terminal.      ║
+║                                                        ║
+║  You can change these settings anytime:               ║
+║  • Press Ctrl+, to open Settings                      ║
+║  • Use /profile switch to change profiles             ║
+║  • Use /theme switch to change themes                 ║
+║                                                        ║
+║            [Launch Terminal] [Tutorial]               ║
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
+```
+
+### **Changing Later:**
+```
+Settings Panel (Ctrl+,):
+
+┌─ Settings ────────────────────────────────────────────┐
+│                                                        │
+│ ┌─ Profile ──────────────────────────────────────┐   │
+│ │ Current: Day Trader 📊                         │   │
+│ │ [Switch Profile] [Edit Profile] [Create New]  │   │
+│ └────────────────────────────────────────────────┘   │
+│                                                        │
+│ ┌─ Theme ────────────────────────────────────────┐   │
+│ │ Current: cypherpunk 🌃                          │   │
+│ │ [Switch Theme] [Customize Colors]             │   │
+│ └────────────────────────────────────────────────┘   │
+│                                                        │
+│ ┌─ Dashboard ────────────────────────────────────┐   │
+│ │ Panels: 6 active                               │   │
+│ │ [Add Panel] [Remove Panel] [Rearrange]        │   │
+│ └────────────────────────────────────────────────┘   │
+│                                                        │
+│ [Save] [Reset to Defaults] [Close]                   │
+└────────────────────────────────────────────────────────┘
+```
+3. ✅ Multi-Exchange Funding Rates
+Current Status:
+❌ NOT described - theVision only mentions HyperLiquid funding rates.
+
+### **Overview**
+The Funding Rate panel aggregates funding rates from **multiple exchanges** in real-time to identify arbitrage opportunities.
+
+### **Funding Rate Comparison Panel**
+```
+┌─ Multi-Exchange Funding Rates (Real-Time) ────────────┐
+│                                                        │
+│ Symbol │  HL   │ Binance │ Bybit │  Spread │  Arb?  │
+│ ───────┼───────┼─────────┼───────┼─────────┼────────│
+│ BTC    │+0.01% │ +0.05%  │+0.02% │ 0.04%   │  No    │
+│ ETH    │-0.08% │ +0.02%  │-0.05% │ 0.10%   │  ⚠️ Yes │← Opportunity
+│ SOL    │-0.18% │ -0.15%  │-0.20% │ 0.05%   │  No    │
+│ XRP    │+0.03% │ +0.12%  │+0.08% │ 0.09%   │  No    │
+│ HYPE   │+0.01% │   N/A   │  N/A  │  N/A    │  N/A   │
+│                                                        │
+│ Arbitrage Alerts:                                     │
+│ • ETH: Long HL (-0.08%), Short Binance (+0.02%)      │
+│   Expected profit: 0.10% per 8h = 456% APY           │
+│   Risk: Basis risk, liquidation cascades             │
+│                                                        │
+│ [Add Exchange] [Export CSV] [AI Analyze]             │
+└────────────────────────────────────────────────────────┘
+```
+
+### **Color Coding (from your script logic)**
+```python
+def get_funding_color(yearly_rate: float) -> tuple:
+    """Determine color based on funding rate severity"""
+    if yearly_rate > 50:
+        return 'black', 'on_red'        # Extreme positive
+    elif yearly_rate > 30:
+        return 'black', 'on_yellow'     # High positive
+    elif yearly_rate > 5:
+        return 'black', 'on_cyan'       # Elevated positive
+    elif yearly_rate > -10:
+        return 'black', 'on_green'      # Normal range
+    else:
+        return 'black', 'on_light_green'  # Negative (shorts paying)
+```
+
+### **Arbitrage Detection Logic**
+```python
+def detect_funding_arbitrage(rates: dict) -> List[dict]:
+    """
+    Identify funding rate arbitrage opportunities.
+    
+    Returns list of opportunities with:
+    - Symbol
+    - Long exchange (lowest rate)
+    - Short exchange (highest rate)
+    - Spread (difference)
+    - Expected annual profit
+    """
+    opportunities = []
+    
+    for symbol in rates.keys():
+        exchanges = rates[symbol]
+        
+        # Find min/max rates
+        min_exchange = min(exchanges, key=lambda x: x['rate'])
+        max_exchange = max(exchanges, key=lambda x: x['rate'])
+        
+        spread = max_exchange['rate'] - min_exchange['rate']
+        
+        # Only flag if spread >0.05% (0.0005)
+        if spread > 0.0005:
+            annual_profit = (spread * 3 * 365) * 100  # 3 funding periods per day
+            
+            opportunities.append({
+                'symbol': symbol,
+                'long': min_exchange['name'],
+                'short': max_exchange['name'],
+                'spread': spread,
+                'annual_profit_pct': annual_profit,
+                'confidence': 'HIGH' if spread > 0.001 else 'MEDIUM'
+            })
+    
+    return sorted(opportunities, key=lambda x: x['spread'], reverse=True)
+```
+
+What's Documented:
+Command Palette Invocation:
+Press / or Ctrl+K to open
+Modal overlay (dims dashboard)
+Tab autocomplete
+Command history (up/down arrows)
+Fuzzy search
+Command Syntax:
+bash
+# Verbose (beginner)
+/whales btc --min 100k --timeframe 1h
+
+### **Search Within Panel**
+```
+# While focused on any panel, press '/'
+/search <query>
+
+Examples:
+In Whale Feed panel:
+/search btc          → Filter to BTC trades only
+/search >1M          → Show trades >$1M
+/search sell         → Show only sells
+
+In Liquidation panel:
+/search cascade      → Show cascade events only
+/search btc >5M      → BTC liquidations >$5M
+```
+
+# Quick access (shortcuts)
+Ctrl+1-9                   → Jump to panel 1-9
+W, L, F, S, etc.           → Panel shortcuts (customizable)
+
+# Layout management
+/layout save <name>        → Save current layout
+/layout load <name>        → Load saved layout
+/layout reset              → Reset to profile default
+
+# Split panel
+/split horizontal          → Split current panel horizontally
+/split vertical            → Split vertically
+```
+
+1. **Startup Wizard UX** - Complete 6-screen wizard with cursor navigation, persistence, and skip options
+
+3. **Multi-Exchange Funding Rate Arbitrage** - New panel supporting:
+   - Binance Futures WebSocket integration
+   - Cross-exchange rate comparison
+   - Arbitrage detection logic
+   - Color-coded alerts and notifications
+
+Would you like me to:
+1. **Create the full theVision1_5.txt file** in your repository?
+2. **Generate implementation agent prompts** for specific subsystems?
+3. **Create a Strategy Testing Guide** as a separate detailed document?
+4. **Build out the Startup Wizard** component specification?
+
+one last feature add to theVision_v1_5, The user should be able to select and click on wallet addresses that appear in the TUI, to see data relating to the panel they are appearing in(wallets will display recent transactions, assets held, etc...). that should give us a solid MVP.
+ create the full document in a privte repository named TickerTrace, add a PRD, a README, a command cheatsheet, and a strategy implementation guide. these documents will be our foundation.
+
+I've initiated the creation of your TickerTrace repository with the complete foundation documentation suite. The coding agent is now working on creating:
+
+- **Selectable/clickable wallet addresses** throughout the TUI
+- **Context-aware wallet panel** showing:
+  - Recent transactions (last 50)
+  - Current assets held with values
+  - Position history on HyperLiquid
+  - P&L summary (realized/unrealized)
+  - Wallet labels (if known whale/smart money)
+- **Adaptive content** based on source panel:
+  - From Whale Feed → Trade history + position changes
+  - From Liquidation Feed → Liquidation history + risk metrics
+  - From Depositor List → Deposit/withdrawal history + net flow
+
+| Source Panel | Wallet Detail Shows |
+|--------------|---------------------|
+| Whale Feed | Trade history, position changes, P&L |
+| Liquidation Feed | Liquidation history, risk metrics |
+| Depositor List | Deposit/withdrawal history, net flow |
+
+## Quick Git/GitHub Primer for You
+
+## What Just Happened
+
+1. **View your repo**: https://github.com/GroverChorizo/TickerTrace
+2. **Clone it locally** (to work on your machine):
+   ```bash
+   git clone https://github.com/GroverChorizo/TickerTrace.git
+   cd TickerTrace
+   ```
+3. **Start building** the actual Python/Textual application based on the docs
+
+When you see a PR, you can:
+- Click **"Files changed"** tab to preview all content
+- Leave comments if something needs adjustment
+- Only click **"Merge"** when you're satisfied with everything
+
+When the PR appears, click on **"Files changed"** tab and verify you see:
+
+I see the issue - the PR #2 shows **0 files changed** and **0 additions**, meaning the agent failed to create any files before closing. I've now restarted the agent with a **simplified approach**:
+
+| File | Content | Est. Lines |
+|------|---------|------------|
+| `docs/FtheVision_v1_5.md` | **Frontend/UX** - Themes, layouts, widgets, wizard, commands | ~1500 |
+| `docs/BtheVision_v1_5.md` | **Backend/Data** - APIs, alerts, backtesting, Monte Carlo, risk | ~1500 |
+
+1. **Wait** for a new Pull Request to appear
+2. Check: https://github.com/GroverChorizo/TickerTrace/pulls
+3. **Don't merge** until you see 7 files in "Files changed"
+
+You're right to ask - I did **not** finish creating the actual content. Let me be clear about what happened:
+
+### Option B: Retry Coding Agent (Split Approach)
+Try the coding agent again with smaller, separate documents.
+
+### **C. Missing Visualizations**
+
+WALK-FORWARD SUMMARY:
+  Avg Train Sharpe:  2.41
+  Avg Test Sharpe:   1.98
+  Avg Degradation:   0.43 (acceptable)
+  
+Verdict: PASS (consistent OOS performance)
+```
+2. ✅ Themes & Profiles UX
+Current Status:
+YES, described but needs clarification on cursor visibility and startup wizard flow.
+
+A. What's Already Documented:
+Themes (Line ~516-525):
+
+4 themes: cypherpunk (default), Dark Pro, Matrix, Minimal
+Color palettes defined
+Switching via Settings → Appearance
+Profiles (Lines ~13-93):
+
+4 trading profiles defined:
+Day Trader
+Liquidation Hunter
+Whale Watcher
+Funding Arbitrageur
+Each has specific dashboard layout
+B. What's MISSING - Startup Wizard UX:
+Need to add explicit startup wizard flow:
+
+markdown
+## 🚀 **First-Time Startup Wizard**
+
+#### **Screen 1: Welcome**
+```
+╔════════════════════════════════════════════════════════╗
+║                                                        ║
+║   🎯 HYPERLIQUID QUANT TERMINAL                       ║
+║      Professional Trading Workstation                  ║
+║                                                        ║
+║   Welcome! Let's set up your workspace.               ║
+║                                                        ║
+║   This wizard will guide you through:                 ║
+║   • Selecting your trading profile                    ║
+║   • Choosing your theme                               ║
+║   • Configuring data streams                          ║
+║   • Setting up alerts                                 ║
+║                                                        ║
+║   ⏱ Estimated time: 2-3 minutes                       ║
+║                                                        ║
+║            [Continue] [Skip Wizard]                   ║
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
+
+#### **Screen 2: Profile Selection**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 1/4: Choose Your Trading Profile                ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  ▶ 1. 📊 Day Trader                                   ║← Cursor here
+║     Focus: Price action, momentum, intraday           ║
+║     Data: Ticks, positions, whale trades              ║
+║                                                        ║
+║    2. 🔥 Liquidation Hunter                           ║
+║     Focus: Cascade detection, over-leverage           ║
+║     Data: Liquidations, position risk                 ║
+║                                                        ║
+║    3. 🐋 Whale Watcher                                ║
+║     Focus: Smart money tracking, large orders         ║
+║     Data: Whale trades, wallet analysis               ║
+║                                                        ║
+║    4. 💰 Funding Arbitrageur                          ║
+║     Focus: Funding rate opportunities                 ║
+║     Data: Funding rates, HLP timing                   ║
+║                                                        ║
+║    5. ⚙️  Custom Profile (build your own)             ║
+║                                                        ║
+║  Use ↑↓ to navigate, Enter to select, Esc to back    ║
+╚════════════════════════════════════════════════════════╝
+```
+
+**Cursor Visibility:**
+- **YES, visible cursor** using `▶` character
+- Moves with arrow keys
+- Selected item highlighted with different color
+- Current selection: **Magenta background** + **white text**
+
+#### **Screen 3: Theme Selection**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 2/4: Choose Your Visual Theme                    ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  ▶ 1. 🌃 cypherpunk (Recommended)                      ║
+║     Dark blue-black with magenta accents              ║
+║     Red gradient at bottom, vibrant colors            ║
+║     [Preview] ███ Magenta ███ Cyan ███ Green          ║
+║                                                        ║
+║    2. 🖤 Dark Pro                                      ║
+║     Pure black, muted colors, minimal glow            ║
+║     [Preview] ███ Purple ███ Gray ███ White           ║
+║                                                        ║
+║    3. 💚 Matrix                                        ║
+║     Green-on-black, classic hacker terminal           ║
+║     [Preview] ███ Green ███ Green ███ Green           ║
+║                                                        ║
+║    4. ⚪ Minimal                                       ║
+║     Dark gray, white text, maximum readability        ║
+║     [Preview] ███ White ███ Gray ███ Black            ║
+║                                                        ║
+║  Press 'P' to preview in full screen                  ║
+╚════════════════════════════════════════════════════════╝
+```
+
+#### **Screen 4: Dashboard Customization**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 3/4: Customize Your Dashboard                    ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  Your profile (Day Trader) includes these panels:     ║
+║                                                        ║
+║  ☑ Price Chart (BTC/ETH/SOL)                          ║
+║  ☑ Top Positions (Long/Short ratio)                   ║
+║  ☑ Whale Flow (Last 10 large trades)                  ║
+║  ☑ Liquidation Stats (24h cascade map)                ║
+║                                                        ║
+║  Add additional panels? (optional)                    ║
+║  ☐ Funding Rates                                      ║
+║  ☐ Orderbook Depth                                    ║
+║  ☐ AI Assistant                                       ║
+║  ☐ Backtest Results                                   ║
+║                                                        ║
+║  [Space to toggle, Enter to continue]                 ║
+╚════════════════════════════════════════════════════════╝
+```
+
+#### **Screen 5: Alerts Configuration**
+```
+╔════════════════════════════════════════════════════════╗
+║  Step 4/4: Configure Alerts                            ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  Enable alerts for:                                    ║
+║                                                        ║
+║  ☑ Whale trades >$500k                                ║
+║  ☑ Liquidation cascades                               ║
+║  ☑ Funding rate extremes (>±0.15%)                    ║
+║  ☐ Watchlist anomalies                                ║
+║  ☐ HLP z-score thresholds                             ║
+║  ☐ Smart money signals                                ║
+║                                                        ║
+║  Notification method:                                  ║
+║  ▶ Visual (bottom-right popup)                        ║
+║  ☐ Audio (sound alerts)                               ║
+║  ☐ Both                                               ║
+║                                                        ║
+║  [Space to toggle, Enter to finish]                   ║
+╚════════════════════════════════════════════════════════╝
+```
+
+#### **Screen 6: Completion**
+```
+╔════════════════════════════════════════════════════════╗
+║  ✓ Setup Complete!                                     ║
+╠════════════════════════════════════════════════════════╣
+║                                                        ║
+║  Your workspace is ready:                             ║
+║                                                        ║
+║  Profile: Day Trader 📊                               ║
+║  Theme:   cypherpunk 🌃                                ║
+║  Panels:  4 core + 2 additional                       ║
+║  Alerts:  3 enabled                                   ║
+║                                                        ║
+║  This configuration has been saved and will load      ║
+║  automatically next time you start the terminal.      ║
+║                                                        ║
+║  You can change these settings anytime:               ║
+║  • Press Ctrl+, to open Settings                      ║
+║  • Use /profile switch to change profiles             ║
+║  • Use /theme switch to change themes                 ║
+║                                                        ║
+║            [Launch Terminal] [Tutorial]               ║
+║                                                        ║
+╚════════════════════════════════════════════════════════╝
+```
+
+### **Changing Later:**
+```
+Settings Panel (Ctrl+,):
+
+┌─ Settings ────────────────────────────────────────────┐
+│                                                        │
+│ ┌─ Profile ──────────────────────────────────────┐   │
+│ │ Current: Day Trader 📊                         │   │
+│ │ [Switch Profile] [Edit Profile] [Create New]  │   │
+│ └────────────────────────────────────────────────┘   │
+│                                                        │
+│ ┌─ Theme ────────────────────────────────────────┐   │
+│ │ Current: cypherpunk 🌃                          │   │
+│ │ [Switch Theme] [Customize Colors]             │   │
+│ └────────────────────────────────────────────────┘   │
+│                                                        │
+│ ┌─ Dashboard ────────────────────────────────────┐   │
+│ │ Panels: 6 active                               │   │
+│ │ [Add Panel] [Remove Panel] [Rearrange]        │   │
+│ └────────────────────────────────────────────────┘   │
+│                                                        │
+│ [Save] [Reset to Defaults] [Close]                   │
+└────────────────────────────────────────────────────────┘
+```
+3. ✅ Multi-Exchange Funding Rates
+Current Status:
+❌ NOT described - theVision only mentions HyperLiquid funding rates.
+
+### **Overview**
+The Funding Rate panel aggregates funding rates from **multiple exchanges** in real-time to identify arbitrage opportunities.
+
+### **Funding Rate Comparison Panel**
+```
+┌─ Multi-Exchange Funding Rates (Real-Time) ────────────┐
+│                                                        │
+│ Symbol │  HL   │ Binance │ Bybit │  Spread │  Arb?  │
+│ ───────┼───────┼─────────┼───────┼─────────┼────────│
+│ BTC    │+0.01% │ +0.05%  │+0.02% │ 0.04%   │  No    │
+│ ETH    │-0.08% │ +0.02%  │-0.05% │ 0.10%   │  ⚠️ Yes │← Opportunity
+│ SOL    │-0.18% │ -0.15%  │-0.20% │ 0.05%   │  No    │
+│ XRP    │+0.03% │ +0.12%  │+0.08% │ 0.09%   │  No    │
+│ HYPE   │+0.01% │   N/A   │  N/A  │  N/A    │  N/A   │
+│                                                        │
+│ Arbitrage Alerts:                                     │
+│ • ETH: Long HL (-0.08%), Short Binance (+0.02%)      │
+│   Expected profit: 0.10% per 8h = 456% APY           │
+│   Risk: Basis risk, liquidation cascades             │
+│                                                        │
+│ [Add Exchange] [Export CSV] [AI Analyze]             │
+└────────────────────────────────────────────────────────┘
+```
+
+### **Color Coding (from your script logic)**
+```python
+def get_funding_color(yearly_rate: float) -> tuple:
+    """Determine color based on funding rate severity"""
+    if yearly_rate > 50:
+        return 'black', 'on_red'        # Extreme positive
+    elif yearly_rate > 30:
+        return 'black', 'on_yellow'     # High positive
+    elif yearly_rate > 5:
+        return 'black', 'on_cyan'       # Elevated positive
+    elif yearly_rate > -10:
+        return 'black', 'on_green'      # Normal range
+    else:
+        return 'black', 'on_light_green'  # Negative (shorts paying)
+```
+
+### **Arbitrage Detection Logic**
+```python
+def detect_funding_arbitrage(rates: dict) -> List[dict]:
+    """
+    Identify funding rate arbitrage opportunities.
+    
+    Returns list of opportunities with:
+    - Symbol
+    - Long exchange (lowest rate)
+    - Short exchange (highest rate)
+    - Spread (difference)
+    - Expected annual profit
+    """
+    opportunities = []
+    
+    for symbol in rates.keys():
+        exchanges = rates[symbol]
+        
+        # Find min/max rates
+        min_exchange = min(exchanges, key=lambda x: x['rate'])
+        max_exchange = max(exchanges, key=lambda x: x['rate'])
+        
+        spread = max_exchange['rate'] - min_exchange['rate']
+        
+        # Only flag if spread >0.05% (0.0005)
+        if spread > 0.0005:
+            annual_profit = (spread * 3 * 365) * 100  # 3 funding periods per day
+            
+            opportunities.append({
+                'symbol': symbol,
+                'long': min_exchange['name'],
+                'short': max_exchange['name'],
+                'spread': spread,
+                'annual_profit_pct': annual_profit,
+                'confidence': 'HIGH' if spread > 0.001 else 'MEDIUM'
+            })
+    
+    return sorted(opportunities, key=lambda x: x['spread'], reverse=True)
+```
+
+What's Documented:
+Command Palette Invocation:
+Press / or Ctrl+K to open
+Modal overlay (dims dashboard)
+Tab autocomplete
+Command history (up/down arrows)
+Fuzzy search
+Command Syntax:
+bash
+# Verbose (beginner)
+/whales btc --min 100k --timeframe 1h
+
+### **Search Within Panel**
+```
+# While focused on any panel, press '/'
+/search <query>
+
+Examples:
+In Whale Feed panel:
+/search btc          → Filter to BTC trades only
+/search >1M          → Show trades >$1M
+/search sell         → Show only sells
+
+In Liquidation panel:
+/search cascade      → Show cascade events only
+/search btc >5M      → BTC liquidations >$5M
+```
+
+# Quick access (shortcuts)
+Ctrl+1-9                   → Jump to panel 1-9
+W, L, F, S, etc.           → Panel shortcuts (customizable)
+
+# Layout management
+/layout save <name>        → Save current layout
+/layout load <name>        → Load saved layout
+/layout reset              → Reset to profile default
+
+# Split panel
+/split horizontal          → Split current panel horizontally
+/split vertical            → Split vertically
+```
+
+
+"""
+Remember our core values:
+* Data security first. Our users should feel confident in the fact that everything runs locally (aside from the AI, to which we will add guardrails when we implement) and their data and intellectual property is secure locally. any exports should only export to their local machine. This is why we want everything running in their terminal. quants love privacy.
+* Precision in data, accuracy in action. Our data is never synthetic or modified EVER, our testing apps are finely tuned accurate algorithms designed to provide users with fast, accurate, actionable results to find alpha in their strategies.
+* Normal People, Institutional-Grade tools. Our data streams and back testing/monte carlo/walk forward testing should exemplify industry standard logic and function in a beautifully responsive TUI environment. Ensuring users find an Edge in the market with ease.
+* WE WILL NEVER GIVE FINANCIAL ADVICE AND NO DEFAULT TRADING ALGOS SHOULD EVER BE RUN IN LIVE ENVIRONMENTS. DO YOUR OWN RESEARCH.
+
+Links:
+MoonDev HL API docs: https://moondev.com/docs
+My Forked Repo for the API: @GroverChorizo/Hyperliquid-Data-Layer-API
+some Textual docs: @Textualize/textual and https://textual.textualize.io/guide/
+If you need me to provide more docs for other dependencies just ask and I will.
+"""
+

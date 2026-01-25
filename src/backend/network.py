@@ -9,7 +9,6 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, Optional
 import httpx
-import logging
 
 from .logging_config import get_logger
 
@@ -24,7 +23,9 @@ ENDPOINT_PATHS: Dict[str, str] = {
     "whales": "/api/whales.json",
     "liquidations_stats": "/api/liquidations/stats.json",
     "funding": "/api/funding.json",
+    "info": "/info",
     "candles": "/api/candleSnapshot",
+    "positions": "/api/positions.json",
     # Add or update paths from Vision only
 }
 
@@ -121,6 +122,54 @@ class NetworkClient:
                 logger.error({"event": "fetch_error", "endpoint": endpoint_key, "err": str(e)})
                 raise
         # Exhausted retries
+        logger.error(f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}")
+        raise ConnectionError(f"Failed to fetch {endpoint_key}")
+
+    def post(self, endpoint_key: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = self._build_url(endpoint_key)
+        attempt = 0
+        last_exc: Optional[Exception] = None
+        while attempt < self.retries:
+            attempt += 1
+            start = time.time()
+            try:
+                resp = self._client.post(url, json=payload)
+                elapsed_ms = int((time.time() - start) * 1000)
+                logger.info(
+                    {
+                        "event": "http_request",
+                        "endpoint": endpoint_key,
+                        "status": resp.status_code,
+                        "elapsed_ms": elapsed_ms,
+                        "attempt": attempt,
+                    }
+                )
+
+                if resp.status_code == 429 or 500 <= resp.status_code < 600:
+                    last_exc = RuntimeError(f"Server error: {resp.status_code}")
+                    logger.warning(
+                        {"event": "http_transient_error", "endpoint": endpoint_key, "status": resp.status_code, "attempt": attempt}
+                    )
+                    time.sleep(BACKOFF_FACTOR * (2 ** (attempt - 1)))
+                    continue
+
+                if 400 <= resp.status_code < 500:
+                    logger.error({"event": "http_client_error", "endpoint": endpoint_key, "status": resp.status_code})
+                    raise httpx.HTTPStatusError(f"Client error: {resp.status_code}", request=None, response=None)
+
+                try:
+                    return resp.json()
+                except Exception as e:
+                    logger.error({"event": "json_decode_error", "endpoint": endpoint_key, "err": str(e)})
+                    raise
+            except httpx.RequestError as e:
+                last_exc = e
+                logger.warning({"event": "network_error", "endpoint": endpoint_key, "err": str(e), "attempt": attempt})
+                time.sleep(BACKOFF_FACTOR * (2 ** (attempt - 1)))
+                continue
+            except Exception as e:
+                logger.error({"event": "fetch_error", "endpoint": endpoint_key, "err": str(e)})
+                raise
         logger.error(f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}")
         raise ConnectionError(f"Failed to fetch {endpoint_key}")
 

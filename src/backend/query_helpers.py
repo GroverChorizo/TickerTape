@@ -90,7 +90,7 @@ def query_recent_events(registry: DatasetRegistry, dataset_name: str, since_ts_m
     parts = ds.get("partitions", [])
     out = []
     for p in parts:
-        path = BASE_PARQUET_ROOT / p
+        path = storage.BASE_PARQUET_ROOT / p
         try:
             rows = _read_parquet_or_ndjson(path)
         except Exception:

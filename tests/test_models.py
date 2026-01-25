@@ -3,7 +3,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import pytest
 from datetime import datetime, timezone
-from backend.models import TradeEvent, LiquidationEvent, FundingEvent, Candle
+from backend.models import TradeEvent, Candle
 
 
 def test_trade_event_validation():

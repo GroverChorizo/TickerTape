@@ -44,6 +44,41 @@ Quick commands:
 
     python examples/alert_client.py
 
+- Launch the TickerTape TUI (from repo root):
+
+    python -m tui.app
+
+  The TUI reads local datasets from `data/parquet/`, listens for alerts on `127.0.0.1:8765`,
+  and streams live market data for liquidations, funding rates, whale trades, and event stream panels.
+  Run ingestion first to populate liquidation snapshots (used by non-live panels) and start the alert
+  notifier to stream alerts.
+
+- Run the setup wizard:
+
+    python -m tui.app --setup
+
+- Run ingestion once (liquidations dashboard):
+
+    python tools/run_ingestion.py --profile liquidations_dashboard --once
+
+## TUI Setup, Troubleshooting, and Extension
+
+### Setup
+- Install dependencies: `pip install -r requirements.txt` (includes Textual for the TUI).
+- Optional: configure a research runner by setting `TICKERTAPE_BACKTEST_RUNNER` to a local command
+  template (e.g. `python /path/to/runner.py --strategy {strategy} --dataset {dataset} --timeframe {timeframe} --params '{params}' --seed {seed} --out {out}`).
+
+### Troubleshooting
+- **No liquidation snapshots:** run `python tools/run_ingestion.py --profile liquidations_dashboard --once` to populate `data/parquet/`.
+- **Alert panel disconnected:** ensure the backend alert notifier is running and listening on `127.0.0.1:8765`.
+- **Research jobs blocked:** configure `TICKERTAPE_BACKTEST_RUNNER` or accept the explicit blocked state (no synthetic results are shown).
+- **Live feeds show “Disconnected” or “No data”:** network access is unavailable or the Hyperliquid API is rate-limiting; the panels will retry with backoff and show last-known-good data when available.
+
+### Adding Strategies & Datasets (Research Only)
+- Place strategy files locally and reference them via `/backtest run --strategy /path/to/strategy.py`.
+- Import datasets into `data/parquet/` using the ingestion pipeline or your own local export; the TUI reads registry entries from `data/parquet/_registry.json`.
+- Always keep strategies local and deterministic. No network access or external APIs are permitted during backtests.
+
 
 ## Support the Project
 
@@ -103,3 +138,7 @@ python ../tools/data_integrity_gate.py --ci --root . && pytest -q
 These commands run the gate only against the `TickerTape` project subtree (src/, tests/, docs/ and top-level files) and then run the test suite for the project.
 
 **CI enforcement:** The `Data Integrity Gate` runs as part of the repository GitHub Actions CI and blocks merges on failures via the `data_integrity_gate.yml` workflow for `WhaleWatch/TickerTape`.
+
+## Hyperliquid example mapping
+
+See `docs/hyperliquid_examples_mapping.md` for the mapping between external examples and TickerTape feeds/panels.

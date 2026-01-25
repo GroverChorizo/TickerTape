@@ -2,7 +2,6 @@
 Institutional Mode configuration for backend quant engine.
 Enforces local-only, no network, no synthetic/modified data, no financial advice/live trading defaults.
 """
-from typing import Any
 import logging
 import yaml
 import os

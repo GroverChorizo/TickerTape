@@ -2,9 +2,12 @@
 # Purpose: prevent local research artifacts, secrets, and scratch files from being committed
 
 # Virtual environments
+algo/
+TickerTape/
 venv/
 .venv/
 env/
+TickerTape/
 *.env
 .env.local
 
@@ -22,6 +25,7 @@ outputs/
 
 # Data caches and research artifacts (local-only)
 local_cache/
+*.ndjson
 *.csv
 *.parquet
 *.feather
@@ -40,6 +44,7 @@ local_cache/
 .cache/
 cache/
 tmp/
+data/
 
 # Backtest and Monte Carlo outputs
 backtest_*

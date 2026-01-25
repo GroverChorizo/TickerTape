@@ -2,8 +2,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from pathlib import Path
-import pytest
-from backend.secrets import load_secrets, _DEFAULT_PATH
+from backend.secrets import load_secrets
 
 
 def write_file(path: Path, content: str) -> None:

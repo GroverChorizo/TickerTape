@@ -2,9 +2,13 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import pytest
-import types
+
+httpx = pytest.importorskip("httpx")
+
 from backend.network import NetworkClient
-import httpx
+
+pytest.importorskip("textual")
+pytest.importorskip("httpx")
 
 
 class DummyResponse:

@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import dataclass, asdict
-from typing import Any, Dict, List, Optional, Callable
+from typing import Any, Dict, List, Optional
 import logging
 import time
 

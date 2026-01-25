@@ -3,9 +3,10 @@ pytest>=7.0
 pyarrow>=12
 
 requests
-rich
+rich>=13.7,<15.0
 python-dotenv
 pandas
+textual>=0.60,<0.80
 
 # AI Swarm Agent (requires OPENROUTER_API_KEY in .env)
 openai

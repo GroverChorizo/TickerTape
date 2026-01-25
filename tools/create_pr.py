@@ -1,4 +1,7 @@
-import os, json, urllib.request, sys
+import os
+import json
+import urllib.request
+import sys
 PR = open('PR_DRAFT.md','r',encoding='utf-8').read()
 body = {
   'title': 'Backend MVP — Snapshots, Alerts, Dataset Registry (Frontend-Ready)',
