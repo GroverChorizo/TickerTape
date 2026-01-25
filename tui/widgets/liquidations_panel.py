@@ -1,73 +1,70 @@
-"""Liquidations panel: snapshot KPIs across timeframes."""
+"""Liquidations panel: live liquidation stats."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Dict, List
+from typing import List
 
-from textual.reactive import reactive
-
-from ..backend.snapshots import get_latest_snapshot_with_path
-from ..backend.registry import get_registry
-from ..state.datasets import load_datasets
+from ..feeds.base import FeedResult
 from .panel_base import PanelBase
 
 
-DEFAULT_TIMEFRAMES = ["10m", "1h", "4h", "24h", "1W", "1M", "1Y", "5Y"]
-
-
 class LiquidationsPanel(PanelBase):
-    snapshots: Dict[str, dict] = reactive({}, recompose=False)
-
     def __init__(self) -> None:
         super().__init__(panel_id="liquidations", title="Liquidations")
+        self.feed_result = FeedResult(status="loading")
 
-    def refresh_snapshots(self) -> None:
-        registry = get_registry()
-        datasets = load_datasets(registry)
-        available = datasets.get("feed=liquidations_snapshots")
-        timeframes = available.timeframes if available and available.timeframes else []
-        combined = list(dict.fromkeys(timeframes + DEFAULT_TIMEFRAMES))
-        for tf in combined:
-            snap, path = get_latest_snapshot_with_path(registry, "feed=liquidations_snapshots", tf)
-            if snap:
-                snap["_partition_path"] = path
-                self.snapshots[tf] = snap
-        self.update_text(self._render_snapshots(combined))
+    def update_feed(self, result: FeedResult) -> None:
+        self.feed_result = result
+        self.refresh_panel()
 
-    def _render_snapshots(self, timeframes: List[str]) -> str:
+    def refresh_panel(self) -> None:
+        status = self.feed_result.status
+        if status == "loading":
+            self.render_loading()
+            return
+        if status in {"error", "disconnected"} and not self.feed_result.data:
+            self.render_error(self.feed_result.error or "Unknown error", hint="Retrying with backoff.")
+            return
+        if status == "empty" and not self.feed_result.data:
+            self.render_empty("No data yet.")
+            return
+        self.render_data(self.feed_result.data, status=status, is_lkg=self.feed_result.is_lkg)
+
+    def render_loading(self) -> None:
+        self.update_text("Loading liquidation stats...")
+
+    def render_empty(self, reason: str) -> None:
+        self.update_text(f"No data. {reason}")
+
+    def render_error(self, error: str, hint: str) -> None:
+        self.update_text(f"Error: {error}\n{hint}")
+
+    def render_data(self, payload: dict, status: str = "ok", is_lkg: bool = False) -> None:
+        snapshot = payload.get("snapshot") if isinstance(payload, dict) else None
+        if not isinstance(snapshot, dict):
+            self.update_text("No liquidation snapshot data available.")
+            return
         lines: List[str] = []
-        for tf in timeframes:
-            snap = self.snapshots.get(tf)
-            if not snap:
-                lines.append(f"[{tf}] No snapshot data available. Run /ingest or complete setup wizard.")
-                continue
-            total = snap.get("total_notional", 0.0)
-            count = snap.get("count", 0)
-            cascade = "YES" if snap.get("cascade_detected") else "no"
-            velocity = snap.get("velocity_score", 0.0)
-            computed = snap.get("computed_at_ts_ms")
-            computed_str = self._fmt_ts(computed)
-            age = self._age_seconds(computed)
-            run_id = snap.get("run_id", "unknown")
-            partition_path = snap.get("_partition_path") or "unknown"
-            lines.append(
-                f"[{tf}] count={count} total=${total:,.0f} cascade={cascade} velocity={velocity:.2f} "
-                f"computed={computed_str} age={age} run_id={run_id}"
+        if status == "disconnected" or is_lkg:
+            lines.append("Disconnected — showing last known data.")
+        total = snapshot.get("total_notional")
+        count = snapshot.get("count")
+        cascade = snapshot.get("cascade_detected")
+        velocity = snapshot.get("velocity_score")
+        computed = snapshot.get("computed_at_ts_ms") or snapshot.get("timestamp_ms")
+        lines.append(f"Total notional: {self._fmt_money(total)}")
+        lines.append(f"Count: {count if count is not None else 'n/a'}")
+        lines.append(f"Cascade: {'YES' if cascade else 'no'}")
+        if velocity is not None:
+            lines.append(f"Velocity: {velocity}")
+        lines.append(f"Updated: {self._fmt_ts(computed)}")
+        top_symbols = snapshot.get("top_symbols", [])
+        if isinstance(top_symbols, list) and top_symbols:
+            top_fmt = ", ".join(
+                f"{item.get('symbol', '?')} {self._fmt_money(item.get('notional'))}" for item in top_symbols[:3]
             )
-            lines.append(f"    Partition: {partition_path}")
-            top_symbols = snap.get("top_symbols", [])
-            if top_symbols:
-                top_fmt = ", ".join(
-                    f"{item.get('symbol', '?')} ${item.get('notional', 0):,.0f}" for item in top_symbols[:3]
-                )
-                lines.append(f"    Top symbols: {top_fmt}")
-            top_exchanges = snap.get("top_exchanges", [])
-            if top_exchanges:
-                exch_fmt = ", ".join(
-                    f"{item.get('exchange', '?')} ${item.get('notional', 0):,.0f}" for item in top_exchanges[:3]
-                )
-                lines.append(f"    Top exchanges: {exch_fmt}")
-        return "\n".join(lines) if lines else "No liquidation snapshots available."
+            lines.append(f"Top symbols: {top_fmt}")
+        self.update_text("\n".join(lines))
 
     @staticmethod
     def _fmt_ts(ts_ms: int | None) -> str:
@@ -77,10 +74,8 @@ class LiquidationsPanel(PanelBase):
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     @staticmethod
-    def _age_seconds(ts_ms: int | None) -> str:
-        if not ts_ms:
-            return "unknown"
-        now = datetime.now(timezone.utc)
-        then = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
-        seconds = int((now - then).total_seconds())
-        return f"{seconds}s"
+    def _fmt_money(value: object) -> str:
+        try:
+            return f"${float(value):,.0f}"
+        except (TypeError, ValueError):
+            return "n/a"
