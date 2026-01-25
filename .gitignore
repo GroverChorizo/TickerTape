@@ -16,6 +16,7 @@ __pycache__/
 
 # Data caches and research artifacts (local-only)
 local_cache/
+*.ndjson
 *.csv
 *.parquet
 *.feather
@@ -34,6 +35,7 @@ local_cache/
 .cache/
 cache/
 tmp/
+data/
 
 # Backtest and Monte Carlo outputs
 backtest_*
