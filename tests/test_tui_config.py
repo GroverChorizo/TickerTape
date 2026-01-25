@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from tui.config import TuiConfig, config_needs_setup, ensure_data_root, load_config, save_config
+from tui.config import TuiConfig, DEFAULT_THEME, config_needs_setup, ensure_data_root, load_config, save_config
 
 
 def test_config_round_trip(tmp_path, monkeypatch):
@@ -14,6 +14,7 @@ def test_config_round_trip(tmp_path, monkeypatch):
         mode="offline_demo",
         data_root=data_root,
         profile="day_trader",
+        theme=DEFAULT_THEME,
         secrets_path=None,
         config_path=config_path,
     )
@@ -28,6 +29,7 @@ def test_ensure_data_root(tmp_path):
         mode="offline_demo",
         data_root=tmp_path / "parquet",
         profile="day_trader",
+        theme=DEFAULT_THEME,
         secrets_path=None,
         config_path=tmp_path / "config.json",
     )
@@ -40,6 +42,7 @@ def test_config_needs_setup(tmp_path):
         mode="offline_demo",
         data_root=tmp_path / "parquet",
         profile="day_trader",
+        theme=DEFAULT_THEME,
         secrets_path=None,
         config_path=tmp_path / "config.json",
     )

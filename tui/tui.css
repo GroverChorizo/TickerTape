@@ -1,14 +1,14 @@
 Screen {
-    background: #050a12;
-    color: #d6e2f0;
+    background: var(--background-primary);
+    color: var(--text-primary);
 }
 
 #title {
     dock: top;
     height: 3;
     content-align: center middle;
-    background: #0a1420;
-    color: #4dd0e1;
+    background: var(--panel-background);
+    color: var(--accent-header);
     text-style: bold;
 }
 
@@ -19,63 +19,84 @@ Screen {
 #left {
     width: 24;
     padding: 1;
-    border: tall #1f2a38;
+    border: tall var(--panel-border);
 }
 
 #center {
     width: 1fr;
     padding: 1;
-    border: tall #1f2a38;
+    border: tall var(--panel-border);
 }
 
 #right {
     width: 32;
     padding: 1;
-    border: tall #1f2a38;
+    border: tall var(--panel-border);
 }
 
 .section {
     text-style: bold;
     padding-bottom: 1;
+    color: var(--text-primary);
 }
 
 .help {
-    color: #7f8fa6;
+    color: var(--text-secondary);
 }
 
 PanelBase {
-    border: tall #233145;
+    border: tall var(--panel-border);
     padding: 1;
     margin-bottom: 1;
-    background: #0b111a;
+    background: var(--panel-background);
+}
+
+PanelBase.status-error {
+    border: heavy var(--alert-critical);
+}
+
+PanelBase.status-disconnected {
+    border: tall var(--alert-warning);
+}
+
+PanelBase.status-empty {
+    border: tall var(--panel-border);
 }
 
 WalletPanel {
-    border: tall #233145;
+    border: tall var(--panel-border);
     padding: 1;
     margin-bottom: 1;
-    background: #0b111a;
+    background: var(--panel-background);
 }
 
 WalletDetailPanel {
-    border: tall #233145;
+    border: tall var(--panel-border);
     padding: 1;
     margin-bottom: 1;
-    background: #0b111a;
+    background: var(--panel-background);
 }
 
 .focus {
-    border: tall #4dd0e1;
+    border: heavy var(--focus-border);
+}
+
+PanelBase.status-error.focus {
+    border: heavy var(--alert-critical);
+}
+
+PanelBase.status-disconnected.focus {
+    border: heavy var(--alert-warning);
 }
 
 .dim {
-    color: #6f7d90;
+    color: var(--text-secondary);
 }
 
 #footer {
     dock: bottom;
     height: 6;
-    border-top: tall #1f2a38;
+    border-top: tall var(--panel-border);
     padding: 1;
 }
 
@@ -86,12 +107,29 @@ WalletDetailPanel {
 #status {
     width: 100%;
     padding-top: 1;
-    color: #b0bec5;
+    color: var(--text-secondary);
 }
 
 #wizard {
     padding: 1;
-    border: tall #233145;
+    border: tall var(--panel-border);
+}
+
+#settings {
+    padding: 1;
+    border: tall var(--panel-border);
+    background: var(--panel-background);
+}
+
+#settings_title {
+    text-style: bold;
+    color: var(--accent-header);
+    padding-bottom: 1;
+}
+
+#settings_section {
+    color: var(--text-secondary);
+    padding-bottom: 1;
 }
 
 #roadmap_body {

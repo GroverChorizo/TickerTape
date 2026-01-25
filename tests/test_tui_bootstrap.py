@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from backend import storage as storage_module
 from backend.storage import DatasetRegistry
 from tui.bootstrap import bootstrap_data
-from tui.config import TuiConfig
+from tui.config import TuiConfig, DEFAULT_THEME
 from tui.diagnostics import collect_diagnostics
 
 
@@ -18,6 +18,7 @@ def test_bootstrap_creates_registry(tmp_path, monkeypatch):
         mode="offline_demo",
         data_root=data_root,
         profile="day_trader",
+        theme=DEFAULT_THEME,
         secrets_path=None,
         config_path=tmp_path / "config.json",
     )
@@ -36,6 +37,7 @@ def test_diagnostics_redacts_secrets(tmp_path):
         mode="offline_demo",
         data_root=data_root,
         profile="day_trader",
+        theme=DEFAULT_THEME,
         secrets_path=Path("/tmp/secret.env"),
         config_path=tmp_path / "config.json",
     )

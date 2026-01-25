@@ -10,6 +10,7 @@ import os
 
 DEFAULT_DATA_ROOT = Path("data/parquet")
 DEFAULT_PROFILE = "day_trader"
+DEFAULT_THEME = "cypherpunk"
 
 
 @dataclass
@@ -17,6 +18,7 @@ class TuiConfig:
     mode: str
     data_root: Path
     profile: str
+    theme: str
     secrets_path: Optional[Path]
     config_path: Path
 
@@ -54,11 +56,13 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
     mode = overrides.get("mode") or os.environ.get("TICKERTAPE_MODE") or payload.get("mode") or "offline_demo"
     data_root = Path(overrides.get("data_root") or os.environ.get("TICKERTAPE_DATA_ROOT") or payload.get("data_root") or DEFAULT_DATA_ROOT)
     profile = overrides.get("profile") or os.environ.get("TICKERTAPE_PROFILE") or payload.get("profile") or DEFAULT_PROFILE
+    theme = overrides.get("theme") or os.environ.get("TICKERTAPE_THEME") or payload.get("theme") or DEFAULT_THEME
     secrets_path = overrides.get("secrets_path") or os.environ.get("TICKERTAPE_SECRETS_PATH") or payload.get("secrets_path")
     return TuiConfig(
         mode=mode,
         data_root=data_root,
         profile=profile,
+        theme=theme,
         secrets_path=Path(secrets_path) if secrets_path else None,
         config_path=path,
     )
