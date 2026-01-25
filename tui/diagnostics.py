@@ -19,6 +19,13 @@ def _version(pkg: str) -> str:
     except Exception:
         return "unknown"
 
+def _path_posix(p: Path | None) -> str | None:
+    if p is None:
+        return None
+    # Force stable, cross-OS display paths for diagnostics
+    return p.as_posix().replace("\\", "/")
+
+
 
 def collect_diagnostics(config: TuiConfig, registry: DatasetRegistry) -> Dict[str, Any]:
     datasets = registry.list_datasets()
@@ -28,11 +35,11 @@ def collect_diagnostics(config: TuiConfig, registry: DatasetRegistry) -> Dict[st
         "platform": platform.platform(),
         "textual": _version("textual"),
         "rich": _version("rich"),
-        "data_root": str(config.data_root),
-        "config_path": str(config.config_path),
+        "data_root": _path_posix(config.data_root),
+        "config_path": _path_posix(config.config_path),
         "mode": config.mode,
         "profile": config.profile,
-        "secrets_path": str(config.secrets_path) if config.secrets_path else None,
+        "secrets_path": _path_posix(config.secrets_path) if config.secrets_path else None,
         "registry_exists": (config.data_root / "_registry.json").exists(),
         "dataset_counts": dataset_counts,
     }
