@@ -103,19 +103,21 @@ class FundingRatesFeed(BaseFeed):
     def __init__(
         self,
         client: "NetworkClient",
+        *,
+        registry: DatasetRegistry,
         coins: Optional[List[str]] = None,
-        poll_interval: float = 20.0,
+        poll_interval: float = 10.0,
         offline: bool = False,
-        registry: Optional[DatasetRegistry] = None,
         dataset_name: str = "funding_rates",
         timeframe: str = "live",
     ) -> None:
         super().__init__(name="funding", poll_interval=poll_interval, offline=offline)
         self.client = client
         self.coins = coins or ["BTC"]
-        self._registry = registry or DatasetRegistry()
+        self._registry = registry
         self._dataset_name = dataset_name
         self._timeframe = timeframe
+
 
     def fetch(self) -> Dict[str, Any]:
         end_ms = int(time.time() * 1000)

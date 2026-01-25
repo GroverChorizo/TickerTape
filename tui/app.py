@@ -110,7 +110,7 @@ class TickerTapeApp(App):
         self.live_client = HyperliquidClient()
         self.liquidations_stats_feed = LiquidationsFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.positions_feed = PositionsFeed(self.client, offline=self.config.mode == "offline_demo")
-        self.funding_feed = FundingRatesFeed(self.client, offline=self.config.mode == "offline_demo")
+        self.funding_feed = FundingRatesFeed(client=self.client, registry=self.registry, coins=None, poll_interval=10.0, offline=self.config.mode == "offline_demo")
         self.whales_feed = WhaleTradesFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.events_feed = EventStreamFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.streams.register(self.liquidations_stats_feed)
