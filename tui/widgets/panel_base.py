@@ -19,6 +19,12 @@ class PanelBase(Static):
     def set_collapsed(self, collapsed: bool) -> None:
         self.display = not collapsed
 
+    @property
+    def content(self):
+        """Compat for tests/helpers: return the current renderable (what Static is showing)."""
+        # Textual Static keeps the current display value in `renderable`
+        return getattr(self, "renderable", None)
+
     def update_text(self, content: str | Text) -> None:
         """Update panel content using plain text (no markup)."""
         if isinstance(content, Text):
