@@ -1,6 +1,7 @@
 """Panel base widget for TickerTape."""
 from __future__ import annotations
 
+from rich.text import Text
 from textual.widgets import Static
 
 
@@ -12,3 +13,10 @@ class PanelBase(Static):
 
     def set_collapsed(self, collapsed: bool) -> None:
         self.display = not collapsed
+
+    def update_text(self, content: str | Text) -> None:
+        """Update panel content using plain text (no markup)."""
+        if isinstance(content, Text):
+            self.update(content)
+        else:
+            self.update(Text(content))

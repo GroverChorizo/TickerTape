@@ -50,6 +50,20 @@ PanelBase {
     background: #0b111a;
 }
 
+WalletPanel {
+    border: tall #233145;
+    padding: 1;
+    margin-bottom: 1;
+    background: #0b111a;
+}
+
+WalletDetailPanel {
+    border: tall #233145;
+    padding: 1;
+    margin-bottom: 1;
+    background: #0b111a;
+}
+
 .focus {
     border: tall #4dd0e1;
 }

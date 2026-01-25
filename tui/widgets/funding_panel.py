@@ -18,18 +18,18 @@ class FundingPanel(PanelBase):
         registry = get_registry()
         datasets = load_datasets(registry)
         if "feed=funding_rates" not in datasets:
-            self.update("Funding feed unavailable (stub or missing).")
+            self.update_text("Funding feed unavailable (stub or missing).")
             return
         snap = get_latest_snapshot(registry, "feed=funding_rates", "1h")
         if not snap:
-            self.update("No funding snapshot data available.")
+            self.update_text("No funding snapshot data available.")
             return
         lines: List[str] = []
         lines.append(f"Symbol: {snap.get('symbol', 'n/a')}")
         lines.append(f"Rate: {snap.get('rate', 'n/a')}")
         lines.append(f"Period: {snap.get('period', 'n/a')}")
         lines.append(f"Computed: {self._fmt_ts(snap.get('timestamp_ms'))}")
-        self.update("\n".join(lines))
+        self.update_text("\n".join(lines))
 
     @staticmethod
     def _fmt_ts(ts_ms: int | None) -> str:

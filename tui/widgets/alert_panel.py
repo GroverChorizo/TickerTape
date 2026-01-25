@@ -16,10 +16,10 @@ class AlertPanel(PanelBase):
     def refresh_panel(self) -> None:
         if not self.stream.connected:
             if not self.stream.alerts:
-                self.update("Alert stream disconnected. Start backend alert notifier to receive alerts.")
+                self.update_text("Alert stream disconnected. Start backend alert notifier to receive alerts.")
                 return
         if not self.stream.alerts:
-            self.update("No alerts received.")
+            self.update_text("No alerts received.")
             return
         lines: List[str] = []
         for alert in self.stream.alerts[-8:]:
@@ -27,4 +27,4 @@ class AlertPanel(PanelBase):
             lines.append(
                 f"[{ts.strftime('%H:%M:%S')}] {alert.severity.upper()} {alert.alert_type} ({alert.source_feed})"
             )
-        self.update("\n".join(lines))
+        self.update_text("\n".join(lines))

@@ -15,14 +15,14 @@ class BacktestPanel(PanelBase):
 
     def refresh_panel(self) -> None:
         if not self.queue.jobs:
-            self.update(
+            self.update_text(
                 "No research jobs queued. Use the command bar for /backtest, /montecarlo, or /walkforward runs."
             )
             return
         lines: List[str] = []
         for job in self.queue.jobs[-8:]:
             lines.append(self._format_job(job))
-        self.update("\n".join(lines))
+        self.update_text("\n".join(lines))
 
     def _format_job(self, job: ResearchJob) -> str:
         created = self._fmt_ts(job.created_at_ms)

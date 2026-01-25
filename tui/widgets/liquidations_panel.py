@@ -31,7 +31,7 @@ class LiquidationsPanel(PanelBase):
             snap = get_latest_snapshot(registry, "feed=liquidations_snapshots", tf)
             if snap:
                 self.snapshots[tf] = snap
-        self.update(self._render_snapshots(combined))
+        self.update_text(self._render_snapshots(combined))
 
     def _render_snapshots(self, timeframes: List[str]) -> str:
         lines: List[str] = []

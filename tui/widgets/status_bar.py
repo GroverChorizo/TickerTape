@@ -4,6 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
+from rich.text import Text
 from textual.widgets import Static
 
 
@@ -21,18 +22,17 @@ class StatusBar(Static):
         backend = "OK" if backend_ok else "MISSING"
         last_snapshot = self._fmt_ts(last_snapshot_ts)
         alert_state = "connected" if alert_connected else "disconnected"
-        self.update(
-            " | ".join(
-                [
-                    f"Profile: {profile}",
-                    f"Backend: {backend}",
-                    f"Jobs: {active_jobs}",
-                    f"Last Snapshot: {last_snapshot}",
-                    f"Alerts: {alert_count} ({alert_state})",
-                    f"Feeds: {feeds}",
-                ]
-            )
+        content = " | ".join(
+            [
+                f"Profile: {profile}",
+                f"Backend: {backend}",
+                f"Jobs: {active_jobs}",
+                f"Last Snapshot: {last_snapshot}",
+                f"Alerts: {alert_count} ({alert_state})",
+                f"Feeds: {feeds}",
+            ]
         )
+        self.update(Text(content))
 
     @staticmethod
     def _fmt_ts(ts_ms: Optional[int]) -> str:
