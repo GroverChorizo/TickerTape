@@ -64,7 +64,6 @@ from .config import TuiConfig, config_needs_setup, ensure_data_root, load_config
 from .diagnostics import collect_diagnostics
 from .wizard import StartupWizard
 from .roadmap import RoadmapScreen
-from .settings import SettingsScreen
 from .state.alerts import AlertStream
 from .state.datasets import load_datasets
 from .state.profiles import get_profile
@@ -81,7 +80,8 @@ from .widgets.status_bar import StatusBar
 from .widgets.whale_panel import WhalePanel
 from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
 from backend.network import NetworkClient
-from tui.themes import DEFAULT_THEME_ID, get_theme, list_themes
+from tui.themes.palettes import Palette
+from tui.themes.theme_manager import get_palette_for_profile, list_theme_ids, set_theme_for_profile
 from tui.feeds.hyperliquid import (
     EventStreamFeed,
     FundingRatesFeed,
@@ -91,6 +91,7 @@ from tui.feeds.hyperliquid import (
 )
 from tui.feeds.market_data import MarketDataFeed
 from .streaming import StreamSupervisor
+from .widgets.panel_base import PanelBase
 
 
 class TickerTapeApp(App):
@@ -137,7 +138,7 @@ class TickerTapeApp(App):
         self._panels: Dict[str, Static] = {}
         self._last_snapshot_ts: int | None = None
         self._logger = logging.getLogger(__name__)
-        self._theme_id = self.config.theme or DEFAULT_THEME_ID
+        self._palette: Palette = get_palette_for_profile(self.session_state.active_profile)
 
     def compose(self) -> ComposeResult:
         active_profile = self.session_state.active_profile
@@ -167,6 +168,7 @@ class TickerTapeApp(App):
                     "event_stream": events,
                     "research": research,
                 }
+                self._apply_palette_to_panels(self._palette)
                 order = get_profile_state(self.session_state, profile.name).panel_order
                 for panel_id in order:
                     panel = self._panels.get(panel_id)
@@ -188,7 +190,6 @@ class TickerTapeApp(App):
             yield Footer()
 
     def on_mount(self) -> None:
-        self.apply_theme(self._theme_id, persist=False)
         self.alert_stream.start()
         self.set_interval(5, self.refresh_panels)
         self.set_interval(2, self.refresh_status)
@@ -268,10 +269,14 @@ class TickerTapeApp(App):
         for panel_id, panel in self._panels.items():
             if panel_id in profile.focus_panels:
                 panel.remove_class("dim")
-                panel.add_class("focus")
+                if isinstance(panel, PanelBase):
+                    panel.set_focus(True)
             else:
-                panel.remove_class("focus")
                 panel.add_class("dim")
+                if isinstance(panel, PanelBase):
+                    panel.set_focus(False)
+        self._palette = get_palette_for_profile(profile_name)
+        self._apply_palette_to_panels(self._palette)
         self.session_state.active_profile = profile_name
         save_session_state(self.session_state)
 
@@ -349,14 +354,17 @@ class TickerTapeApp(App):
             self._open_wizard()
             return
         if cmd == "theme":
-            if len(args) >= 2 and args[0] == "switch":
-                self.apply_theme(args[1], persist=True)
+            if not args or args[0] == "list":
+                themes = ", ".join(list_theme_ids())
+                self.notify(f"Available themes: {themes}")
                 return
-            themes = ", ".join(t.theme_id for t in list_themes())
-            self.notify(f"Usage: /theme switch <name>. Available: {themes}", severity="warning")
-            return
-        if cmd == "settings":
-            self._open_settings()
+            if args[0] == "set" and len(args) > 1:
+                theme_id = set_theme_for_profile(self.session_state.active_profile, args[1])
+                self._palette = get_palette_for_profile(self.session_state.active_profile)
+                self._apply_palette_to_panels(self._palette)
+                self.notify(f"Theme set to {theme_id}")
+                return
+            self.notify("Usage: /theme list | /theme set <name>", severity="warning")
             return
         if cmd == "coin":
             if not args:
@@ -387,20 +395,10 @@ class TickerTapeApp(App):
     def _open_roadmap(self) -> None:
         self.push_screen(RoadmapScreen())
 
-    def _open_settings(self) -> None:
-        self.push_screen(SettingsScreen())
-
-    def apply_theme(self, theme_id: str, persist: bool = True) -> None:
-        theme = get_theme(theme_id)
-        if theme_id != theme.theme_id:
-            self.notify(f"Unknown theme '{theme_id}', using {theme.theme_id}.", severity="warning")
-        self._theme_id = theme.theme_id
-        self.stylesheet.set_variables(theme.to_css_variables())
-        self.refresh_css()
-        if persist:
-            self.config.theme = theme.theme_id
-            save_config(self.config)
-        self.notify(f"Theme: {theme.name}")
+    def _apply_palette_to_panels(self, palette: Palette) -> None:
+        for panel in self._panels.values():
+            if isinstance(panel, PanelBase):
+                panel.set_palette(palette)
 
     def handle_research_command(self, job_type: str, args: List[str]) -> None:
         if not args:

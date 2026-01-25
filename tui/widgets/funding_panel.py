@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from ..feeds.base import FeedResult
+from tui.render.palette import build_text, error_footer, format_last_good, muted_line, status_line
 from .panel_base import PanelBase
 
 
@@ -42,24 +43,24 @@ class FundingPanel(PanelBase):
     def render_loading(self) -> None:
         self.set_status_class("loading")
         lines = [
-            self.format_status_line("loading"),
-            "Loading funding rates...",
+            status_line("loading", self.palette),
+            muted_line("Loading funding rates...", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_empty(self, reason: str) -> None:
         self.set_status_class("empty")
         lines = [
-            self.format_status_line("empty"),
-            f"No data. {reason}",
+            status_line("empty", self.palette),
+            muted_line(f"No data. {reason}", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_error(self, error: str, hint: str, updated_ts_ms: int | None) -> None:
         self.set_status_class("error")
-        lines = self.format_error_footer(error, updated_ts_ms, backoff_note="feed-managed")
-        lines.append(f"Hint: {hint}")
-        self.update_text(self.join_lines(lines))
+        lines = error_footer(error, updated_ts_ms, backoff_note="feed-managed", palette=self.palette)
+        lines.append((f"Hint: {hint}", self.palette.text.muted))
+        self.update_text(build_text(lines))
 
     def render_data(
         self,
@@ -72,22 +73,23 @@ class FundingPanel(PanelBase):
         if not isinstance(funding, dict) or not funding:
             self.set_status_class("empty")
             lines = [
-                self.format_status_line("empty"),
-                "No funding data available.",
+                status_line("empty", self.palette),
+                muted_line("No funding data available.", self.palette),
             ]
-            self.update_text(self.join_lines(lines))
+            self.update_text(build_text(lines))
             return
         lines: List[str] = []
         self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        lines.append(self.format_status_line("disconnected" if status == "disconnected" else "ok"))
+        status_value = "disconnected" if status == "disconnected" else "ok"
+        styled_lines = [status_line(status_value, self.palette)]
         if status == "disconnected" or is_lkg:
-            lines.append(f"Showing last known data. Last good: {self.format_last_good(updated_ts_ms)}")
+            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
         for coin, item in funding.items():
             latest = item.get("latest") if isinstance(item, dict) else None
             history = item.get("history") if isinstance(item, dict) else None
             rate = latest.get("rate") if isinstance(latest, dict) else None
             ts = latest.get("timestamp_ms") if isinstance(latest, dict) else None
-            lines.append(f"{coin}: rate={rate if rate is not None else 'n/a'} updated={self._fmt_ts(ts)}")
+            styled_lines.append((f"{coin}: rate={rate if rate is not None else 'n/a'} updated={self._fmt_ts(ts)}", self.palette.text.primary))
             if isinstance(history, list) and history:
                 recent = ", ".join(
                     f"{entry.get('rate'):.5f}"
@@ -95,8 +97,8 @@ class FundingPanel(PanelBase):
                     if isinstance(entry, dict) and isinstance(entry.get("rate"), (int, float))
                 )
                 if recent:
-                    lines.append(f"  recent: {recent}")
-        self.update_text("\n".join(lines))
+                    styled_lines.append(muted_line(f"  recent: {recent}", self.palette))
+        self.update_text(build_text(styled_lines))
 
     @staticmethod
     def _fmt_ts(ts_ms: int | None) -> str:

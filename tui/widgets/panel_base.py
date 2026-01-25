@@ -1,11 +1,12 @@
 """Panel base widget for TickerTape."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Iterable, List
+from typing import Optional
 
 from rich.text import Text
 from textual.widgets import Static
+
+from tui.themes.palettes import Palette, cypherpunk_default
 
 
 class PanelBase(Static):
@@ -13,6 +14,9 @@ class PanelBase(Static):
         super().__init__(**kwargs)
         self.panel_id = panel_id
         self.border_title = title
+        self.palette: Palette = cypherpunk_default
+        self._status: str = "ok"
+        self._focused: bool = False
 
     def set_collapsed(self, collapsed: bool) -> None:
         self.display = not collapsed
@@ -24,39 +28,29 @@ class PanelBase(Static):
         else:
             self.update(Text(content))
 
+    def set_palette(self, palette: Palette) -> None:
+        self.palette = palette
+        self.styles.background = palette.bg.panel
+        self.styles.border = ("tall", palette.border.panel)
+        self.styles.color = palette.text.primary
+        self._apply_border()
+
     def set_status_class(self, status: str) -> None:
-        for name in ("status-ok", "status-loading", "status-empty", "status-error", "status-disconnected"):
-            self.remove_class(name)
-        status_class = f"status-{status}"
-        self.add_class(status_class)
+        self._status = status
+        self._apply_border()
 
-    @staticmethod
-    def format_status_line(status: str) -> str:
-        labels = {
-            "ok": "LIVE",
-            "loading": "LOADING",
-            "empty": "NO DATA",
-            "error": "ERROR",
-            "disconnected": "DISCONNECTED",
-        }
-        label = labels.get(status, status.upper())
-        return f"Status: {label}"
+    def set_focus(self, focused: bool) -> None:
+        self._focused = focused
+        self._apply_border()
 
-    @staticmethod
-    def format_last_good(ts_ms: int | None) -> str:
-        if not ts_ms:
-            return "none"
-        dt = datetime.fromtimestamp(ts_ms / 1000, tz=timezone.utc)
-        return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
-
-    def format_error_footer(self, error: str, updated_ts_ms: int | None, backoff_note: str) -> List[str]:
-        return [
-            "Feed Error",
-            self.format_status_line("error"),
-            f"Error: {error}",
-            f"Backoff: {backoff_note}",
-            f"Last good: {self.format_last_good(updated_ts_ms)}",
-        ]
-
-    def join_lines(self, lines: Iterable[str]) -> str:
-        return "\n".join(line for line in lines if line)
+    def _apply_border(self) -> None:
+        if not self.palette:
+            return
+        if self._status == "error":
+            self.styles.border = ("heavy", self.palette.accent.red)
+        elif self._status == "disconnected":
+            self.styles.border = ("tall", self.palette.accent.orange)
+        elif self._focused:
+            self.styles.border = ("heavy", self.palette.border.focus)
+        else:
+            self.styles.border = ("tall", self.palette.border.panel)

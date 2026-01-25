@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from ..feeds.base import FeedResult
+from tui.render.palette import build_text, error_footer, format_last_good, muted_line, status_line
 from .panel_base import PanelBase
 
 
@@ -42,24 +43,24 @@ class LiquidationsPanel(PanelBase):
     def render_loading(self) -> None:
         self.set_status_class("loading")
         lines = [
-            self.format_status_line("loading"),
-            "Loading liquidation stats...",
+            status_line("loading", self.palette),
+            muted_line("Loading liquidation stats...", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_empty(self, reason: str) -> None:
         self.set_status_class("empty")
         lines = [
-            self.format_status_line("empty"),
-            f"No data. {reason}",
+            status_line("empty", self.palette),
+            muted_line(f"No data. {reason}", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_error(self, error: str, hint: str, updated_ts_ms: int | None) -> None:
         self.set_status_class("error")
-        lines = self.format_error_footer(error, updated_ts_ms, backoff_note="feed-managed")
-        lines.append(f"Hint: {hint}")
-        self.update_text(self.join_lines(lines))
+        lines = error_footer(error, updated_ts_ms, backoff_note="feed-managed", palette=self.palette)
+        lines.append((f"Hint: {hint}", self.palette.text.muted))
+        self.update_text(build_text(lines))
 
     def render_data(
         self,
@@ -72,34 +73,33 @@ class LiquidationsPanel(PanelBase):
         if not isinstance(snapshot, dict):
             self.set_status_class("empty")
             lines = [
-                self.format_status_line("empty"),
-                "No liquidation snapshot data available.",
+                status_line("empty", self.palette),
+                muted_line("No liquidation snapshot data available.", self.palette),
             ]
-            self.update_text(self.join_lines(lines))
+            self.update_text(build_text(lines))
             return
-        lines: List[str] = []
         self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        lines.append(self.format_status_line("disconnected" if status == "disconnected" else "ok"))
+        styled_lines = [status_line("disconnected" if status == "disconnected" else "ok", self.palette)]
         if status == "disconnected" or is_lkg:
-            lines.append(f"Showing last known data. Last good: {self.format_last_good(updated_ts_ms)}")
+            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
         total = snapshot.get("total_notional")
         count = snapshot.get("count")
         cascade = snapshot.get("cascade_detected")
         velocity = snapshot.get("velocity_score")
         computed = snapshot.get("computed_at_ts_ms") or snapshot.get("timestamp_ms")
-        lines.append(f"Total notional: {self._fmt_money(total)}")
-        lines.append(f"Count: {count if count is not None else 'n/a'}")
-        lines.append(f"Cascade: {'YES' if cascade else 'no'}")
+        styled_lines.append((f"Total notional: {self._fmt_money(total)}", self.palette.text.primary))
+        styled_lines.append((f"Count: {count if count is not None else 'n/a'}", self.palette.text.primary))
+        styled_lines.append((f"Cascade: {'YES' if cascade else 'no'}", self.palette.text.primary))
         if velocity is not None:
-            lines.append(f"Velocity: {velocity}")
-        lines.append(f"Updated: {self._fmt_ts(computed)}")
+            styled_lines.append((f"Velocity: {velocity}", self.palette.text.primary))
+        styled_lines.append((f"Updated: {self._fmt_ts(computed)}", self.palette.text.muted))
         top_symbols = snapshot.get("top_symbols", [])
         if isinstance(top_symbols, list) and top_symbols:
             top_fmt = ", ".join(
                 f"{item.get('symbol', '?')} {self._fmt_money(item.get('notional'))}" for item in top_symbols[:3]
             )
-            lines.append(f"Top symbols: {top_fmt}")
-        self.update_text("\n".join(lines))
+            styled_lines.append((f"Top symbols: {top_fmt}", self.palette.text.primary))
+        self.update_text(build_text(styled_lines))
 
     @staticmethod
     def _fmt_ts(ts_ms: int | None) -> str:

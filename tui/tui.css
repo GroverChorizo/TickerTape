@@ -1,14 +1,14 @@
 Screen {
-    background: var(--background-primary);
-    color: var(--text-primary);
+    background: #0a0e1a;
+    color: #d6dde6;
 }
 
 #title {
     dock: top;
     height: 3;
     content-align: center middle;
-    background: var(--panel-background);
-    color: var(--accent-header);
+    background: #0d1117;
+    color: #79b4c4;
     text-style: bold;
 }
 
@@ -19,84 +19,60 @@ Screen {
 #left {
     width: 24;
     padding: 1;
-    border: tall var(--panel-border);
+    border: tall #243044;
 }
 
 #center {
     width: 1fr;
     padding: 1;
-    border: tall var(--panel-border);
+    border: tall #243044;
 }
 
 #right {
     width: 32;
     padding: 1;
-    border: tall var(--panel-border);
+    border: tall #243044;
 }
 
 .section {
     text-style: bold;
     padding-bottom: 1;
-    color: var(--text-primary);
+    color: #d6dde6;
 }
 
 .help {
-    color: var(--text-secondary);
+    color: #7a8797;
 }
 
 PanelBase {
-    border: tall var(--panel-border);
+    border: tall #243044;
     padding: 1;
     margin-bottom: 1;
-    background: var(--panel-background);
-}
-
-PanelBase.status-error {
-    border: heavy var(--alert-critical);
-}
-
-PanelBase.status-disconnected {
-    border: tall var(--alert-warning);
-}
-
-PanelBase.status-empty {
-    border: tall var(--panel-border);
+    background: #0d1117;
 }
 
 WalletPanel {
-    border: tall var(--panel-border);
+    border: tall #243044;
     padding: 1;
     margin-bottom: 1;
-    background: var(--panel-background);
+    background: #0d1117;
 }
 
 WalletDetailPanel {
-    border: tall var(--panel-border);
+    border: tall #243044;
     padding: 1;
     margin-bottom: 1;
-    background: var(--panel-background);
-}
-
-.focus {
-    border: heavy var(--focus-border);
-}
-
-PanelBase.status-error.focus {
-    border: heavy var(--alert-critical);
-}
-
-PanelBase.status-disconnected.focus {
-    border: heavy var(--alert-warning);
+    background: #0d1117;
 }
 
 .dim {
-    color: var(--text-secondary);
+    color: #7a8797;
 }
 
 #footer {
     dock: bottom;
     height: 6;
-    border-top: tall var(--panel-border);
+    border-top: tall #243044;
     padding: 1;
 }
 
@@ -107,29 +83,12 @@ PanelBase.status-disconnected.focus {
 #status {
     width: 100%;
     padding-top: 1;
-    color: var(--text-secondary);
+    color: #7a8797;
 }
 
 #wizard {
     padding: 1;
-    border: tall var(--panel-border);
-}
-
-#settings {
-    padding: 1;
-    border: tall var(--panel-border);
-    background: var(--panel-background);
-}
-
-#settings_title {
-    text-style: bold;
-    color: var(--accent-header);
-    padding-bottom: 1;
-}
-
-#settings_section {
-    color: var(--text-secondary);
-    padding-bottom: 1;
+    border: tall #243044;
 }
 
 #roadmap_body {

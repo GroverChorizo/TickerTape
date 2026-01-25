@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from ..feeds.base import FeedResult
+from tui.render.palette import build_text, error_footer, format_last_good, muted_line, status_line
 from .panel_base import PanelBase
 from .wallet_panel import WalletsDiscovered
 
@@ -43,24 +44,24 @@ class EventStream(PanelBase):
     def render_loading(self) -> None:
         self.set_status_class("loading")
         lines = [
-            self.format_status_line("loading"),
-            "Loading live events...",
+            status_line("loading", self.palette),
+            muted_line("Loading live events...", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_empty(self, reason: str) -> None:
         self.set_status_class("empty")
         lines = [
-            self.format_status_line("empty"),
-            f"No data. {reason}",
+            status_line("empty", self.palette),
+            muted_line(f"No data. {reason}", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_error(self, error: str, hint: str, updated_ts_ms: int | None) -> None:
         self.set_status_class("error")
-        lines = self.format_error_footer(error, updated_ts_ms, backoff_note="feed-managed")
-        lines.append(f"Hint: {hint}")
-        self.update_text(self.join_lines(lines))
+        lines = error_footer(error, updated_ts_ms, backoff_note="feed-managed", palette=self.palette)
+        lines.append((f"Hint: {hint}", self.palette.text.muted))
+        self.update_text(build_text(lines))
 
     def render_data(
         self,
@@ -73,23 +74,23 @@ class EventStream(PanelBase):
         if not isinstance(events, list) or not events:
             self.set_status_class("empty")
             lines = [
-                self.format_status_line("empty"),
-                "Waiting for event stream. No recent events available.",
+                status_line("empty", self.palette),
+                muted_line("Waiting for event stream. No recent events available.", self.palette),
             ]
-            self.update_text(self.join_lines(lines))
+            self.update_text(build_text(lines))
             return
-        lines: List[str] = []
+        styled_lines: List[tuple[str, str]] = []
         self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        lines.append(self.format_status_line("disconnected" if status == "disconnected" else "ok"))
+        styled_lines.append(status_line("disconnected" if status == "disconnected" else "ok", self.palette))
         if status == "disconnected" or is_lkg:
-            lines.append(f"Showing last known data. Last good: {self.format_last_good(updated_ts_ms)}")
+            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
         for event in events[-10:]:
             ts = event.get("timestamp_ms") or hint_ts(event)
             symbol = event.get("symbol", "?")
             side = event.get("side", "?")
             size = event.get("size", "?")
-            lines.append(f"[{fmt_ts(ts)}] {symbol} {side} size={size}")
-        self.update_text("\n".join(lines))
+            styled_lines.append((f"[{fmt_ts(ts)}] {symbol} {side} size={size}", self.palette.text.primary))
+        self.update_text(build_text(styled_lines))
         wallets = _extract_wallets(events)
         if wallets:
             self.post_message(WalletsDiscovered(wallets, source="event_stream"))

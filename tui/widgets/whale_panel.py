@@ -4,6 +4,7 @@ from __future__ import annotations
 from typing import List
 
 from ..feeds.base import FeedResult
+from tui.render.palette import build_text, error_footer, format_last_good, heading_line, muted_line, status_line
 from .panel_base import PanelBase
 from .wallet_panel import WalletsDiscovered
 
@@ -43,24 +44,24 @@ class WhalePanel(PanelBase):
     def render_loading(self) -> None:
         self.set_status_class("loading")
         lines = [
-            self.format_status_line("loading"),
-            "Loading whale trades...",
+            status_line("loading", self.palette),
+            muted_line("Loading whale trades...", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_empty(self, reason: str) -> None:
         self.set_status_class("empty")
         lines = [
-            self.format_status_line("empty"),
-            f"No data. {reason}",
+            status_line("empty", self.palette),
+            muted_line(f"No data. {reason}", self.palette),
         ]
-        self.update_text(self.join_lines(lines))
+        self.update_text(build_text(lines))
 
     def render_error(self, error: str, hint: str, updated_ts_ms: int | None) -> None:
         self.set_status_class("error")
-        lines = self.format_error_footer(error, updated_ts_ms, backoff_note="feed-managed")
-        lines.append(f"Hint: {hint}")
-        self.update_text(self.join_lines(lines))
+        lines = error_footer(error, updated_ts_ms, backoff_note="feed-managed", palette=self.palette)
+        lines.append((f"Hint: {hint}", self.palette.text.muted))
+        self.update_text(build_text(lines))
 
     def render_data(
         self,
@@ -75,18 +76,18 @@ class WhalePanel(PanelBase):
         if not isinstance(trades, list) or not trades:
             self.set_status_class("empty")
             lines = [
-                self.format_status_line("empty"),
-                "No whale trade data available.",
+                status_line("empty", self.palette),
+                muted_line("No whale trade data available.", self.palette),
             ]
-            self.update_text(self.join_lines(lines))
+            self.update_text(build_text(lines))
             return
         filtered = [t for t in trades if _meets_min_notional(t, self.min_notional)]
-        lines: List[str] = []
+        styled_lines: List[tuple[str, str]] = []
         self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        lines.append(self.format_status_line("disconnected" if status == "disconnected" else "ok"))
+        styled_lines.append(status_line("disconnected" if status == "disconnected" else "ok", self.palette))
         if status == "disconnected" or is_lkg:
-            lines.append(f"Showing last known data. Last good: {self.format_last_good(updated_ts_ms)}")
-        lines.append("Recent whale trades:")
+            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
+        styled_lines.append(heading_line("Recent whale trades:", self.palette))
         for event in (filtered or trades)[-5:]:
             symbol = event.get("symbol") or event.get("coin") or "?"
             side = event.get("side") or event.get("direction") or "?"
@@ -94,8 +95,8 @@ class WhalePanel(PanelBase):
             price = event.get("price") or "?"
             wallet = event.get("wallet") or event.get("wallet_address") or event.get("address")
             wallet_hint = f" wallet={wallet}" if isinstance(wallet, str) and wallet else ""
-            lines.append(f"- {symbol} {side} size={size} price={price}{wallet_hint}")
-        self.update_text("\n".join(lines))
+            styled_lines.append((f"- {symbol} {side} size={size} price={price}{wallet_hint}", self.palette.accent.cyan))
+        self.update_text(build_text(styled_lines))
         wallets = _extract_wallets(trades)
         if wallets:
             self.post_message(WalletsDiscovered(wallets, source="whales"))
