@@ -1,5 +1,8 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import asyncio
-from src.backend.alerts import SocketNotifier, AlertManager
+from backend.alerts import SocketNotifier, AlertManager
 
 
 def test_alert_emission(tmp_path):

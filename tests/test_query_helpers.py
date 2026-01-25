@@ -1,6 +1,9 @@
-from src.backend.query_helpers import load_latest_snapshot, list_datasets
-from src.backend.storage import DatasetRegistry
-from src.backend import storage
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from backend.query_helpers import load_latest_snapshot, list_datasets
+from backend.storage import DatasetRegistry
+from backend import storage
 
 
 def test_load_latest_snapshot_cli(tmp_path, monkeypatch):

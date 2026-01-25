@@ -1,6 +1,9 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 from datetime import datetime, timezone, timedelta
-from src.backend.liquidations_feed import LiquidationsFeed
-from src.backend.models import LiquidationEvent
+from backend.liquidations_feed import LiquidationsFeed
+from backend.models import LiquidationEvent
 
 
 def make_event(ts: datetime, symbol: str, side: str, price: float, size: float, exchange: str = None):

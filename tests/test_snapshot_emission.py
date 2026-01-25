@@ -1,8 +1,11 @@
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
 import pytest
 from pathlib import Path
-from src.backend.storage import DatasetRegistry, BASE_PARQUET_ROOT
-from src.backend.liquidations_feed import LiquidationsFeed
-from src.backend.snapshotter import run_once
+from backend.storage import DatasetRegistry, BASE_PARQUET_ROOT
+from backend.liquidations_feed import LiquidationsFeed
+from backend.snapshotter import run_once
 import shutil
 
 

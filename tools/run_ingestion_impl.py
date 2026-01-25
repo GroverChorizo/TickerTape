@@ -5,9 +5,12 @@ from pathlib import Path
 from datetime import datetime, timezone
 import logging
 
-from src.backend.storage import DatasetRegistry
-from src.backend.liquidations_feed import LiquidationsFeed
-from src.backend.snapshotter import run_once
+import sys
+import os
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from backend.storage import DatasetRegistry
+from backend.liquidations_feed import LiquidationsFeed
+from backend.snapshotter import run_once
 
 logger = logging.getLogger(__name__)
 
