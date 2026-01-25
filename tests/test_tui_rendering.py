@@ -4,6 +4,11 @@ import sys
 import asyncio
 import pytest
 
+pytest.importorskip("textual")
+pytest.importorskip("httpx")
+
+
+
 textual = pytest.importorskip("textual")
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
