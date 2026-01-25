@@ -72,7 +72,7 @@ from .state.session import get_profile_state, load_session_state, save_session_s
 from .widgets.alert_panel import AlertPanel
 from .widgets.backtest_panel import BacktestPanel
 from .widgets.event_stream import EventStream
-from .widgets.positions_panel import PositionsPanel
+from .widgets.market_data_panel import MarketDataPanel
 from .widgets.funding_panel import FundingPanel
 from .widgets.liquidations_panel import LiquidationsPanel
 from .widgets.profile_selector import ProfileSelector, ProfileSelected
@@ -80,7 +80,6 @@ from .widgets.status_bar import StatusBar
 from .widgets.whale_panel import WhalePanel
 from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
 from backend.network import NetworkClient
-from backend.feeds.positions import PositionsFeed
 from tui.feeds.hyperliquid import (
     EventStreamFeed,
     FundingRatesFeed,
@@ -88,6 +87,7 @@ from tui.feeds.hyperliquid import (
     LiquidationsFeed,
     WhaleTradesFeed,
 )
+from tui.feeds.market_data import MarketDataFeed
 from .streaming import StreamSupervisor
 
 
@@ -101,6 +101,7 @@ class TickerTapeApp(App):
         ("ctrl+4", "toggle_panel('event_stream')", "Toggle event stream"),
         ("ctrl+5", "toggle_panel('alerts')", "Toggle alerts"),
         ("ctrl+6", "toggle_panel('research')", "Toggle research"),
+        ("c", "cycle_coin", "Cycle coin"),
         ("r", "refresh_panels", "Refresh panels"),
         ("p", "open_plan", "Open roadmap"),
     ]
@@ -118,12 +119,16 @@ class TickerTapeApp(App):
         self.client = NetworkClient()
         self.live_client = HyperliquidClient()
         self.liquidations_stats_feed = LiquidationsFeed(self.live_client, offline=self.config.mode == "offline_demo")
-        self.positions_feed = PositionsFeed(self.client, offline=self.config.mode == "offline_demo")
+        self.market_data_feed = MarketDataFeed(
+            self.live_client,
+            registry=self.registry,
+            offline=self.config.mode == "offline_demo",
+        )
         self.funding_feed = FundingRatesFeed(client=self.client, registry=self.registry, coins=None, poll_interval=10.0, offline=self.config.mode == "offline_demo")
         self.whales_feed = WhaleTradesFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.events_feed = EventStreamFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.streams.register(self.liquidations_stats_feed)
-        self.streams.register(self.positions_feed)
+        self.streams.register(self.market_data_feed)
         self.streams.register(self.funding_feed)
         self.streams.register(self.whales_feed)
         self.streams.register(self.events_feed)
@@ -146,7 +151,7 @@ class TickerTapeApp(App):
                 )
             with Vertical(id="center"):
                 liquidations = LiquidationsPanel()
-                positions = PositionsPanel()
+                positions = MarketDataPanel()
                 funding = FundingPanel()
                 whales = WhalePanel()
                 events = EventStream()
@@ -209,9 +214,8 @@ class TickerTapeApp(App):
             )
             self._last_snapshot_ts = self.liquidations_stats_feed.latest().updated_ts_ms
         positions = self._panels.get("positions")
-        if isinstance(positions, PositionsPanel):
-            positions.update_payload(self.positions_feed.latest() or {"status": self.positions_feed.state.status})
-            self._safe_refresh(positions, "positions", positions.refresh_panel)
+        if isinstance(positions, MarketDataPanel):
+            self._safe_refresh(positions, "positions", lambda: positions.update_feed(self.market_data_feed.latest()))
         funding = self._panels.get("funding")
         if isinstance(funding, FundingPanel):
             self._safe_refresh(funding, "funding", lambda: funding.update_feed(self.funding_feed.latest()))
@@ -296,6 +300,10 @@ class TickerTapeApp(App):
     def action_refresh_panels(self) -> None:
         self.refresh_panels()
 
+    def action_cycle_coin(self) -> None:
+        coin = self.market_data_feed.cycle_coin()
+        self.notify(f"Selected coin: {coin}")
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
         command = event.value.strip()
         event.input.value = ""
@@ -335,6 +343,13 @@ class TickerTapeApp(App):
             return
         if cmd == "setup":
             self._open_wizard()
+            return
+        if cmd == "coin":
+            if not args:
+                self.notify("Usage: /coin <symbol>", severity="warning")
+                return
+            self.market_data_feed.set_selected_coin(args[0])
+            self.notify(f"Selected coin set to {self.market_data_feed.selected_coin}")
             return
         self.notify("Unknown command", severity="warning")
 
