@@ -1,8 +1,6 @@
 """Panel base widget for TickerTape."""
 from __future__ import annotations
 
-from typing import Optional
-
 from rich.text import Text
 from textual.widgets import Static
 

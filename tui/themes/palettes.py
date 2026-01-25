@@ -41,16 +41,31 @@ class Palette:
     border: BorderPalette
     accent: AccentPalette
 
+    def to_tokens(self) -> Dict[str, str]:
+        return {
+            "background_primary": self.bg.primary,
+            "panel_background": self.bg.panel,
+            "panel_border": self.border.panel,
+            "text_primary": self.text.primary,
+            "text_muted": self.text.muted,
+            "accent_header": self.accent.cyan,
+            "accent_focus": self.border.focus,
+            "accent_ai": self.accent.purple,
+            "success": self.accent.green,
+            "warning": self.accent.orange,
+            "danger": self.accent.red,
+        }
+
 
 cypherpunk_default = Palette(
-    theme_id="cypherpunk_default",
+    theme_id="cypherpunk",
     name="Cypherpunk",
     bg=BackgroundPalette(primary="#0a0e1a", panel="#0d1117"),
     text=TextPalette(primary="#d6dde6", muted="#7a8797"),
     border=BorderPalette(panel="#243044", focus="#79b4c4"),
     accent=AccentPalette(
         cyan="#79b4c4",
-        purple="#a855f7",
+        purple="#8b5cf6",
         green="#39ff88",
         orange="#f59e0b",
         red="#ef4444",
@@ -72,9 +87,41 @@ dark_pro = Palette(
     ),
 )
 
+matrix = Palette(
+    theme_id="matrix",
+    name="Matrix",
+    bg=BackgroundPalette(primary="#050707", panel="#0b0f0b"),
+    text=TextPalette(primary="#b7f7c5", muted="#5b8a6a"),
+    border=BorderPalette(panel="#1f3b2f", focus="#7ef2a0"),
+    accent=AccentPalette(
+        cyan="#7ef2a0",
+        purple="#a855f7",
+        green="#22c55e",
+        orange="#f59e0b",
+        red="#ef4444",
+    ),
+)
+
+minimal = Palette(
+    theme_id="minimal",
+    name="Minimal",
+    bg=BackgroundPalette(primary="#101317", panel="#141a22"),
+    text=TextPalette(primary="#e5e7eb", muted="#a1a9b4"),
+    border=BorderPalette(panel="#2b3543", focus="#93c5fd"),
+    accent=AccentPalette(
+        cyan="#93c5fd",
+        purple="#8b5cf6",
+        green="#16a34a",
+        orange="#f59e0b",
+        red="#ef4444",
+    ),
+)
+
 PALETTES: Dict[str, Palette] = {
     cypherpunk_default.theme_id: cypherpunk_default,
     dark_pro.theme_id: dark_pro,
+    matrix.theme_id: matrix,
+    minimal.theme_id: minimal,
 }
 
 DEFAULT_THEME_ID = cypherpunk_default.theme_id

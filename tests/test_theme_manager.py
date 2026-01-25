@@ -1,15 +1,32 @@
-from tui.themes import theme_manager
 from tui.themes.palettes import DEFAULT_THEME_ID
+from tui.themes.theme_manager import ThemeManager
+from tui.state import session as session_state
 
 
 def test_theme_manager_default(tmp_path, monkeypatch):
-    monkeypatch.setattr(theme_manager, "THEME_STATE_PATH", tmp_path / "themes.json")
-    assert theme_manager.get_theme_for_profile("day_trader") == DEFAULT_THEME_ID
+    monkeypatch.setattr(session_state, "STATE_PATH", tmp_path / "state.json")
+    manager = ThemeManager()
+    manager.set_active_profile("day_trader")
+    assert manager.current_id() == DEFAULT_THEME_ID
 
 
 def test_theme_manager_persists_selection(tmp_path, monkeypatch):
-    path = tmp_path / "themes.json"
-    monkeypatch.setattr(theme_manager, "THEME_STATE_PATH", path)
-    theme_id = theme_manager.set_theme_for_profile("day_trader", "dark_pro")
-    assert theme_id == "dark_pro"
-    assert theme_manager.get_theme_for_profile("day_trader") == "dark_pro"
+    monkeypatch.setattr(session_state, "STATE_PATH", tmp_path / "state.json")
+    manager = ThemeManager()
+    manager.set_active_profile("day_trader")
+    manager.apply(app=DummyApp(), theme_name="dark_pro")
+    reloaded = ThemeManager()
+    reloaded.set_active_profile("day_trader")
+    assert reloaded.current_id() == "dark_pro"
+
+
+class DummyApp:
+    def apply_palette(self, palette) -> None:
+        self.palette = palette
+
+
+def test_theme_manager_lists_all_themes(tmp_path, monkeypatch):
+    monkeypatch.setattr(session_state, "STATE_PATH", tmp_path / "state.json")
+    manager = ThemeManager()
+    available = manager.available()
+    assert set(available) == {"cypherpunk", "dark_pro", "matrix", "minimal"}

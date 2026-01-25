@@ -16,6 +16,7 @@ STATE_PATH = Path("data/tui_state.json")
 class ProfileState:
     panel_order: List[str] = field(default_factory=lambda: list(DEFAULT_PANEL_ORDER))
     collapsed: Dict[str, bool] = field(default_factory=dict)
+    theme: str = ""
 
 
 @dataclass
@@ -30,6 +31,7 @@ class SessionState:
                 name: {
                     "panel_order": state.panel_order,
                     "collapsed": state.collapsed,
+                    "theme": state.theme,
                 }
                 for name, state in self.profiles.items()
             },
@@ -42,6 +44,7 @@ class SessionState:
             profiles[name] = ProfileState(
                 panel_order=list(state.get("panel_order", DEFAULT_PANEL_ORDER)),
                 collapsed=dict(state.get("collapsed", {})),
+                theme=state.get("theme", ""),
             )
         active_profile = payload.get("active_profile", default_profile().name)
         return cls(active_profile=active_profile, profiles=profiles)

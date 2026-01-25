@@ -81,7 +81,7 @@ from .widgets.whale_panel import WhalePanel
 from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
 from backend.network import NetworkClient
 from tui.themes.palettes import Palette
-from tui.themes.theme_manager import get_palette_for_profile, list_theme_ids, set_theme_for_profile
+from tui.themes.theme_manager import ThemeManager
 from tui.feeds.hyperliquid import (
     EventStreamFeed,
     FundingRatesFeed,
@@ -138,7 +138,8 @@ class TickerTapeApp(App):
         self._panels: Dict[str, Static] = {}
         self._last_snapshot_ts: int | None = None
         self._logger = logging.getLogger(__name__)
-        self._palette: Palette = get_palette_for_profile(self.session_state.active_profile)
+        self.theme_manager = ThemeManager(self.session_state)
+        self._palette: Palette = self.theme_manager.current()
 
     def compose(self) -> ComposeResult:
         active_profile = self.session_state.active_profile
@@ -190,6 +191,7 @@ class TickerTapeApp(App):
             yield Footer()
 
     def on_mount(self) -> None:
+        self.apply_palette(self._palette)
         self.alert_stream.start()
         self.set_interval(5, self.refresh_panels)
         self.set_interval(2, self.refresh_status)
@@ -275,8 +277,9 @@ class TickerTapeApp(App):
                 panel.add_class("dim")
                 if isinstance(panel, PanelBase):
                     panel.set_focus(False)
-        self._palette = get_palette_for_profile(profile_name)
-        self._apply_palette_to_panels(self._palette)
+        self.theme_manager.set_active_profile(profile_name)
+        self._palette = self.theme_manager.current()
+        self.apply_palette(self._palette)
         self.session_state.active_profile = profile_name
         save_session_state(self.session_state)
 
@@ -355,14 +358,13 @@ class TickerTapeApp(App):
             return
         if cmd == "theme":
             if not args or args[0] == "list":
-                themes = ", ".join(list_theme_ids())
+                themes = ", ".join(self.theme_manager.available())
                 self.notify(f"Available themes: {themes}")
                 return
             if args[0] == "set" and len(args) > 1:
-                theme_id = set_theme_for_profile(self.session_state.active_profile, args[1])
-                self._palette = get_palette_for_profile(self.session_state.active_profile)
-                self._apply_palette_to_panels(self._palette)
-                self.notify(f"Theme set to {theme_id}")
+                self.theme_manager.set_active_profile(self.session_state.active_profile)
+                self.theme_manager.apply(self, args[1])
+                self.notify(f"Theme set to {self.theme_manager.current_id()}")
                 return
             self.notify("Usage: /theme list | /theme set <name>", severity="warning")
             return
@@ -394,6 +396,18 @@ class TickerTapeApp(App):
 
     def _open_roadmap(self) -> None:
         self.push_screen(RoadmapScreen())
+
+    def apply_palette(self, palette: Palette) -> None:
+        self._palette = palette
+        self.styles.background = palette.bg.primary
+        self.styles.color = palette.text.primary
+        try:
+            title = self.query_one("#title")
+            title.styles.background = palette.bg.panel
+            title.styles.color = palette.accent.cyan
+        except Exception:
+            pass
+        self._apply_palette_to_panels(palette)
 
     def _apply_palette_to_panels(self, palette: Palette) -> None:
         for panel in self._panels.values():
