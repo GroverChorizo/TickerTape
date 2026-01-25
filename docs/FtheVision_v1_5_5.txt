@@ -2145,16 +2145,14 @@ W, L, F, S, etc.           → Panel shortcuts (customizable)
 /split vertical            → Split vertically
 ```
 
-Your Prompt:
+
 """
-This is all great! I think this is going to look amazing. thank you!
 Remember our core values:
 * Data security first. Our users should feel confident in the fact that everything runs locally (aside from the AI, to which we will add guardrails when we implement) and their data and intellectual property is secure locally. any exports should only export to their local machine. This is why we want everything running in their terminal. quants love privacy.
 * Precision in data, accuracy in action. Our data is never synthetic or modified EVER, our testing apps are finely tuned accurate algorithms designed to provide users with fast, accurate, actionable results to find alpha in their strategies.
 * Normal People, Institutional-Grade tools. Our data streams and back testing/monte carlo/walk forward testing should exemplify industry standard logic and function in a beautifully responsive TUI environment. Ensuring users find an Edge in the market with ease.
 * WE WILL NEVER GIVE FINANCIAL ADVICE AND NO DEFAULT TRADING ALGOS SHOULD EVER BE RUN IN LIVE ENVIRONMENTS. DO YOUR OWN RESEARCH.
-with that in mind, now merge the updates to two files called BtheVision_v1_5 and FtheVision_v1_5, BtheVision = Backend vision content and FtheVision = Frontend vision content. Ensure that we exemplify our core values, and make sure the code is annotated for when I review it. Thank you. theVision_v1_5 documents will be powerhouse prompts when we finish!
-Examine the context and links provided please, then make the necessary updates and merge the content to the respective (B or F)theVision_v1_5 document. I will attach all documents for context and links below.
+
 Links:
 MoonDev HL API docs: https://moondev.com/docs
 My Forked Repo for the API: @GroverChorizo/Hyperliquid-Data-Layer-API
