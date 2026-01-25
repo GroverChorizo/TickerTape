@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import shlex
 import sys
 from pathlib import Path
@@ -42,6 +43,7 @@ class TickerTapeApp(App):
         ("ctrl+4", "toggle_panel('event_stream')", "Toggle event stream"),
         ("ctrl+5", "toggle_panel('alerts')", "Toggle alerts"),
         ("ctrl+6", "toggle_panel('research')", "Toggle research"),
+        ("r", "refresh_panels", "Refresh panels"),
     ]
 
     def __init__(self) -> None:
@@ -52,6 +54,7 @@ class TickerTapeApp(App):
         self.research_queue = ResearchQueue()
         self._panels: Dict[str, Static] = {}
         self._last_snapshot_ts: int | None = None
+        self._logger = logging.getLogger(__name__)
 
     def compose(self) -> ComposeResult:
         active_profile = self.session_state.active_profile
@@ -102,24 +105,38 @@ class TickerTapeApp(App):
     def refresh_panels(self) -> None:
         liquidations = self._panels.get("liquidations")
         if isinstance(liquidations, LiquidationsPanel):
-            liquidations.refresh_snapshots()
+            self._safe_refresh(
+                liquidations,
+                "liquidations",
+                lambda: liquidations.refresh_snapshots(),
+            )
             latest = max((s.get("computed_at_ts_ms") for s in liquidations.snapshots.values()), default=None)
             self._last_snapshot_ts = latest
         funding = self._panels.get("funding")
         if isinstance(funding, FundingPanel):
-            funding.refresh_panel()
+            self._safe_refresh(funding, "funding", funding.refresh_panel)
         whales = self._panels.get("whales")
         if isinstance(whales, WhalePanel):
-            whales.refresh_panel()
+            self._safe_refresh(whales, "whales", whales.refresh_panel)
         events = self._panels.get("event_stream")
         if isinstance(events, EventStream):
-            events.refresh_panel()
+            self._safe_refresh(events, "event_stream", events.refresh_panel)
         alerts = self._panels.get("alerts")
         if isinstance(alerts, AlertPanel):
-            alerts.refresh_panel()
+            self._safe_refresh(alerts, "alerts", alerts.refresh_panel)
         research = self._panels.get("research")
         if isinstance(research, BacktestPanel):
-            research.refresh_panel()
+            self._safe_refresh(research, "research", research.refresh_panel)
+
+    def _safe_refresh(self, panel: Static, name: str, fn) -> None:
+        try:
+            fn()
+        except Exception as exc:
+            self._logger.exception("Panel refresh failed: %s", name)
+            if hasattr(panel, "update_text"):
+                panel.update_text(f"Panel error. Press R to retry. ({type(exc).__name__})")
+            else:
+                panel.update(f"Panel error. Press R to retry. ({type(exc).__name__})")
 
     def refresh_status(self) -> None:
         status = self.query_one(StatusBar)
@@ -162,6 +179,9 @@ class TickerTapeApp(App):
         profile_state = get_profile_state(self.session_state, self.session_state.active_profile)
         profile_state.collapsed[panel_id] = not panel.display
         save_session_state(self.session_state)
+
+    def action_refresh_panels(self) -> None:
+        self.refresh_panels()
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         command = event.value.strip()

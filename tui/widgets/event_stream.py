@@ -18,7 +18,7 @@ class EventStream(PanelBase):
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         events = recent_events(registry, "feed=liquidations_events", now_ms - 5 * 60 * 1000)
         if not events:
-            self.update("No liquidation events available in the last 5 minutes.")
+            self.update_text("No liquidation events available in the last 5 minutes.")
             return
         lines: List[str] = []
         for event in events[-10:]:
@@ -27,7 +27,7 @@ class EventStream(PanelBase):
             side = event.get("side", "?")
             size = event.get("size", "?")
             lines.append(f"[{fmt_ts(ts)}] {symbol} {side} size={size}")
-        self.update("\n".join(lines))
+        self.update_text("\n".join(lines))
 
 
 def fmt_ts(ts: int | None) -> str:

@@ -8,7 +8,7 @@ import re
 from backend.storage import DatasetRegistry
 
 
-TIMEFRAME_PATTERN = re.compile(r"timeframe=([^/]+)")
+TIMEFRAME_PATTERN = re.compile(r"timeframe=([^/\\\\]+)")
 
 
 @dataclass

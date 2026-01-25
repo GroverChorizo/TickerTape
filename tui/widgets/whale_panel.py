@@ -18,12 +18,12 @@ class WhalePanel(PanelBase):
         registry = get_registry()
         datasets = load_datasets(registry)
         if "feed=whale_trades" not in datasets:
-            self.update("Whale trades feed unavailable (stub or missing).")
+            self.update_text("Whale trades feed unavailable (stub or missing).")
             return
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         events = recent_events(registry, "feed=whale_trades", now_ms - 60 * 60 * 1000)
         if not events:
-            self.update("No whale trade data available in the last hour.")
+            self.update_text("No whale trade data available in the last hour.")
             return
         lines: List[str] = ["Recent whale trades (last hour):"]
         for event in events[-5:]:
@@ -32,4 +32,4 @@ class WhalePanel(PanelBase):
             size = event.get("size", "?")
             price = event.get("price", "?")
             lines.append(f"- {symbol} {side} size={size} price={price}")
-        self.update("\n".join(lines))
+        self.update_text("\n".join(lines))
