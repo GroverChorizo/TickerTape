@@ -51,6 +51,14 @@ Quick commands:
   The TUI reads local datasets from `data/parquet/` and listens for alerts on `127.0.0.1:8765`.
   Run ingestion first to populate liquidation snapshots and start the alert notifier to stream alerts.
 
+- Run the setup wizard:
+
+    python -m tui.app --setup
+
+- Run ingestion once (liquidations dashboard):
+
+    python tools/run_ingestion.py --profile liquidations_dashboard --once
+
 ## TUI Setup, Troubleshooting, and Extension
 
 ### Setup

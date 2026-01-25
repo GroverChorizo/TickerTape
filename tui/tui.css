@@ -88,3 +88,12 @@ WalletDetailPanel {
     padding-top: 1;
     color: #b0bec5;
 }
+
+#wizard {
+    padding: 1;
+    border: tall #233145;
+}
+
+#roadmap_body {
+    padding-top: 1;
+}

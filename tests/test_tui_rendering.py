@@ -38,12 +38,15 @@ def test_liquidations_panel_handles_markup_strings(monkeypatch):
 
         return DummyRegistry()
 
-    def fake_get_latest_snapshot(_registry, _dataset, _timeframe):
-        return None
+    def fake_get_latest_snapshot_with_path(_registry, _dataset, _timeframe):
+        return None, None
 
     monkeypatch.setattr("tui.widgets.liquidations_panel.load_datasets", fake_load_datasets)
     monkeypatch.setattr("tui.widgets.liquidations_panel.get_registry", fake_get_registry)
-    monkeypatch.setattr("tui.widgets.liquidations_panel.get_latest_snapshot", fake_get_latest_snapshot)
+    monkeypatch.setattr(
+        "tui.widgets.liquidations_panel.get_latest_snapshot_with_path",
+        fake_get_latest_snapshot_with_path,
+    )
 
     async def _run() -> None:
         async with app.run_test():
@@ -69,7 +72,10 @@ def test_liquidations_panel_handles_empty_registry(monkeypatch):
     monkeypatch.setattr("tui.widgets.liquidations_panel.load_datasets", fake_load_datasets)
     monkeypatch.setattr("tui.widgets.liquidations_panel.get_registry", fake_get_registry)
 
-    monkeypatch.setattr("tui.widgets.liquidations_panel.get_latest_snapshot", lambda *_: None)
+    monkeypatch.setattr(
+        "tui.widgets.liquidations_panel.get_latest_snapshot_with_path",
+        lambda *_: (None, None),
+    )
 
     async def _run() -> None:
         async with app.run_test():

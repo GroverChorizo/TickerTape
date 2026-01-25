@@ -6,6 +6,7 @@ from typing import List
 
 from ..backend.registry import get_registry
 from ..backend.queries import recent_events
+from ..backend.snapshots import get_latest_snapshot
 from .panel_base import PanelBase
 from .wallet_panel import WalletsDiscovered
 
@@ -19,7 +20,12 @@ class EventStream(PanelBase):
         now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
         events = recent_events(registry, "feed=liquidations_events", now_ms - 5 * 60 * 1000)
         if not events:
-            self.update_text("No liquidation events available in the last 5 minutes.")
+            snapshot = get_latest_snapshot(registry, "feed=liquidations_snapshots", "10m")
+            if snapshot:
+                ts = snapshot.get("computed_at_ts_ms")
+                self.update_text(f"Waiting for event stream. Latest snapshot at {fmt_ts(ts)}.")
+            else:
+                self.update_text("Waiting for event stream. No recent snapshots available.")
             return
         lines: List[str] = []
         for event in events[-10:]:

@@ -22,6 +22,18 @@ From the repository root:
 python -m tui.app
 ```
 
+Run the setup wizard:
+
+```bash
+python -m tui.app --setup
+```
+
+CLI flags:
+
+- `--profile <name>` start in a profile
+- `--data-root <path>` override data root
+- `--offline` force offline demo mode
+
 ## Command Palette
 
 Use the command bar at the bottom for orchestration:
@@ -31,6 +43,9 @@ Use the command bar at the bottom for orchestration:
 - `/backtest sweep --strategy PATH --dataset DATASET --timeframe 1h --grid key=1,2 --seed 123`
 - `/montecarlo run ...`
 - `/walkforward run ...`
+- `/ingest` (run a single ingestion cycle)
+- `/diag` (print diagnostics)
+- `/plan` (show roadmap)
 
 If no backtest runner is configured, jobs are recorded as **blocked** with the explicit reason.
 
