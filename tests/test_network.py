@@ -5,6 +5,9 @@ import pytest
 from backend.network import NetworkClient
 import httpx
 
+pytest.importorskip("textual")
+pytest.importorskip("httpx")
+
 
 class DummyResponse:
     def __init__(self, status_code:int, json_obj=None):
