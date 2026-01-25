@@ -48,8 +48,10 @@ Quick commands:
 
     python -m tui.app
 
-  The TUI reads local datasets from `data/parquet/` and listens for alerts on `127.0.0.1:8765`.
-  Run ingestion first to populate liquidation snapshots and start the alert notifier to stream alerts.
+  The TUI reads local datasets from `data/parquet/`, listens for alerts on `127.0.0.1:8765`,
+  and streams live market data for liquidations, funding rates, whale trades, and event stream panels.
+  Run ingestion first to populate liquidation snapshots (used by non-live panels) and start the alert
+  notifier to stream alerts.
 
 - Run the setup wizard:
 
@@ -70,6 +72,7 @@ Quick commands:
 - **No liquidation snapshots:** run `python tools/run_ingestion.py --profile liquidations_dashboard --once` to populate `data/parquet/`.
 - **Alert panel disconnected:** ensure the backend alert notifier is running and listening on `127.0.0.1:8765`.
 - **Research jobs blocked:** configure `TICKERTAPE_BACKTEST_RUNNER` or accept the explicit blocked state (no synthetic results are shown).
+- **Live feeds show “Disconnected” or “No data”:** network access is unavailable or the Hyperliquid API is rate-limiting; the panels will retry with backoff and show last-known-good data when available.
 
 ### Adding Strategies & Datasets (Research Only)
 - Place strategy files locally and reference them via `/backtest run --strategy /path/to/strategy.py`.

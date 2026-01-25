@@ -4,9 +4,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import List
 
-from ..backend.registry import get_registry
-from ..backend.queries import recent_events
-from ..backend.snapshots import get_latest_snapshot
+from ..feeds.base import FeedResult
 from .panel_base import PanelBase
 from .wallet_panel import WalletsDiscovered
 
@@ -14,20 +12,42 @@ from .wallet_panel import WalletsDiscovered
 class EventStream(PanelBase):
     def __init__(self) -> None:
         super().__init__(panel_id="event_stream", title="Live Event Stream")
+        self.feed_result = FeedResult(status="loading")
+
+    def update_feed(self, result: FeedResult) -> None:
+        self.feed_result = result
+        self.refresh_panel()
 
     def refresh_panel(self) -> None:
-        registry = get_registry()
-        now_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
-        events = recent_events(registry, "feed=liquidations_events", now_ms - 5 * 60 * 1000)
-        if not events:
-            snapshot = get_latest_snapshot(registry, "feed=liquidations_snapshots", "10m")
-            if snapshot:
-                ts = snapshot.get("computed_at_ts_ms")
-                self.update_text(f"Waiting for event stream. Latest snapshot at {fmt_ts(ts)}.")
-            else:
-                self.update_text("Waiting for event stream. No recent snapshots available.")
+        status = self.feed_result.status
+        if status == "loading":
+            self.render_loading()
+            return
+        if status in {"error", "disconnected"} and not self.feed_result.data:
+            self.render_error(self.feed_result.error or "Unknown error", hint="Retrying with backoff.")
+            return
+        if status == "empty" and not self.feed_result.data:
+            self.render_empty("No data yet.")
+            return
+        self.render_data(self.feed_result.data, status=status, is_lkg=self.feed_result.is_lkg)
+
+    def render_loading(self) -> None:
+        self.update_text("Loading live events...")
+
+    def render_empty(self, reason: str) -> None:
+        self.update_text(f"No data. {reason}")
+
+    def render_error(self, error: str, hint: str) -> None:
+        self.update_text(f"Error: {error}\n{hint}")
+
+    def render_data(self, payload: dict, status: str = "ok", is_lkg: bool = False) -> None:
+        events = payload.get("events") if isinstance(payload, dict) else None
+        if not isinstance(events, list) or not events:
+            self.update_text("Waiting for event stream. No recent events available.")
             return
         lines: List[str] = []
+        if status == "disconnected" or is_lkg:
+            lines.append("Disconnected — showing last known data.")
         for event in events[-10:]:
             ts = event.get("timestamp_ms") or hint_ts(event)
             symbol = event.get("symbol", "?")

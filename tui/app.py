@@ -80,8 +80,14 @@ from .widgets.status_bar import StatusBar
 from .widgets.whale_panel import WhalePanel
 from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
 from backend.network import NetworkClient
-from backend.feeds.liquidations_stats import LiquidationsStatsFeed
 from backend.feeds.positions import PositionsFeed
+from tui.feeds.hyperliquid import (
+    EventStreamFeed,
+    FundingRatesFeed,
+    HyperliquidClient,
+    LiquidationsFeed,
+    WhaleTradesFeed,
+)
 from .streaming import StreamSupervisor
 
 
@@ -110,10 +116,17 @@ class TickerTapeApp(App):
         self.research_queue = ResearchQueue()
         self.streams = StreamSupervisor()
         self.client = NetworkClient()
-        self.liquidations_stats_feed = LiquidationsStatsFeed(self.client, offline=self.config.mode == "offline_demo")
+        self.live_client = HyperliquidClient()
+        self.liquidations_stats_feed = LiquidationsFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.positions_feed = PositionsFeed(self.client, offline=self.config.mode == "offline_demo")
+        self.funding_feed = FundingRatesFeed(client=self.client, registry=self.registry, coins=None, poll_interval=10.0, offline=self.config.mode == "offline_demo")
+        self.whales_feed = WhaleTradesFeed(self.live_client, offline=self.config.mode == "offline_demo")
+        self.events_feed = EventStreamFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.streams.register(self.liquidations_stats_feed)
         self.streams.register(self.positions_feed)
+        self.streams.register(self.funding_feed)
+        self.streams.register(self.whales_feed)
+        self.streams.register(self.events_feed)
         self._panels: Dict[str, Static] = {}
         self._last_snapshot_ts: int | None = None
         self._logger = logging.getLogger(__name__)
@@ -181,6 +194,10 @@ class TickerTapeApp(App):
             self.client.close()
         except Exception:
             pass
+        try:
+            self.live_client.close()
+        except Exception:
+            pass
 
     def refresh_panels(self) -> None:
         liquidations = self._panels.get("liquidations")
@@ -188,23 +205,22 @@ class TickerTapeApp(App):
             self._safe_refresh(
                 liquidations,
                 "liquidations",
-                lambda: liquidations.refresh_snapshots(),
+                lambda: liquidations.update_feed(self.liquidations_stats_feed.latest()),
             )
-            latest = max((s.get("computed_at_ts_ms") for s in liquidations.snapshots.values()), default=None)
-            self._last_snapshot_ts = latest
+            self._last_snapshot_ts = self.liquidations_stats_feed.latest().updated_ts_ms
         positions = self._panels.get("positions")
         if isinstance(positions, PositionsPanel):
             positions.update_payload(self.positions_feed.latest() or {"status": self.positions_feed.state.status})
             self._safe_refresh(positions, "positions", positions.refresh_panel)
         funding = self._panels.get("funding")
         if isinstance(funding, FundingPanel):
-            self._safe_refresh(funding, "funding", funding.refresh_panel)
+            self._safe_refresh(funding, "funding", lambda: funding.update_feed(self.funding_feed.latest()))
         whales = self._panels.get("whales")
         if isinstance(whales, WhalePanel):
-            self._safe_refresh(whales, "whales", whales.refresh_panel)
+            self._safe_refresh(whales, "whales", lambda: whales.update_feed(self.whales_feed.latest()))
         events = self._panels.get("event_stream")
         if isinstance(events, EventStream):
-            self._safe_refresh(events, "event_stream", events.refresh_panel)
+            self._safe_refresh(events, "event_stream", lambda: events.update_feed(self.events_feed.latest()))
         alerts = self._panels.get("alerts")
         if isinstance(alerts, AlertPanel):
             self._safe_refresh(alerts, "alerts", alerts.refresh_panel)

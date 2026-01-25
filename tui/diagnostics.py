@@ -19,6 +19,13 @@ def _version(pkg: str) -> str:
     except Exception:
         return "unknown"
 
+def _path_posix(p: Path | None) -> str | None:
+    if p is None:
+        return None
+    # Force stable, cross-OS display paths for diagnostics
+    return p.as_posix().replace("\\", "/")
+
+
 
 def _path_posix(p: Path | None) -> str | None:
     if p is None:

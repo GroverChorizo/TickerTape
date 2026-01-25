@@ -6,6 +6,7 @@ import logging
 from typing import Dict, Optional
 
 from backend.feeds.base import BaseFeed
+from tui.feeds.base import BaseFeed as TuiFeedBase
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ class StreamSupervisor:
         self._feeds: Dict[str, BaseFeed] = {}
         self._running = False
 
-    def register(self, feed: BaseFeed) -> None:
+    def register(self, feed: BaseFeed | TuiFeedBase) -> None:
         self._feeds[feed.name] = feed
 
     def start(self) -> None:
@@ -32,24 +33,42 @@ class StreamSupervisor:
             task.cancel()
         self._tasks = {}
 
-    async def _poll(self, feed: BaseFeed) -> None:
+    async def _poll(self, feed: BaseFeed | TuiFeedBase) -> None:
         backoff = 1.0
         while self._running:
             try:
-                payload = feed.fetch()
-                feed.update(payload)
-                backoff = 1.0
+                if isinstance(feed, TuiFeedBase):
+                    result = feed.fetch_result()
+                    backoff = 1.0 if result.status == "ok" else backoff
+                    delay = feed.next_delay(result.status)
+                else:
+                    payload = feed.fetch()
+                    feed.update(payload)
+                    backoff = 1.0
+                    delay = feed.poll_interval if feed.state.status != "error" else backoff
             except Exception as exc:
                 logger.warning({"event": "feed_error", "feed": feed.name, "error": str(exc)})
-                feed.set_error(str(exc))
-                backoff = min(backoff * 2, 30.0)
-            await asyncio.sleep(feed.poll_interval if feed.state.status != "error" else backoff)
+                if isinstance(feed, TuiFeedBase):
+                    feed.fetch_result()
+                    backoff = min(backoff * 2, feed.max_backoff)
+                    delay = backoff
+                else:
+                    feed.set_error(str(exc))
+                    backoff = min(backoff * 2, 30.0)
+                    delay = backoff
+            await asyncio.sleep(delay)
 
     async def run_once(self, feed_name: str) -> None:
         feed = self._feeds[feed_name]
         try:
-            payload = feed.fetch()
-            feed.update(payload)
+            if isinstance(feed, TuiFeedBase):
+                feed.fetch_result()
+            else:
+                payload = feed.fetch()
+                feed.update(payload)
         except Exception as exc:
-            feed.set_error(str(exc))
+            if isinstance(feed, TuiFeedBase):
+                feed.fetch_result()
+            else:
+                feed.set_error(str(exc))
             logger.warning({"event": "feed_error", "feed": feed.name, "error": str(exc)})
