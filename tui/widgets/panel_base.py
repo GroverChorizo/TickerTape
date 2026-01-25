@@ -14,6 +14,9 @@ class PanelBase(Static):
     def set_collapsed(self, collapsed: bool) -> None:
         self.display = not collapsed
 
-    def update_text(self, content: str) -> None:
+    def update_text(self, content: str | Text) -> None:
         """Update panel content using plain text (no markup)."""
-        self.update(Text(content))
+        if isinstance(content, Text):
+            self.update(content)
+        else:
+            self.update(Text(content))

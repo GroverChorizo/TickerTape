@@ -7,6 +7,7 @@ from typing import List
 from ..backend.registry import get_registry
 from ..backend.queries import recent_events
 from .panel_base import PanelBase
+from .wallet_panel import WalletsDiscovered
 
 
 class EventStream(PanelBase):
@@ -28,6 +29,9 @@ class EventStream(PanelBase):
             size = event.get("size", "?")
             lines.append(f"[{fmt_ts(ts)}] {symbol} {side} size={size}")
         self.update_text("\n".join(lines))
+        wallets = _extract_wallets(events)
+        if wallets:
+            self.post_message(WalletsDiscovered(wallets, source="event_stream"))
 
 
 def fmt_ts(ts: int | None) -> str:
@@ -44,3 +48,13 @@ def hint_ts(event: dict) -> int | None:
         except Exception:
             return None
     return None
+
+
+def _extract_wallets(events: List[dict]) -> List[str]:
+    wallets: List[str] = []
+    for event in events:
+        for key in ("wallet", "wallet_address", "address"):
+            value = event.get(key)
+            if isinstance(value, str) and value:
+                wallets.append(value)
+    return wallets

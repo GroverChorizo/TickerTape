@@ -8,6 +8,7 @@ from ..backend.registry import get_registry
 from ..backend.queries import recent_events
 from ..state.datasets import load_datasets
 from .panel_base import PanelBase
+from .wallet_panel import WalletsDiscovered
 
 
 class WhalePanel(PanelBase):
@@ -31,5 +32,20 @@ class WhalePanel(PanelBase):
             side = event.get("side", "?")
             size = event.get("size", "?")
             price = event.get("price", "?")
-            lines.append(f"- {symbol} {side} size={size} price={price}")
+            wallet = event.get("wallet") or event.get("wallet_address") or event.get("address")
+            wallet_hint = f" wallet={wallet}" if isinstance(wallet, str) and wallet else ""
+            lines.append(f"- {symbol} {side} size={size} price={price}{wallet_hint}")
         self.update_text("\n".join(lines))
+        wallets = _extract_wallets(events)
+        if wallets:
+            self.post_message(WalletsDiscovered(wallets, source="whales"))
+
+
+def _extract_wallets(events: List[dict]) -> List[str]:
+    wallets: List[str] = []
+    for event in events:
+        for key in ("wallet", "wallet_address", "address"):
+            value = event.get(key)
+            if isinstance(value, str) and value:
+                wallets.append(value)
+    return wallets

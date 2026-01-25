@@ -31,6 +31,7 @@ from .widgets.liquidations_panel import LiquidationsPanel
 from .widgets.profile_selector import ProfileSelector, ProfileSelected
 from .widgets.status_bar import StatusBar
 from .widgets.whale_panel import WhalePanel
+from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
 
 
 class TickerTapeApp(App):
@@ -91,6 +92,12 @@ class TickerTapeApp(App):
                 alert_panel = AlertPanel(self.alert_stream)
                 self._panels["alerts"] = alert_panel
                 yield alert_panel
+                wallet_panel = WalletPanel()
+                self._panels["wallets"] = wallet_panel
+                yield wallet_panel
+                wallet_detail = WalletDetailPanel()
+                self._panels["wallet_detail"] = wallet_detail
+                yield wallet_detail
         with Vertical(id="footer"):
             yield Input(placeholder="Command palette: /profile, /backtest, /montecarlo, /walkforward", id="command")
             yield StatusBar(id="status")
@@ -166,6 +173,16 @@ class TickerTapeApp(App):
 
     def on_profile_selected(self, message: ProfileSelected) -> None:
         self.apply_profile(message.profile_name)
+
+    def on_wallets_discovered(self, message: WalletsDiscovered) -> None:
+        panel = self._panels.get("wallets")
+        if isinstance(panel, WalletPanel):
+            panel.update_wallets(message.addresses, message.source)
+
+    def on_wallet_selected(self, message: WalletSelected) -> None:
+        panel = self._panels.get("wallet_detail")
+        if isinstance(panel, WalletDetailPanel):
+            panel.update_wallet(message.address, message.source)
 
     def action_focus_command(self) -> None:
         self.query_one("#command", Input).focus()
