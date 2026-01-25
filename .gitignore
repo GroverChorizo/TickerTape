@@ -17,6 +17,12 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Runtime / generated data
+data/
+outputs/
+*.parquet
+*.ndjson
+
 # Data caches and research artifacts (local-only)
 local_cache/
 *.ndjson
