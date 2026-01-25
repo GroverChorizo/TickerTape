@@ -44,6 +44,30 @@ Quick commands:
 
     python examples/alert_client.py
 
+- Launch the TickerTape TUI (from repo root):
+
+    python -m tui.app
+
+  The TUI reads local datasets from `data/parquet/` and listens for alerts on `127.0.0.1:8765`.
+  Run ingestion first to populate liquidation snapshots and start the alert notifier to stream alerts.
+
+## TUI Setup, Troubleshooting, and Extension
+
+### Setup
+- Install dependencies: `pip install -r requirements.txt` (includes Textual for the TUI).
+- Optional: configure a research runner by setting `TICKERTAPE_BACKTEST_RUNNER` to a local command
+  template (e.g. `python /path/to/runner.py --strategy {strategy} --dataset {dataset} --timeframe {timeframe} --params '{params}' --seed {seed} --out {out}`).
+
+### Troubleshooting
+- **No liquidation snapshots:** run `python tools/run_ingestion.py --profile liquidations_dashboard --once` to populate `data/parquet/`.
+- **Alert panel disconnected:** ensure the backend alert notifier is running and listening on `127.0.0.1:8765`.
+- **Research jobs blocked:** configure `TICKERTAPE_BACKTEST_RUNNER` or accept the explicit blocked state (no synthetic results are shown).
+
+### Adding Strategies & Datasets (Research Only)
+- Place strategy files locally and reference them via `/backtest run --strategy /path/to/strategy.py`.
+- Import datasets into `data/parquet/` using the ingestion pipeline or your own local export; the TUI reads registry entries from `data/parquet/_registry.json`.
+- Always keep strategies local and deterministic. No network access or external APIs are permitted during backtests.
+
 
 ## Support the Project
 

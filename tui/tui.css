@@ -1,0 +1,76 @@
+Screen {
+    background: #050a12;
+    color: #d6e2f0;
+}
+
+#title {
+    dock: top;
+    height: 3;
+    content-align: center middle;
+    background: #0a1420;
+    color: #4dd0e1;
+    text-style: bold;
+}
+
+#body {
+    height: 1fr;
+}
+
+#left {
+    width: 24;
+    padding: 1;
+    border: tall #1f2a38;
+}
+
+#center {
+    width: 1fr;
+    padding: 1;
+    border: tall #1f2a38;
+}
+
+#right {
+    width: 32;
+    padding: 1;
+    border: tall #1f2a38;
+}
+
+.section {
+    text-style: bold;
+    padding-bottom: 1;
+}
+
+.help {
+    color: #7f8fa6;
+}
+
+PanelBase {
+    border: tall #233145;
+    padding: 1;
+    margin-bottom: 1;
+    background: #0b111a;
+}
+
+.focus {
+    border: tall #4dd0e1;
+}
+
+.dim {
+    color: #6f7d90;
+}
+
+#footer {
+    dock: bottom;
+    height: 6;
+    border-top: tall #1f2a38;
+    padding: 1;
+}
+
+#command {
+    width: 100%;
+}
+
+#status {
+    width: 100%;
+    padding-top: 1;
+    color: #b0bec5;
+}
