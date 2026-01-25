@@ -2,6 +2,8 @@
 # Purpose: prevent local research artifacts, secrets, and scratch files from being committed
 
 # Virtual environments
+algo/
+TickerTape/
 venv/
 .venv/
 env/
