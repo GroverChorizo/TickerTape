@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import List
 
 from ..feeds.base import FeedResult
-from tui.render.palette import build_text, error_footer, format_last_good, muted_line, status_line
+from tui.render.palette import build_text, format_last_good, last_updated_line, muted_line, panel_header
 from .panel_base import PanelBase
 
 
@@ -43,7 +43,8 @@ class LiquidationsPanel(PanelBase):
     def render_loading(self) -> None:
         self.set_status_class("loading")
         lines = [
-            status_line("loading", self.palette),
+            panel_header(self.title, "loading", self.palette),
+            last_updated_line(self.feed_result.updated_ts_ms, self.palette),
             muted_line("Loading liquidation stats...", self.palette),
         ]
         self.update_text(build_text(lines))
@@ -51,15 +52,20 @@ class LiquidationsPanel(PanelBase):
     def render_empty(self, reason: str) -> None:
         self.set_status_class("empty")
         lines = [
-            status_line("empty", self.palette),
+            panel_header(self.title, "empty", self.palette),
+            last_updated_line(self.feed_result.updated_ts_ms, self.palette),
             muted_line(f"No data. {reason}", self.palette),
         ]
         self.update_text(build_text(lines))
 
     def render_error(self, error: str, hint: str, updated_ts_ms: int | None) -> None:
         self.set_status_class("error")
-        lines = error_footer(error, updated_ts_ms, backoff_note="feed-managed", palette=self.palette)
-        lines.append((f"Hint: {hint}", self.palette.text.muted))
+        lines = [
+            panel_header(self.title, "error", self.palette),
+            last_updated_line(updated_ts_ms, self.palette),
+            (error, self.palette.text.primary),
+            (f"Hint: {hint}", self.palette.text.muted),
+        ]
         self.update_text(build_text(lines))
 
     def render_data(
@@ -73,13 +79,18 @@ class LiquidationsPanel(PanelBase):
         if not isinstance(snapshot, dict):
             self.set_status_class("empty")
             lines = [
-                status_line("empty", self.palette),
+                panel_header(self.title, "empty", self.palette),
+                last_updated_line(updated_ts_ms, self.palette),
                 muted_line("No liquidation snapshot data available.", self.palette),
             ]
             self.update_text(build_text(lines))
             return
         self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        styled_lines = [status_line("disconnected" if status == "disconnected" else "ok", self.palette)]
+        status_value = "disconnected" if status == "disconnected" else "ok"
+        styled_lines = [
+            panel_header(self.title, status_value, self.palette),
+            last_updated_line(updated_ts_ms, self.palette),
+        ]
         if status == "disconnected" or is_lkg:
             styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
         total = snapshot.get("total_notional")

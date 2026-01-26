@@ -15,11 +15,24 @@ to apply the returned secrets into `os.environ` if they wish.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Tuple
 import os
+import sys
 
 _DEFAULT_PATH = Path.home() / ".tickertape" / "secrets" / "HLdontShare.env"
 _ENV_VARS = ["HL_DONT_SHARE_PATH", "HLDONT_SHARE_PATH", "TICKERTAPE_SECRETS_PATH"]
+_MOONDEV_ENV = "MOONDEV_API_KEY"
+_CONFIG_ENV = "TICKERTAPE_CONFIG_PATH"
+
+
+def _default_config_path() -> Path:
+    if sys.platform.startswith("win"):
+        base = Path(os.environ.get("APPDATA", Path.home()))
+        return base / "TickerTape" / "config.env"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "TickerTape" / "config.env"
+    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "tickertape" / "config.env"
 
 
 def _parse_env_file(path: Path) -> Dict[str, str]:
@@ -75,4 +88,53 @@ def load_secrets(path: Optional[Path] = None, env_var_names: Optional[Iterable[s
     return {}
 
 
-__all__ = ["load_secrets", "_DEFAULT_PATH"]
+def resolve_moondev_api_key(
+    *,
+    config_path: Optional[Path] = None,
+    dotenv_path: Optional[Path] = None,
+) -> Tuple[Optional[str], Optional[str]]:
+    """Resolve MoonDev API key from env, config, or .env files.
+
+    Precedence:
+    1) Environment variable MOONDEV_API_KEY
+    2) Config file (override via TICKERTAPE_CONFIG_PATH)
+    3) Optional .env in the current working directory
+    """
+    env_val = os.environ.get(_MOONDEV_ENV)
+    if env_val:
+        return env_val.strip(), f"env:{_MOONDEV_ENV}"
+
+    config_candidate = config_path
+    if config_candidate is None:
+        override = os.environ.get(_CONFIG_ENV)
+        if override:
+            config_candidate = Path(override).expanduser()
+        else:
+            config_candidate = _default_config_path()
+    if config_candidate and config_candidate.exists() and config_candidate.is_file():
+        data = _parse_env_file(config_candidate)
+        val = data.get(_MOONDEV_ENV)
+        if val:
+            return val.strip(), f"config:{config_candidate}"
+
+    env_candidate = dotenv_path or Path.cwd() / ".env"
+    if env_candidate.exists() and env_candidate.is_file():
+        data = _parse_env_file(env_candidate)
+        val = data.get(_MOONDEV_ENV)
+        if val:
+            return val.strip(), f"dotenv:{env_candidate}"
+
+    return None, None
+
+
+def moondev_config_help() -> str:
+    config_path = os.environ.get(_CONFIG_ENV) or str(_default_config_path())
+    return (
+        "MoonDev API key missing. Set MOONDEV_API_KEY or place it in:\n"
+        f"- {config_path}\n"
+        "Format: MOONDEV_API_KEY=your_key\n"
+        "You can also use a local .env for dev (gitignored)."
+    )
+
+
+__all__ = ["load_secrets", "_DEFAULT_PATH", "resolve_moondev_api_key", "moondev_config_help"]
