@@ -51,7 +51,7 @@ logging.LoggerAdapter.__call__ = _adapter_call  # type: ignore[assignment]
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Input, Static
+from textual.widgets import Input, Static
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
@@ -188,7 +188,7 @@ class TickerTapeApp(App):
         with Vertical(id="footer"):
             yield Input(placeholder="Command palette: /profile, /backtest, /montecarlo, /walkforward", id="command")
             yield StatusBar(id="status")
-            yield Footer()
+            yield Static("Ctrl+P command | Ctrl+1-6 panels | C cycle coin | R refresh | P roadmap", id="shortcuts")
 
     def on_mount(self) -> None:
         self.apply_palette(self._palette)

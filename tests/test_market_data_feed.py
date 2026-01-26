@@ -9,10 +9,10 @@ class DummyClient:
     def __init__(self, responses):
         self.responses = responses
 
-    def get_json(self, path, params=None):
-        key = path
+    def get_json(self, endpoint_key, params=None, **kwargs):
+        key = (endpoint_key, tuple(sorted(kwargs.items())))
         if params:
-            key = (path, tuple(sorted(params.items())))
+            key = (endpoint_key, tuple(sorted(kwargs.items())), tuple(sorted(params.items())))
         value = self.responses[key]
         if isinstance(value, list):
             if not value:
@@ -42,11 +42,11 @@ def test_parse_candles_minimal_schema():
 
 def test_market_data_feed_disconnect_and_recovery():
     responses = {
-        "/api/prices": [{"symbol": "BTC", "price": 1}],
-        "/api/price/BTC": {"bestBid": 1, "bestAsk": 2},
-        "/api/orderbook/BTC": {"bids": [[1, 1]], "asks": [[2, 1]]},
-        ("/api/candles/BTC", (("interval", "1h"), ("limit", 10))): [{"t": 1, "o": 1, "h": 1, "l": 1, "c": 1}],
-        ("/api/candles/BTC", (("interval", "1m"), ("limit", 10))): [{"t": 1, "o": 1, "h": 1, "l": 1, "c": 1}],
+        ("prices", ()): [{"symbol": "BTC", "price": 1}],
+        ("price", (("symbol", "BTC"),)): {"bestBid": 1, "bestAsk": 2},
+        ("orderbook", (("symbol", "BTC"),)): {"bids": [[1, 1]], "asks": [[2, 1]]},
+        ("candles", (("symbol", "BTC"),), (("interval", "1h"), ("limit", 10))): [{"t": 1, "o": 1, "h": 1, "l": 1, "c": 1}],
+        ("candles", (("symbol", "BTC"),), (("interval", "1m"), ("limit", 10))): [{"t": 1, "o": 1, "h": 1, "l": 1, "c": 1}],
     }
     client = DummyClient(responses)
     feed = MarketDataFeed(client)
@@ -61,11 +61,11 @@ def test_market_data_feed_disconnect_and_recovery():
     assert disconnected.status == "disconnected"
     assert disconnected.data is not None
 
-    responses["/api/prices"] = [{"symbol": "BTC", "price": 2}]
-    responses["/api/price/BTC"] = {"bestBid": 2, "bestAsk": 3}
-    responses["/api/orderbook/BTC"] = {"bids": [[2, 1]], "asks": [[3, 1]]}
-    responses[("/api/candles/BTC", (("interval", "1h"), ("limit", 10)))] = [{"t": 2, "o": 2, "h": 2, "l": 2, "c": 2}]
-    responses[("/api/candles/BTC", (("interval", "1m"), ("limit", 10)))] = [{"t": 2, "o": 2, "h": 2, "l": 2, "c": 2}]
+    responses[("prices", ())] = [{"symbol": "BTC", "price": 2}]
+    responses[("price", (("symbol", "BTC"),))] = {"bestBid": 2, "bestAsk": 3}
+    responses[("orderbook", (("symbol", "BTC"),))] = {"bids": [[2, 1]], "asks": [[3, 1]]}
+    responses[("candles", (("symbol", "BTC"),), (("interval", "1h"), ("limit", 10)))] = [{"t": 2, "o": 2, "h": 2, "l": 2, "c": 2}]
+    responses[("candles", (("symbol", "BTC"),), (("interval", "1m"), ("limit", 10)))] = [{"t": 2, "o": 2, "h": 2, "l": 2, "c": 2}]
     feed._last_fetch = {k: 0.0 for k in feed._last_fetch}
     recovered = feed.fetch_result()
     assert recovered.status == "ok"

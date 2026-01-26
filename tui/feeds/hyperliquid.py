@@ -9,6 +9,7 @@ import time
 
 from backend.storage import DatasetRegistry, partition_and_write
 from .base import BaseFeed
+from .url_builder import EndpointUrlBuilder
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ class FundingPoint:
 class HyperliquidClient:
     def __init__(
         self,
-        base_url: str = "https://api.hyperliquid.xyz",
+        base_url: str = "https://api.moondev.com",
         timeout: float = 10.0,
         retries: int = 3,
     ) -> None:
@@ -36,19 +37,22 @@ class HyperliquidClient:
         self.retries = retries
         self._httpx = httpx
         self._client = httpx.Client(timeout=httpx.Timeout(timeout))
+        self._url_builder = EndpointUrlBuilder(self.base_url)
 
     def close(self) -> None:
         self._client.close()
 
-    def get_json(self, path: str, params: Optional[Dict[str, Any]] = None) -> Any:
-        return self._request("GET", path, params=params)
+    def get_json(self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+        url = self._url_builder.build(endpoint_key, **kwargs)
+        return self._request("GET", url, params=params)
 
-    def post_json(self, path: str, payload: Dict[str, Any]) -> Any:
-        return self._request("POST", path, json=payload)
+    def post_json(self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any) -> Any:
+        url = self._url_builder.build(endpoint_key, **kwargs)
+        return self._request("POST", url, json=payload)
 
-    def _request(self, method: str, path: str, **kwargs) -> Any:
-        url = f"{self.base_url}{path}"
+    def _request(self, method: str, url: str, **kwargs) -> Any:
         last_exc: Optional[Exception] = None
+        last_error: Optional[str] = None
         for attempt in range(1, self.retries + 1):
             try:
                 resp = self._client.request(method, url, **kwargs)
@@ -56,23 +60,30 @@ class HyperliquidClient:
                     {
                         "event": "http_request",
                         "method": method,
-                        "path": path,
+                        "url": url,
                         "status": resp.status_code,
                         "attempt": attempt,
                     }
                 )
                 if resp.status_code == 429 or 500 <= resp.status_code < 600:
-                    last_exc = RuntimeError(f"HTTP {resp.status_code}")
+                    last_error = _format_http_error(method, url, resp)
+                    last_exc = RuntimeError(last_error)
                     time.sleep(self._backoff(attempt))
                     continue
                 if 400 <= resp.status_code < 500:
-                    raise self._httpx.HTTPStatusError(f"HTTP {resp.status_code}", request=None, response=None)
-                return resp.json()
+                    raise RuntimeError(_format_http_error(method, url, resp))
+                try:
+                    return resp.json()
+                except Exception:
+                    raise RuntimeError(_format_json_error(method, url, resp))
             except self._httpx.RequestError as exc:
                 last_exc = exc
-                logger.warning({"event": "http_error", "path": path, "attempt": attempt, "error": str(exc)})
+                last_error = f"{method} {url} -> Request error: {exc}"
+                logger.warning({"event": "http_error", "url": url, "attempt": attempt, "error": str(exc)})
                 time.sleep(self._backoff(attempt))
-        raise ConnectionError(f"Failed to fetch {path}: {last_exc}")
+        if last_error:
+            raise ConnectionError(last_error)
+        raise ConnectionError(f"Failed to fetch {url}: {last_exc}")
 
     @staticmethod
     def _backoff(attempt: int) -> float:
@@ -85,7 +96,7 @@ class LiquidationsFeed(BaseFeed):
         self.client = client
 
     def fetch(self) -> Dict[str, Any]:
-        data = self.client.get_json("/api/liquidations/stats.json")
+        data = self.client.get_json("liquidations_stats")
         return {"snapshot": data, "received_ts_ms": int(time.time() * 1000)}
 
 
@@ -95,7 +106,7 @@ class WhaleTradesFeed(BaseFeed):
         self.client = client
 
     def fetch(self) -> Dict[str, Any]:
-        data = self.client.get_json("/api/whales.json")
+        data = self.client.get_json("whales")
         return {"trades": data, "received_ts_ms": int(time.time() * 1000)}
 
 
@@ -161,9 +172,29 @@ class EventStreamFeed(BaseFeed):
         self.client = client
 
     def fetch(self) -> Dict[str, Any]:
-        whales = self.client.get_json("/api/whales.json")
+        whales = self.client.get_json("whales")
         events = _normalize_whale_events(whales)
         return {"events": events[-20:], "received_ts_ms": int(time.time() * 1000)}
+
+
+def _format_http_error(method: str, url: str, response: Any) -> str:
+    snippet = ""
+    try:
+        snippet = str(getattr(response, "text", "") or "")
+    except Exception:
+        snippet = ""
+    snippet = snippet.replace("\r", " ").replace("\n", " ")[:200]
+    return f"{method} {url} -> HTTP {response.status_code}: {snippet}"
+
+
+def _format_json_error(method: str, url: str, response: Any) -> str:
+    snippet = ""
+    try:
+        snippet = str(getattr(response, "text", "") or "")
+    except Exception:
+        snippet = ""
+    snippet = snippet.replace("\r", " ").replace("\n", " ")[:200]
+    return f"{method} {url} -> HTTP {response.status_code} (json decode error): {snippet}"
 
 
 def _parse_funding_history(raw: Any) -> List[FundingPoint]:

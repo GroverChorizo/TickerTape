@@ -111,3 +111,18 @@ def test_panel_error_includes_http_status():
 
     asyncio.run(_run())
     assert "HTTP 404" in _panel_text(panel)
+
+
+def test_panel_error_preserves_raw_line():
+    panel = EventStream()
+    error_line = "GET https://api.moondev.com/api/whales.json -> HTTP 404: Not Found"
+    result = FeedResult(status="error", error=error_line)
+
+    app = _PanelApp(panel)
+
+    async def _run() -> None:
+        async with app.run_test():
+            panel.update_feed(result)
+
+    asyncio.run(_run())
+    assert error_line in _panel_text(panel).splitlines()

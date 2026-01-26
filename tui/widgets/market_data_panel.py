@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from ..feeds.base import FeedResult
-from tui.render.palette import build_text, error_footer, format_last_good, heading_line, muted_line, status_line
+from tui.render.palette import build_text, format_last_good, heading_line, last_updated_line, muted_line, panel_header
 from .panel_base import PanelBase
 
 
@@ -43,7 +43,8 @@ class MarketDataPanel(PanelBase):
     def render_loading(self) -> None:
         self.set_status_class("loading")
         lines = [
-            status_line("loading", self.palette),
+            panel_header(self.title, "loading", self.palette),
+            last_updated_line(self.feed_result.updated_ts_ms, self.palette),
             muted_line("Loading market data...", self.palette),
         ]
         self.update_text(build_text(lines))
@@ -51,15 +52,20 @@ class MarketDataPanel(PanelBase):
     def render_empty(self, reason: str) -> None:
         self.set_status_class("empty")
         lines = [
-            status_line("empty", self.palette),
+            panel_header(self.title, "empty", self.palette),
+            last_updated_line(self.feed_result.updated_ts_ms, self.palette),
             muted_line(f"No market data. {reason}", self.palette),
         ]
         self.update_text(build_text(lines))
 
     def render_error(self, error: str, hint: str, updated_ts_ms: int | None) -> None:
         self.set_status_class("error")
-        lines = error_footer(error, updated_ts_ms, backoff_note="feed-managed", palette=self.palette)
-        lines.append((f"Hint: {hint}", self.palette.text.muted))
+        lines = [
+            panel_header(self.title, "error", self.palette),
+            last_updated_line(updated_ts_ms, self.palette),
+            (error, self.palette.text.primary),
+            (f"Hint: {hint}", self.palette.text.muted),
+        ]
         self.update_text(build_text(lines))
 
     def render_data(
@@ -72,14 +78,17 @@ class MarketDataPanel(PanelBase):
         if not isinstance(payload, dict):
             self.set_status_class("empty")
             lines = [
-                status_line("empty", self.palette),
+                panel_header(self.title, "empty", self.palette),
+                last_updated_line(updated_ts_ms, self.palette),
                 muted_line("No market data available.", self.palette),
             ]
             self.update_text(build_text(lines))
             return
         styled_lines: List[tuple[str, str | None]] = []
         self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        styled_lines.append(status_line("disconnected" if status == "disconnected" else "ok", self.palette))
+        status_value = "disconnected" if status == "disconnected" else "ok"
+        styled_lines.append(panel_header(self.title, status_value, self.palette))
+        styled_lines.append(last_updated_line(updated_ts_ms, self.palette))
         if status == "disconnected" or is_lkg:
             styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
         selected_coin = payload.get("selected_coin") or "BTC"
@@ -155,7 +164,7 @@ class MarketDataPanel(PanelBase):
             lines.append(muted_line("No candle data.", self.palette))
             return
         lines.append(("Time | Open | High | Low | Close | Vol", self.palette.accent.cyan))
-        for entry in candles[-10:]:
+        for entry in list(reversed(candles))[:10]:
             if not isinstance(entry, dict):
                 continue
             ts = self._fmt_ts(entry.get("timestamp_ms"))
