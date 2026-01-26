@@ -17,6 +17,7 @@ class ProfileState:
     panel_order: List[str] = field(default_factory=lambda: list(DEFAULT_PANEL_ORDER))
     collapsed: Dict[str, bool] = field(default_factory=dict)
     theme: str = ""
+    selected_symbol: str | None = None
 
 
 @dataclass
@@ -32,6 +33,7 @@ class SessionState:
                     "panel_order": state.panel_order,
                     "collapsed": state.collapsed,
                     "theme": state.theme,
+                    "selected_symbol": state.selected_symbol,
                 }
                 for name, state in self.profiles.items()
             },
@@ -45,6 +47,7 @@ class SessionState:
                 panel_order=list(state.get("panel_order", DEFAULT_PANEL_ORDER)),
                 collapsed=dict(state.get("collapsed", {})),
                 theme=state.get("theme", ""),
+                selected_symbol=state.get("selected_symbol"),
             )
         active_profile = payload.get("active_profile", default_profile().name)
         return cls(active_profile=active_profile, profiles=profiles)
@@ -69,5 +72,8 @@ def save_session_state(state: SessionState) -> None:
 
 def get_profile_state(state: SessionState, profile_name: str) -> ProfileState:
     if profile_name not in state.profiles:
-        state.profiles[profile_name] = ProfileState()
+        from .profiles import PROFILES
+
+        default_order = PROFILES.get(profile_name).default_panel_order if profile_name in PROFILES else DEFAULT_PANEL_ORDER
+        state.profiles[profile_name] = ProfileState(panel_order=list(default_order))
     return state.profiles[profile_name]

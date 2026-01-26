@@ -24,6 +24,15 @@ DEFAULT_PANEL_ORDER = [
     "research",
 ]
 
+LIQUIDATION_HUNTER_ORDER = [
+    "liquidations_radar",
+    "liquidations_top",
+    "liquidations_context",
+    "capture_status",
+    "alerts",
+    "research",
+]
+
 
 PROFILES: Dict[str, ProfileConfig] = {
     "day_trader": ProfileConfig(
@@ -37,8 +46,8 @@ PROFILES: Dict[str, ProfileConfig] = {
         name="liquidation_hunter",
         label="Liquidation Hunter",
         description="Stress indicators, cascades, and liquidations focus.",
-        focus_panels=["liquidations", "event_stream", "alerts", "research"],
-        default_panel_order=DEFAULT_PANEL_ORDER,
+        focus_panels=["liquidations_radar", "liquidations_top", "liquidations_context", "capture_status", "alerts"],
+        default_panel_order=LIQUIDATION_HUNTER_ORDER,
     ),
     "whale_watcher": ProfileConfig(
         name="whale_watcher",

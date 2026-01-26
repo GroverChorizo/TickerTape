@@ -75,6 +75,10 @@ from .widgets.event_stream import EventStream
 from .widgets.market_data_panel import MarketDataPanel
 from .widgets.funding_panel import FundingPanel
 from .widgets.liquidations_panel import LiquidationsPanel
+from .widgets.liquidations_radar import LiquidationsRadarPanel
+from .widgets.liquidations_top import LiquidationsTopPanel
+from .widgets.liquidations_context import LiquidationsContextPanel
+from .widgets.capture_status import CaptureStatusPanel
 from .widgets.profile_selector import ProfileSelector, ProfileSelected
 from .widgets.status_bar import StatusBar
 from .widgets.whale_panel import WhalePanel
@@ -89,6 +93,7 @@ from tui.feeds.hyperliquid import (
     LiquidationsFeed,
     WhaleTradesFeed,
 )
+from tui.feeds.liquidations import LiquidationsRadarFeed
 from tui.feeds.funding import MultiExchangeFundingFeed
 from tui.feeds.market_data import MarketDataFeed
 from .streaming import StreamSupervisor
@@ -117,17 +122,26 @@ class TickerTapeApp(App):
         self.session_state = load_session_state()
         if self.config.profile:
             self.session_state.active_profile = self.config.profile
+        profile_state = get_profile_state(self.session_state, self.session_state.active_profile)
+        self._selected_symbol = (profile_state.selected_symbol or "BTC").upper()
         self.alert_stream = AlertStream()
         self.research_queue = ResearchQueue()
         self.streams = StreamSupervisor()
         self.client = NetworkClient()
         self.live_client = HyperliquidClient()
         self.liquidations_stats_feed = LiquidationsFeed(self.live_client, offline=self.config.mode == "offline_demo")
+        self.liquidations_radar_feed = LiquidationsRadarFeed(
+            self.live_client,
+            registry=self.registry,
+            poll_interval=5.0,
+            offline=self.config.mode == "offline_demo",
+        )
         self.market_data_feed = MarketDataFeed(
             self.live_client,
             registry=self.registry,
             offline=self.config.mode == "offline_demo",
         )
+        self.market_data_feed.set_selected_coin(self._selected_symbol)
         self.funding_feed = MultiExchangeFundingFeed(
             hyperliquid_client=self.client,
             moondev_client=self.live_client,
@@ -139,6 +153,7 @@ class TickerTapeApp(App):
         self.whales_feed = WhaleTradesFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.events_feed = EventStreamFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.streams.register(self.liquidations_stats_feed)
+        self.streams.register(self.liquidations_radar_feed)
         self.streams.register(self.market_data_feed)
         self.streams.register(self.funding_feed)
         self.streams.register(self.whales_feed)
@@ -164,6 +179,10 @@ class TickerTapeApp(App):
                 )
             with Vertical(id="center"):
                 liquidations = LiquidationsPanel()
+                liquidations_radar = LiquidationsRadarPanel()
+                liquidations_top = LiquidationsTopPanel()
+                liquidations_context = LiquidationsContextPanel()
+                capture_status = CaptureStatusPanel()
                 positions = MarketDataPanel()
                 funding = FundingPanel()
                 whales = WhalePanel()
@@ -171,6 +190,10 @@ class TickerTapeApp(App):
                 research = BacktestPanel(self.research_queue)
                 self._panels = {
                     "liquidations": liquidations,
+                    "liquidations_radar": liquidations_radar,
+                    "liquidations_top": liquidations_top,
+                    "liquidations_context": liquidations_context,
+                    "capture_status": capture_status,
                     "positions": positions,
                     "funding": funding,
                     "whales": whales,
@@ -228,6 +251,40 @@ class TickerTapeApp(App):
                 lambda: liquidations.update_feed(self.liquidations_stats_feed.latest()),
             )
             self._last_snapshot_ts = self.liquidations_stats_feed.latest().updated_ts_ms
+        liquidations_radar = self._panels.get("liquidations_radar")
+        if isinstance(liquidations_radar, LiquidationsRadarPanel):
+            self._safe_refresh(
+                liquidations_radar,
+                "liquidations_radar",
+                lambda: liquidations_radar.update_feed(self.liquidations_radar_feed.latest(), selected_symbol=self._selected_symbol),
+            )
+            self._last_snapshot_ts = self.liquidations_radar_feed.latest().updated_ts_ms or self._last_snapshot_ts
+        liquidations_top = self._panels.get("liquidations_top")
+        if isinstance(liquidations_top, LiquidationsTopPanel):
+            self._safe_refresh(
+                liquidations_top,
+                "liquidations_top",
+                lambda: liquidations_top.update_feed(self.liquidations_radar_feed.latest(), selected_symbol=self._selected_symbol),
+            )
+        liquidations_context = self._panels.get("liquidations_context")
+        if isinstance(liquidations_context, LiquidationsContextPanel):
+            self._safe_refresh(
+                liquidations_context,
+                "liquidations_context",
+                lambda: liquidations_context.update_context(
+                    selected_symbol=self._selected_symbol,
+                    liquidation_result=self.liquidations_radar_feed.latest(),
+                    market_result=self.market_data_feed.latest(),
+                    funding_result=self.funding_feed.latest(),
+                ),
+            )
+        capture_status = self._panels.get("capture_status")
+        if isinstance(capture_status, CaptureStatusPanel):
+            self._safe_refresh(
+                capture_status,
+                "capture_status",
+                lambda: capture_status.update_feed(self.liquidations_radar_feed.latest()),
+            )
         positions = self._panels.get("positions")
         if isinstance(positions, MarketDataPanel):
             self._safe_refresh(positions, "positions", lambda: positions.update_feed(self.market_data_feed.latest()))
@@ -288,6 +345,13 @@ class TickerTapeApp(App):
         self.theme_manager.set_active_profile(profile_name)
         self._palette = self.theme_manager.current()
         self.apply_palette(self._palette)
+        profile_state = get_profile_state(self.session_state, profile.name)
+        for panel_id in profile.default_panel_order:
+            if panel_id not in profile_state.panel_order:
+                profile_state.panel_order.append(panel_id)
+        if profile_state.selected_symbol:
+            self._selected_symbol = profile_state.selected_symbol.upper()
+            self.market_data_feed.set_selected_coin(self._selected_symbol)
         self.session_state.active_profile = profile_name
         save_session_state(self.session_state)
 
@@ -376,6 +440,31 @@ class TickerTapeApp(App):
                 return
             self.notify("Usage: /theme list | /theme set <name>", severity="warning")
             return
+        if cmd in {"liqs", "liquidations"}:
+            if not args:
+                self.notify("Usage: /liqs select <symbol|#>", severity="warning")
+                return
+            if args[0] == "select" and len(args) > 1:
+                symbol = self._resolve_liquidation_symbol(args[1])
+                if not symbol:
+                    self.notify("Symbol not found in top list.", severity="warning")
+                    return
+                self._set_liquidation_symbol(symbol)
+                return
+            self.notify("Usage: /liqs select <symbol|#>", severity="warning")
+            return
+        if cmd == "capture":
+            if not args:
+                status = "ON" if self.liquidations_radar_feed.capture_enabled else "OFF"
+                self.notify(f"Capture is {status}. Use /capture on|off to toggle.")
+                return
+            if args[0] in {"on", "off"}:
+                enabled = args[0] == "on"
+                self.liquidations_radar_feed.set_capture_enabled(enabled)
+                self.notify(f"Capture {'enabled' if enabled else 'disabled'}.")
+                return
+            self.notify("Usage: /capture on|off", severity="warning")
+            return
         if cmd == "coin":
             if not args:
                 self.notify("Usage: /coin <symbol>", severity="warning")
@@ -387,6 +476,23 @@ class TickerTapeApp(App):
             self.notify(moondev_config_help(), severity="warning")
             return
         self.notify("Unknown command", severity="warning")
+
+    def _resolve_liquidation_symbol(self, token: str) -> str | None:
+        panel = self._panels.get("liquidations_top")
+        if isinstance(panel, LiquidationsTopPanel):
+            return panel.resolve_symbol(token)
+        return token.strip().upper() if token else None
+
+    def _set_liquidation_symbol(self, symbol: str) -> None:
+        symbol = symbol.strip().upper()
+        if not symbol:
+            return
+        self._selected_symbol = symbol
+        self.market_data_feed.set_selected_coin(symbol)
+        profile_state = get_profile_state(self.session_state, self.session_state.active_profile)
+        profile_state.selected_symbol = symbol
+        save_session_state(self.session_state)
+        self.notify(f"Selected symbol: {symbol}")
 
     def _show_diagnostics(self) -> None:
         data = collect_diagnostics(self.config, self.registry)
