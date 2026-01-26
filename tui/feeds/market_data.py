@@ -193,6 +193,23 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
     items = raw
     if isinstance(raw, dict):
         items = raw.get("data") or raw.get("prices") or raw.get("coins") or raw.get("result") or raw.get("snapshot")
+    if isinstance(items, dict):
+        funding_map = raw.get("funding_rates") if isinstance(raw, dict) else None
+        oi_map = raw.get("open_interest") if isinstance(raw, dict) else None
+        ts = _coerce_int(raw.get("timestamp_ms") or raw.get("timestamp") or raw.get("time")) if isinstance(raw, dict) else None
+        parsed: List[Dict[str, Any]] = []
+        for symbol, price in items.items():
+            parsed.append(
+                {
+                    "symbol": _coerce_str(symbol) or "?",
+                    "last": _coerce_float(price),
+                    "mid": None,
+                    "funding": _coerce_float(funding_map.get(symbol)) if isinstance(funding_map, dict) else None,
+                    "open_interest": _coerce_float(oi_map.get(symbol)) if isinstance(oi_map, dict) else None,
+                    "timestamp_ms": ts,
+                }
+            )
+        return parsed
     if not isinstance(items, list):
         return []
     parsed: List[Dict[str, Any]] = []
@@ -239,12 +256,25 @@ def _parse_quick_price(raw: Any, symbol: str) -> Optional[Dict[str, Any]]:
 
 
 def _parse_orderbook(raw: Any, depth: int = 10) -> Optional[Dict[str, Any]]:
+    bids = asks = ts = None
     if isinstance(raw, dict):
-        bids = raw.get("bids") or raw.get("bid") or raw.get("levels", {}).get("bids")
-        asks = raw.get("asks") or raw.get("ask") or raw.get("levels", {}).get("asks")
+        levels = raw.get("levels")
+        if isinstance(levels, dict):
+            bids = raw.get("bids") or raw.get("bid") or levels.get("bids")
+            asks = raw.get("asks") or raw.get("ask") or levels.get("asks")
+        elif isinstance(levels, list) and len(levels) >= 2:
+            bids = raw.get("bids") or raw.get("bid") or levels[0]
+            asks = raw.get("asks") or raw.get("ask") or levels[1]
+        else:
+            bids = raw.get("bids") or raw.get("bid")
+            asks = raw.get("asks") or raw.get("ask")
         ts = raw.get("timestamp_ms") or raw.get("timestamp") or raw.get("time")
-    else:
-        bids = asks = ts = None
+    elif isinstance(raw, list):
+        if len(raw) >= 2 and isinstance(raw[0], list) and isinstance(raw[1], list):
+            bids, asks = raw[0], raw[1]
+        else:
+            bids = raw
+            asks = []
     bid_levels = _parse_book_side(bids, depth)
     ask_levels = _parse_book_side(asks, depth)
     if not bid_levels and not ask_levels:

@@ -70,6 +70,15 @@ def _default_config_path() -> Path:
     base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     return base / "tickertape" / "config.env"
 
+def _default_config_path() -> Path:
+    if sys.platform.startswith("win"):
+        base = Path(os.environ.get("APPDATA", Path.home()))
+        return base / "TickerTape" / "config.env"
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "TickerTape" / "config.env"
+    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+    return base / "tickertape" / "config.env"
+
 
 def _parse_env_file(path: Path) -> Dict[str, str]:
     """Parse KEY=VALUE lines from a .env-style file. Returns empty dict on error."""
@@ -160,7 +169,7 @@ def default_secrets_file_path() -> Path:
     return (home / _DEFAULT_FILENAME).resolve()
 
 # Backwards-compatible alias for older tests/callers
-_DEFAULT_PATH = default_secrets_file_path("C:\\Users\\grover\\.tickertape\\secrets\\HLdontShare.env")
+_DEFAULT_PATH = default_secrets_file_path()
 
 
 def resolve_secrets_file_path(
@@ -210,10 +219,10 @@ def resolve_secrets_file_path(
             source="explicit_path_missing",
         )
 
-    # 3) Default path in Secrets Home
+    # 3) Default path
     return SecretsLocation(
         secrets_home=secrets_home_dir(),
-        secrets_file=default_secrets_file_path(),
+        secrets_file=Path(_DEFAULT_PATH).expanduser().resolve(),
         source="default",
     )
 

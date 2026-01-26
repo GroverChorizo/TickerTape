@@ -15,6 +15,7 @@ class EndpointSpec:
 ENDPOINT_SPECS: Dict[str, EndpointSpec] = {
     "liquidations_stats": EndpointSpec("/api/liquidations/stats.json"),
     "whales": EndpointSpec("/api/whales.json"),
+    "events": EndpointSpec("/api/events.json"),
     "prices": EndpointSpec("/api/prices"),
     "price": EndpointSpec("/api/price/{symbol}", symbol_case="upper"),
     "orderbook": EndpointSpec("/api/orderbook/{symbol}", symbol_case="upper"),

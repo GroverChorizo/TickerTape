@@ -1,7 +1,7 @@
 from tui.feeds.base import BaseFeed, FeedResult
 from tui.feeds.hyperliquid import FundingRatesFeed, _parse_funding_history
 from backend.storage import DatasetRegistry
-from backend import storage
+import backend.storage as storage
 
 
 class DummyFeed(BaseFeed):

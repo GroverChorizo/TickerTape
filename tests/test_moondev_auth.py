@@ -39,8 +39,11 @@ def test_moondev_auth_attaches_header(monkeypatch):
     assert "api_key" not in dummy.calls[0]["params"]
 
 
-def test_moondev_missing_key_blocks_request(monkeypatch):
+def test_moondev_missing_key_blocks_request(monkeypatch, tmp_path):
     monkeypatch.delenv("MOONDEV_API_KEY", raising=False)
+    config_path = tmp_path / "config.env"
+    config_path.write_text("# no api key\n", encoding="utf-8")
+    monkeypatch.setenv("TICKERTAPE_CONFIG_PATH", str(config_path))
     dummy = DummyClient([DummyResponse(status_code=200, payload={"ok": True})])
     client = MoonDevClient(client=dummy)
 

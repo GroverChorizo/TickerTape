@@ -1,12 +1,12 @@
 """Hyperliquid feed adapters for the TUI."""
 from __future__ import annotations
-from backend import storage, network
+
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 import logging
 import time
 
-from .backend.storage import DatasetRegistry, partition_and_write
+from backend.storage import DatasetRegistry, partition_and_write
 from .base import BaseFeed
 from .url_builder import EndpointUrlBuilder
 from .moondev_client import MoonDevClient
@@ -14,7 +14,7 @@ from .moondev_client import MoonDevClient
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from .backend.network import NetworkClient
+    from backend.network import NetworkClient
 
 
 @dataclass
@@ -127,8 +127,8 @@ class EventStreamFeed(BaseFeed):
         self.client = client
 
     def fetch(self) -> Dict[str, Any]:
-        whales = self.client.get_json("whales")
-        events = _normalize_whale_events(whales)
+        raw = self.client.get_json("events")
+        events = _normalize_events(raw)
         return {"events": events[-20:], "received_ts_ms": int(time.time() * 1000)}
 
 
@@ -189,4 +189,46 @@ def _normalize_whale_events(raw: Any) -> List[Dict[str, Any]]:
             "raw": entry,
         }
         events.append(event)
+    return events
+
+
+def _normalize_events(raw: Any) -> List[Dict[str, Any]]:
+    events: List[Dict[str, Any]] = []
+    data = raw
+    if isinstance(raw, dict):
+        data = raw.get("events") or raw.get("data") or raw.get("items") or raw.get("results")
+    if not isinstance(data, list):
+        return events
+    for entry in data:
+        if not isinstance(entry, dict):
+            continue
+        symbol = (
+            entry.get("symbol")
+            or entry.get("coin")
+            or entry.get("asset")
+            or entry.get("token")
+            or entry.get("market")
+            or entry.get("event_type")
+            or entry.get("type")
+        )
+        side = entry.get("side") or entry.get("direction") or entry.get("action") or entry.get("type")
+        size = (
+            entry.get("size")
+            or entry.get("amount")
+            or entry.get("qty")
+            or entry.get("quantity")
+            or entry.get("value")
+            or entry.get("usd_value")
+            or entry.get("notional")
+        )
+        events.append(
+            {
+                "timestamp_ms": entry.get("timestamp_ms") or entry.get("timestamp") or entry.get("time"),
+                "symbol": symbol or "event",
+                "side": side or "?",
+                "size": size if size is not None else "?",
+                "wallet": entry.get("wallet") or entry.get("wallet_address") or entry.get("address") or entry.get("user"),
+                "raw": entry,
+            }
+        )
     return events

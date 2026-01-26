@@ -36,7 +36,17 @@ class DatasetRegistry:
             self._write({"datasets": {}})
 
     def _read(self) -> Dict[str, Any]:
-        return json.loads(self.path.read_text(encoding="utf-8"))
+        try:
+            raw = self.path.read_text(encoding="utf-8")
+        except Exception:
+            return {"datasets": {}}
+        if not raw.strip():
+            return {"datasets": {}}
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            # Corrupted or partial write; fall back to empty registry
+            return {"datasets": {}}
 
     def _write(self, data: Dict[str, Any]) -> None:
         self.path.write_text(json.dumps(data, sort_keys=True, indent=2), encoding="utf-8")

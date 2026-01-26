@@ -1,7 +1,7 @@
 httpx>=0.23
 pytest>=7.0
 pyarrow>=12
-
+backend
 requests
 rich>=13.7,<15.0
 python-dotenv
