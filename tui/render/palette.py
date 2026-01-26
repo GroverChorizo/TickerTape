@@ -42,9 +42,13 @@ def format_status_label(status: str) -> str:
 def status_style(status: str, palette: Palette) -> str:
     if status == "ok":
         return palette.accent.green
+    if status == "live":
+        return palette.accent.green
     if status == "loading":
         return palette.accent.cyan
     if status == "disconnected":
+        return palette.accent.orange
+    if status == "stale":
         return palette.accent.orange
     if status == "error":
         return palette.accent.orange

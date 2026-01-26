@@ -1,20 +1,20 @@
 """Hyperliquid feed adapters for the TUI."""
 from __future__ import annotations
-
+from backend import storage, network
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 import logging
-import random
 import time
 
-from backend.storage import DatasetRegistry, partition_and_write
+from .backend.storage import DatasetRegistry, partition_and_write
 from .base import BaseFeed
 from .url_builder import EndpointUrlBuilder
+from .moondev_client import MoonDevClient
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from backend.network import NetworkClient
+    from .backend.network import NetworkClient
 
 
 @dataclass
@@ -30,64 +30,19 @@ class HyperliquidClient:
         timeout: float = 10.0,
         retries: int = 3,
     ) -> None:
-        import httpx
-
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.retries = retries
-        self._httpx = httpx
-        self._client = httpx.Client(timeout=httpx.Timeout(timeout))
-        self._url_builder = EndpointUrlBuilder(self.base_url)
+        self._client = MoonDevClient(base_url=self.base_url, timeout=timeout, retries=retries)
 
     def close(self) -> None:
         self._client.close()
 
     def get_json(self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
-        url = self._url_builder.build(endpoint_key, **kwargs)
-        return self._request("GET", url, params=params)
+        return self._client.get_json(endpoint_key, params=params, **kwargs)
 
     def post_json(self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any) -> Any:
-        url = self._url_builder.build(endpoint_key, **kwargs)
-        return self._request("POST", url, json=payload)
-
-    def _request(self, method: str, url: str, **kwargs) -> Any:
-        last_exc: Optional[Exception] = None
-        last_error: Optional[str] = None
-        for attempt in range(1, self.retries + 1):
-            try:
-                resp = self._client.request(method, url, **kwargs)
-                logger.info(
-                    {
-                        "event": "http_request",
-                        "method": method,
-                        "url": url,
-                        "status": resp.status_code,
-                        "attempt": attempt,
-                    }
-                )
-                if resp.status_code == 429 or 500 <= resp.status_code < 600:
-                    last_error = _format_http_error(method, url, resp)
-                    last_exc = RuntimeError(last_error)
-                    time.sleep(self._backoff(attempt))
-                    continue
-                if 400 <= resp.status_code < 500:
-                    raise RuntimeError(_format_http_error(method, url, resp))
-                try:
-                    return resp.json()
-                except Exception:
-                    raise RuntimeError(_format_json_error(method, url, resp))
-            except self._httpx.RequestError as exc:
-                last_exc = exc
-                last_error = f"{method} {url} -> Request error: {exc}"
-                logger.warning({"event": "http_error", "url": url, "attempt": attempt, "error": str(exc)})
-                time.sleep(self._backoff(attempt))
-        if last_error:
-            raise ConnectionError(last_error)
-        raise ConnectionError(f"Failed to fetch {url}: {last_exc}")
-
-    @staticmethod
-    def _backoff(attempt: int) -> float:
-        return 0.5 * (2 ** (attempt - 1)) + random.uniform(0, 0.25)
+        return self._client.post_json(endpoint_key, payload, **kwargs)
 
 
 class LiquidationsFeed(BaseFeed):

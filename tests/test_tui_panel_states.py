@@ -37,7 +37,22 @@ def test_funding_panel_state_transitions():
     results = [
         FeedResult(status="loading"),
         FeedResult(status="error", error="boom"),
-        FeedResult(status="ok", data={"funding": {"BTC": {"latest": {"rate": 0.0, "timestamp_ms": 1}}}}),
+        FeedResult(
+            status="ok",
+            data={
+                "rows": [
+                    {
+                        "exchange": "Hyperliquid",
+                        "symbol": "BTC",
+                        "rate": 0.0,
+                        "interval_hours": 1.0,
+                        "timestamp_ms": 1,
+                        "annualized_pct": 0.0,
+                        "status": "LIVE",
+                    }
+                ]
+            },
+        ),
     ]
     _run_updates(panel, results)
 
@@ -65,7 +80,19 @@ def test_event_stream_panel_recovery():
 
 def test_funding_panel_disconnect_lkg():
     panel = FundingPanel()
-    payload = {"funding": {"BTC": {"latest": {"rate": 0.0, "timestamp_ms": 1}}}}
+    payload = {
+        "rows": [
+            {
+                "exchange": "Hyperliquid",
+                "symbol": "BTC",
+                "rate": 0.0,
+                "interval_hours": 1.0,
+                "timestamp_ms": 1,
+                "annualized_pct": 0.0,
+                "status": "LIVE",
+            }
+        ]
+    }
     results = [
         FeedResult(status="disconnected", data=payload, is_lkg=True),
         FeedResult(status="ok", data=payload),

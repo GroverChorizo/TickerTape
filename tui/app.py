@@ -80,15 +80,16 @@ from .widgets.status_bar import StatusBar
 from .widgets.whale_panel import WhalePanel
 from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
 from backend.network import NetworkClient
+from backend.secrets import moondev_config_help
 from tui.themes.palettes import Palette
 from tui.themes.theme_manager import ThemeManager
 from tui.feeds.hyperliquid import (
     EventStreamFeed,
-    FundingRatesFeed,
     HyperliquidClient,
     LiquidationsFeed,
     WhaleTradesFeed,
 )
+from tui.feeds.funding import MultiExchangeFundingFeed
 from tui.feeds.market_data import MarketDataFeed
 from .streaming import StreamSupervisor
 from .widgets.panel_base import PanelBase
@@ -127,7 +128,14 @@ class TickerTapeApp(App):
             registry=self.registry,
             offline=self.config.mode == "offline_demo",
         )
-        self.funding_feed = FundingRatesFeed(client=self.client, registry=self.registry, coins=None, poll_interval=10.0, offline=self.config.mode == "offline_demo")
+        self.funding_feed = MultiExchangeFundingFeed(
+            hyperliquid_client=self.client,
+            moondev_client=self.live_client,
+            registry=self.registry,
+            coins=None,
+            poll_interval=10.0,
+            offline=self.config.mode == "offline_demo",
+        )
         self.whales_feed = WhaleTradesFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.events_feed = EventStreamFeed(self.live_client, offline=self.config.mode == "offline_demo")
         self.streams.register(self.liquidations_stats_feed)
@@ -151,7 +159,7 @@ class TickerTapeApp(App):
                 yield ProfileSelector(active_profile)
                 yield Static("Command shortcuts", classes="section")
                 yield Static(
-                    "ctrl+p command | /profile <name> | /backtest run | /backtest sweep",
+                    "ctrl+p command | /profile <name> | /backtest run | /backtest sweep | /secrets",
                     classes="help",
                 )
             with Vertical(id="center"):
@@ -374,6 +382,9 @@ class TickerTapeApp(App):
                 return
             self.market_data_feed.set_selected_coin(args[0])
             self.notify(f"Selected coin set to {self.market_data_feed.selected_coin}")
+            return
+        if cmd in {"secrets", "configure"}:
+            self.notify(moondev_config_help(), severity="warning")
             return
         self.notify("Unknown command", severity="warning")
 
