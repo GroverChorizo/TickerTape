@@ -86,6 +86,12 @@ WalletDetailPanel {
     color: #7a8797;
 }
 
+#shortcuts {
+    width: 100%;
+    padding-top: 1;
+    color: #7a8797;
+}
+
 #wizard {
     padding: 1;
     border: tall #243044;

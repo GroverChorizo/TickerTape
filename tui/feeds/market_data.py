@@ -76,7 +76,7 @@ class MarketDataFeed(BaseFeed):
 
         if self._due(now, "prices"):
             try:
-                raw = self.client.get_json("/api/prices")
+                raw = self.client.get_json("prices")
                 parsed = _parse_top_coins(raw)
                 if parsed:
                     self._cache["top_coins"] = parsed
@@ -88,7 +88,7 @@ class MarketDataFeed(BaseFeed):
 
         if self._due(now, "quick"):
             try:
-                raw = self.client.get_json(f"/api/price/{self.selected_coin}")
+                raw = self.client.get_json("price", symbol=self.selected_coin)
                 parsed = _parse_quick_price(raw, self.selected_coin)
                 if parsed:
                     self._cache["quick"] = parsed
@@ -100,7 +100,7 @@ class MarketDataFeed(BaseFeed):
 
         if self._due(now, "orderbook"):
             try:
-                raw = self.client.get_json(f"/api/orderbook/{self.selected_coin}")
+                raw = self.client.get_json("orderbook", symbol=self.selected_coin)
                 parsed = _parse_orderbook(raw, depth=10)
                 if parsed:
                     self._cache["orderbook"] = parsed
@@ -113,7 +113,8 @@ class MarketDataFeed(BaseFeed):
         if self._due(now, "candles"):
             try:
                 candles_1h = self.client.get_json(
-                    f"/api/candles/{self.selected_coin}",
+                    "candles",
+                    symbol=self.selected_coin,
                     params={"interval": "1h", "limit": 10},
                 )
                 parsed_1h = _parse_candles(candles_1h)
@@ -126,7 +127,8 @@ class MarketDataFeed(BaseFeed):
 
             try:
                 candles_1m = self.client.get_json(
-                    f"/api/candles/{self.selected_coin}",
+                    "candles",
+                    symbol=self.selected_coin,
                     params={"interval": "1m", "limit": 10},
                 )
                 parsed_1m = _parse_candles(candles_1m)
@@ -139,7 +141,7 @@ class MarketDataFeed(BaseFeed):
             self._last_fetch["candles"] = now
 
         if errors and not updated_any:
-            raise ConnectionError("market data unavailable")
+            raise ConnectionError("; ".join(errors))
 
         payload = {
             "ts_ms": int(time.time() * 1000),

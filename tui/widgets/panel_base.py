@@ -11,6 +11,7 @@ class PanelBase(Static):
     def __init__(self, panel_id: str, title: str, **kwargs) -> None:
         super().__init__(**kwargs)
         self.panel_id = panel_id
+        self.title = title
         self.border_title = title
         self.palette: Palette = cypherpunk_default
         self._status: str = "ok"
@@ -51,7 +52,7 @@ class PanelBase(Static):
         if not self.palette:
             return
         if self._status == "error":
-            self.styles.border = ("heavy", self.palette.accent.red)
+            self.styles.border = ("heavy", self.palette.accent.orange)
         elif self._status == "disconnected":
             self.styles.border = ("tall", self.palette.accent.orange)
         elif self._focused:
