@@ -19,8 +19,8 @@ This appendix maps example scripts from the Hyperliquid Data Layer API repo to T
 |10\_user\_positions.py|TBD|User Positions|day\_trader|Planned|
 |11\_user\_fills.py|TBD|User Fills|day\_trader|Planned|
 |12\_hlp\_positions.py|TBD|HLP Positions|funding\_arbitrage|Planned|
-|13\_binance\_liquidations.py|TBD|External Liquidations|liquidation\_hunter|Planned|
-|14\_multi\_liquidations.py|TBD|Multi Liquidations|liquidation\_hunter|Planned|
+|13\_binance\_liquidations.py|External (Hyperliquid-Data-Layer-API/examples/liqs.py)|External Liquidations|liquidation\_hunter|Planned - Binance WS stream via `liqs.py`|
+|14\_multi\_liquidations.py|TBD (merge Hyperliquid + Binance)|Multi Liquidations|liquidation\_hunter|Planned - multi-exchange aggregation|
 |15\_buyers.py|TBD|Buyers|whale\_watcher|Planned|
 |16\_depositors.py|TBD|Depositors|whale\_watcher|Planned|
 |17\_hlp\_sentiment.py|TBD|HLP Sentiment|funding\_arbitrage|Planned|
@@ -29,6 +29,10 @@ This appendix maps example scripts from the Hyperliquid Data Layer API repo to T
 |20\_hip3\_liquidations.py|TBD|HIP3 Liquidations|liquidation\_hunter|Planned|
 |21\_hip3\_market\_data.py|TBD|HIP3 Market Data|day\_trader|Planned|
 |22\_hip3\_dashboard.py|TBD|HIP3 Dashboard|day\_trader|Planned|
+
+Notes:
+- Multi-exchange liquidation coverage requires combining MoonDev liquidation endpoints with Binance WS liquidations.
+- The Hyperliquid Data Layer API repo ships a Binance WS stream example in `examples/liqs.py`; use that as the source of truth for Binance liquidation payloads when wiring the multi-exchange aggregator.
 
 
 
