@@ -17,6 +17,7 @@ class PanelBase(Static):
         self.palette: Palette = cypherpunk_default
         self._status: str = "ok"
         self._focused: bool = False
+        self._alert: bool = False
 
     def set_collapsed(self, collapsed: bool) -> None:
         self.display = not collapsed
@@ -49,10 +50,26 @@ class PanelBase(Static):
         self._focused = focused
         self._apply_border()
 
+    def set_alert(self, alert: bool) -> None:
+        self._alert = alert
+        self._apply_border()
+
+    def clear_alert(self) -> None:
+        self.set_alert(False)
+
+    def trigger_alert(self, duration: float = 1.5) -> None:
+        self.set_alert(True)
+        try:
+            self.set_timer(duration, self.clear_alert)
+        except Exception:
+            pass
+
     def _apply_border(self) -> None:
         if not self.palette:
             return
-        if self._status == "error":
+        if self._alert:
+            self.styles.border = ("heavy", self.palette.accent.red)
+        elif self._status == "error":
             self.styles.border = ("heavy", self.palette.accent.orange)
         elif self._status == "disconnected":
             self.styles.border = ("tall", self.palette.accent.orange)
