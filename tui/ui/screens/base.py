@@ -11,6 +11,8 @@ from tui.ui.widgets.command_bar import CommandBar
 from tui.ui.layout import apply_layout
 from tui.ui.sidebar import Sidebar, SidebarEntry
 from tui.ui.tabbar import TabBar, TabItem
+from tui.ui.tab_carousel import TabCarousel, TabEntry
+from tui.ui.status_bar import StatusBar
 from tui.state.profiles import list_profiles
 from tui.ui.fullscreen import apply_fullscreen_state, toggle_fullscreen
 from tui.ui.density import apply_density_state, toggle_density
@@ -21,6 +23,13 @@ class BaseScreen(Screen):
         ("ctrl+p", "focus_command", "Focus command"),
         ("f", "toggle_fullscreen", "Fullscreen"),
         ("d", "toggle_density", "Density"),
+        ("ctrl+left", "tab_prev", "Previous tab"),
+        ("ctrl+right", "tab_next", "Next tab"),
+        ("alt+1", "tab_index(1)", "Tab 1"),
+        ("alt+2", "tab_index(2)", "Tab 2"),
+        ("alt+3", "tab_index(3)", "Tab 3"),
+        ("alt+4", "tab_index(4)", "Tab 4"),
+        ("alt+5", "tab_index(5)", "Tab 5"),
     ]
 
     def __init__(self, *, screen_id: str, title: str, context: str) -> None:
@@ -28,7 +37,8 @@ class BaseScreen(Screen):
         self.screen_title = title
         self.command_context = context
         self.header = Static("", id="screen_header")
-        self.status = Static("", id="status_strip")
+        self.status = StatusBar(id="status_bar")
+        self.tab_carousel = TabCarousel(id="tab_carousel")
         self.body = Static("", id="screen_body")
         self.sidebar = Sidebar(id="sidebar")
         self.tabbar = TabBar(id="tabbar")
@@ -38,6 +48,7 @@ class BaseScreen(Screen):
         with Vertical(id="screen_root"):
             yield self.header
             yield self.status
+            yield self.tab_carousel
             with Horizontal(id="content_row"):
                 yield self.sidebar
                 yield self.body
@@ -48,7 +59,7 @@ class BaseScreen(Screen):
         self.header.update(text)
 
     def set_status(self, text: str) -> None:
-        self.status.update(text)
+        self.status.set_status(text)
 
     def on_show(self) -> None:
         layout = apply_layout(self, self.size.width)
@@ -82,6 +93,28 @@ class BaseScreen(Screen):
         self._ensure_state()
         toggle_density(self.app, self, self._profile_name())
 
+    def action_tab_prev(self) -> None:
+        key = self.tab_carousel.select_prev()
+        if key:
+            self._switch_tab(key)
+
+    def action_tab_next(self) -> None:
+        key = self.tab_carousel.select_next()
+        if key:
+            self._switch_tab(key)
+
+    def action_tab_index(self, index: str) -> None:
+        tabs = getattr(self.tab_carousel, "_tabs", [])
+        if not tabs:
+            return
+        try:
+            value = int(index)
+        except Exception:
+            return
+        idx = max(0, min(value - 1, len(tabs) - 1))
+        key = tabs[idx].key
+        self._switch_tab(key)
+
     def _sync_navigation(self, layout: str) -> None:
         entries = [SidebarEntry(key="home", label="Home", short="H")]
         for profile in list_profiles():
@@ -107,6 +140,9 @@ class BaseScreen(Screen):
         self.tabbar.set_tabs(tabs)
         self.tabbar.set_active(active_key)
         self.tabbar.display = compact
+        screen_id = self.id or active_key
+        self._sync_tab_carousel(screen_id)
+        self._sync_breadcrumb(screen_id)
 
     def _apply_persisted_ui_state(self) -> None:
         self._ensure_state()
@@ -123,3 +159,46 @@ class BaseScreen(Screen):
         if self.command_context in {"home", "views", "settings"}:
             return self.app.session_state.active_profile
         return self.command_context
+
+    def _switch_tab(self, key: str) -> None:
+        handler = getattr(self.app, "switch_to_screen_id", None)
+        if handler:
+            handler(key)
+
+    def _sync_tab_carousel(self, active_key: str) -> None:
+        getter = getattr(self.app, "get_open_screens", None)
+        if not getter:
+            return
+        tabs = []
+        for idx, entry in enumerate(getter(), start=1):
+            tabs.append(
+                TabEntry(
+                    key=entry["key"],
+                    label=entry["label"],
+                    shortcut=str(idx),
+                )
+            )
+        self.tab_carousel.set_tabs(tabs)
+        self.tab_carousel.set_active(active_key)
+
+    def _sync_breadcrumb(self, active_key: str) -> None:
+        label = None
+        getter = getattr(self.app, "get_open_screens", None)
+        if getter:
+            for entry in getter():
+                if entry["key"] == active_key:
+                    label = entry["label"]
+                    break
+        if active_key == "home":
+            breadcrumb = "home"
+        elif active_key == "settings":
+            breadcrumb = "home > settings"
+        elif active_key.startswith("view_"):
+            breadcrumb = f"home > view/{active_key.replace('view_', '')}"
+        elif active_key.startswith("profile_"):
+            breadcrumb = f"home > profile/{active_key.replace('profile_', '')}"
+        elif label:
+            breadcrumb = f"home > {label}"
+        else:
+            breadcrumb = f"home > {active_key}"
+        self.status.set_breadcrumb(breadcrumb)

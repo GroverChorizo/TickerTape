@@ -91,6 +91,8 @@ class TickerTapeApp(App):
         self._cache = load_cache()
         self._cache.setdefault("preferences", {"refresh_interval_s": 1.0})
         self._tt_screen_stack: List[str] = []
+        self._screen_titles: dict[str, str] = {}
+        self._screen_routes: dict[str, str] = {}
         self._command_history: List[str] = []
         self._history_index: int = 0
         self._top_symbols: List[str] = []
@@ -109,10 +111,11 @@ class TickerTapeApp(App):
             )
         self._register_commands()
         self._load_cached_snapshots()
+        self._open_screen_order = list(self._cache.get("open_screens_order", []))
 
     def on_mount(self) -> None:
         self.apply_palette(self.theme_manager.current())
-        self._push_screen(HomeScreen())
+        self._push_screen(HomeScreen(), route="home")
         if self.secrets_notice:
             self.notify(self.secrets_notice, severity="information")
         if getattr(self, "_show_wizard", False):
@@ -142,8 +145,19 @@ class TickerTapeApp(App):
         except Exception:
             pass
         try:
-            status = self.screen.query_one("#status_strip")
+            status = self.screen.query_one("#status_line")
             status.styles.color = palette.text.muted
+        except Exception:
+            pass
+        try:
+            breadcrumb = self.screen.query_one("#breadcrumb_line")
+            breadcrumb.styles.color = palette.text.muted
+        except Exception:
+            pass
+        try:
+            carousel = self.screen.query_one("#tab_carousel")
+            carousel.styles.background = palette.bg.panel
+            carousel.styles.color = palette.text.primary
         except Exception:
             pass
         try:
@@ -622,7 +636,10 @@ class TickerTapeApp(App):
         save_session_state(self.session_state)
         self.theme_manager.set_active_profile(profile.name)
         self.apply_palette(self.theme_manager.current())
-        self._push_or_replace(self._build_profile_screen(profile.name, profile.label))
+        self._push_or_replace(
+            self._build_profile_screen(profile.name, profile.label),
+            route=f"profile/{profile.name}",
+        )
 
     def _open_view(self, name: str) -> None:
         name = name.strip().lower()
@@ -643,10 +660,10 @@ class TickerTapeApp(App):
         recent.insert(0, view_label)
         self._cache["recent_views"] = recent[:5]
         save_cache(self._cache)
-        self._push_or_replace(screen_cls())
+        self._push_or_replace(screen_cls(), route=f"view/{name}")
 
     def _open_settings(self) -> None:
-        self._push_or_replace(SettingsScreen())
+        self._push_or_replace(SettingsScreen(), route="settings")
 
     def _build_profile_screen(self, name: str, label: str):
         if name == "day_trader":
@@ -666,16 +683,22 @@ class TickerTapeApp(App):
             except Exception:
                 break
             self._tt_screen_stack.pop()
+        self._sync_open_screen_order()
         if not self._tt_screen_stack:
-            self._push_screen(HomeScreen())
+            self._push_screen(HomeScreen(), route="home")
         self._apply_palette_to_screen(self.theme_manager.current())
 
-    def _push_screen(self, screen) -> None:
+    def _push_screen(self, screen, route: str | None = None) -> None:
         self.push_screen(screen)
-        self._tt_screen_stack.append(screen.id or "")
+        screen_id = screen.id or ""
+        self._tt_screen_stack.append(screen_id)
+        self._screen_titles[screen_id] = getattr(screen, "screen_title", screen_id)
+        if route:
+            self._screen_routes[screen_id] = route
+        self._sync_open_screen_order()
         self._apply_palette_to_screen(self.theme_manager.current())
 
-    def _push_or_replace(self, screen) -> None:
+    def _push_or_replace(self, screen, route: str | None = None) -> None:
         if len(self._tt_screen_stack) > 1:
             try:
                 self.pop_screen()
@@ -683,7 +706,7 @@ class TickerTapeApp(App):
                 pass
             if self._tt_screen_stack:
                 self._tt_screen_stack.pop()
-        self._push_screen(screen)
+        self._push_screen(screen, route=route)
 
     def _resolve_symbol(self, token: str) -> Optional[str]:
         token = token.strip()
@@ -763,6 +786,42 @@ class TickerTapeApp(App):
                 )
             except Exception:
                 pass
+
+    def _sync_open_screen_order(self) -> None:
+        order = [sid for sid in self._tt_screen_stack if sid]
+        seen = set()
+        unique: List[str] = []
+        for sid in order:
+            if sid not in seen:
+                unique.append(sid)
+                seen.add(sid)
+        self._open_screen_order = unique
+        self._cache["open_screens_order"] = list(unique)
+        save_cache(self._cache)
+
+    def get_open_screens(self) -> List[dict]:
+        if not self._open_screen_order:
+            self._sync_open_screen_order()
+        entries = []
+        for sid in self._open_screen_order:
+            label = self._screen_titles.get(sid, sid)
+            entries.append({"key": sid, "label": label})
+        return entries
+
+    def switch_to_screen_id(self, screen_id: str) -> None:
+        if screen_id in self._tt_screen_stack:
+            while self._tt_screen_stack and self._tt_screen_stack[-1] != screen_id:
+                try:
+                    self.pop_screen()
+                except Exception:
+                    break
+                self._tt_screen_stack.pop()
+            self._sync_open_screen_order()
+            self._apply_palette_to_screen(self.theme_manager.current())
+            return
+        route = self._screen_routes.get(screen_id)
+        if route:
+            self._open_route(parse_route(route))
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:

@@ -1,105 +1,5 @@
 Screen {
-    --tt-bg-primary: #0a0e1a;
-    --tt-bg-panel: #0d1117;
-    --tt-text-primary: #d6dde6;
-    --tt-text-muted: #7a8797;
-    --tt-border-panel: #243044;
-    --tt-border-focus: #79b4c4;
-    --tt-accent-cyan: #79b4c4;
-    --tt-accent-purple: #8b5cf6;
-    --tt-accent-green: #39ff88;
-    --tt-accent-orange: #f59e0b;
-    --tt-accent-red: #ef4444;
-    --tt-space-1: 1;
-    --tt-space-2: 2;
-    --tt-space-3: 3;
-    --tt-space-4: 4;
-    --tt-space-5: 5;
-    --tt-pad-x: 2;
-    --tt-pad-y: 1;
-    background: var(--tt-bg-primary);
-    color: var(--tt-text-primary);
-}
-
-Screen.theme-cypherpunk {
-    --tt-bg-primary: #0a0e1a;
-    --tt-bg-panel: #0d1117;
-    --tt-text-primary: #d6dde6;
-    --tt-text-muted: #7a8797;
-    --tt-border-panel: #243044;
-    --tt-border-focus: #79b4c4;
-    --tt-accent-cyan: #79b4c4;
-    --tt-accent-purple: #8b5cf6;
-    --tt-accent-green: #39ff88;
-    --tt-accent-orange: #f59e0b;
-    --tt-accent-red: #ef4444;
-}
-
-Screen.theme-dark_pro {
-    --tt-bg-primary: #0b0f14;
-    --tt-bg-panel: #101826;
-    --tt-text-primary: #d7dee7;
-    --tt-text-muted: #8a96a6;
-    --tt-border-panel: #2a3647;
-    --tt-border-focus: #6aaed1;
-    --tt-accent-cyan: #6aaed1;
-    --tt-accent-purple: #8b5cf6;
-    --tt-accent-green: #22c55e;
-    --tt-accent-orange: #f59e0b;
-    --tt-accent-red: #ef4444;
-}
-
-Screen.theme-matrix {
-    --tt-bg-primary: #050707;
-    --tt-bg-panel: #0b0f0b;
-    --tt-text-primary: #b7f7c5;
-    --tt-text-muted: #5b8a6a;
-    --tt-border-panel: #1f3b2f;
-    --tt-border-focus: #7ef2a0;
-    --tt-accent-cyan: #7ef2a0;
-    --tt-accent-purple: #a855f7;
-    --tt-accent-green: #22c55e;
-    --tt-accent-orange: #f59e0b;
-    --tt-accent-red: #ef4444;
-}
-
-Screen.theme-minimal {
-    --tt-bg-primary: #101317;
-    --tt-bg-panel: #141a22;
-    --tt-text-primary: #e5e7eb;
-    --tt-text-muted: #a1a9b4;
-    --tt-border-panel: #2b3543;
-    --tt-border-focus: #93c5fd;
-    --tt-accent-cyan: #93c5fd;
-    --tt-accent-purple: #8b5cf6;
-    --tt-accent-green: #16a34a;
-    --tt-accent-orange: #f59e0b;
-    --tt-accent-red: #ef4444;
-}
-
-Screen.layout-ultra {
-    --tt-pad-x: 4;
-    --tt-pad-y: 1;
-}
-
-Screen.layout-wide {
-    --tt-pad-x: 3;
-    --tt-pad-y: 1;
-}
-
-Screen.layout-standard {
-    --tt-pad-x: 2;
-    --tt-pad-y: 1;
-}
-
-Screen.layout-narrow {
-    --tt-pad-x: 1;
-    --tt-pad-y: 1;
-}
-
-Screen.layout-compact {
-    --tt-pad-x: 1;
-    --tt-pad-y: 0;
+    background: transparent;
 }
 
 Screen.density-compact {
@@ -121,41 +21,25 @@ Screen.density-comfortable {
     height: 3;
     content-align: center middle;
     text-style: bold;
-    background: var(--tt-bg-panel);
-    color: var(--tt-accent-cyan);
 }
 
-#status_strip {
+StatusBar {
     dock: top;
+    height: 2;
+    padding: 0 2;
+}
+
+#status_line {
     height: 1;
-    padding: 0 var(--tt-pad-x);
-    color: var(--tt-text-muted);
 }
 
-#screen_body {
-    height: 1fr;
-    padding: var(--tt-pad-y) var(--tt-pad-x);
-    background: var(--tt-bg-primary);
-    color: var(--tt-text-primary);
-}
-
-CommandBar {
-    height: 3;
-    padding: 0 var(--tt-pad-x);
-    background: var(--tt-bg-panel);
-    color: var(--tt-text-primary);
-}
-
-#command {
-    width: 100%;
-    background: var(--tt-bg-panel);
-    color: var(--tt-text-primary);
-}
-
-#command_status {
-    width: 100%;
+#breadcrumb_line {
     height: 1;
-    color: var(--tt-text-muted);
+}
+
+TabCarousel {
+    height: 1;
+    padding: 0 2;
 }
 
 #content_row {
@@ -165,8 +49,6 @@ CommandBar {
 Sidebar {
     width: 20;
     padding: 1 1;
-    background: var(--tt-bg-panel);
-    color: var(--tt-text-primary);
 }
 
 Screen.layout-narrow Sidebar,
@@ -174,15 +56,57 @@ Screen.layout-compact Sidebar {
     width: 6;
 }
 
+#screen_body {
+    height: 1fr;
+    padding: 1 2;
+}
+
+Screen.layout-ultra #screen_body {
+    padding: 1 4;
+}
+
+Screen.layout-wide #screen_body {
+    padding: 1 3;
+}
+
+Screen.layout-narrow #screen_body {
+    padding: 1 1;
+}
+
+Screen.layout-compact #screen_body {
+    padding: 0 1;
+}
+
+Screen.density-compact #screen_body {
+    padding: 0 1;
+}
+
+Screen.density-comfortable #screen_body {
+    padding: 1 2;
+}
+
 TabBar {
     height: 1;
-    padding: 0 var(--tt-pad-x);
-    background: var(--tt-bg-panel);
-    color: var(--tt-text-primary);
+    padding: 0 2;
+}
+
+CommandBar {
+    height: 3;
+    padding: 0 2;
+}
+
+#command {
+    width: 100%;
+}
+
+#command_status {
+    width: 100%;
+    height: 1;
 }
 
 Screen.fullscreen #screen_header,
-Screen.fullscreen #status_strip,
+Screen.fullscreen StatusBar,
+Screen.fullscreen TabCarousel,
 Screen.fullscreen Sidebar,
 Screen.fullscreen TabBar,
 Screen.fullscreen CommandBar {
