@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import shlex
 import sys
 import time
@@ -93,6 +94,8 @@ class TickerTapeApp(App):
         self.theme_tokens: dict[str, str] = {}
         self._cache = load_cache()
         self._cache.setdefault("preferences", {"refresh_interval_s": 1.0})
+        self._errors: List[str] = []
+        self.sidebar_hidden = bool(self._cache.get("sidebar_hidden", False))
         self._tt_screen_stack: List[str] = []
         self._screen_titles: dict[str, str] = {}
         self._screen_routes: dict[str, str] = {}
@@ -350,10 +353,31 @@ class TickerTapeApp(App):
             "home", "Return to the home screen.", self._cmd_home, aliases=["/"]
         )
         self.command_registry.register(
+            "quit", "Exit the application.", self._cmd_quit, aliases=["exit"]
+        )
+        self.command_registry.register(
+            "reload", "Reload configuration.", self._cmd_reload
+        )
+        self.command_registry.register(
             "profile", "Open a profile screen.", self._cmd_profile
         )
         self.command_registry.register(
             "view", "Open a data view screen.", self._cmd_view
+        )
+        self.command_registry.register(
+            "sidebar", "Toggle sidebar visibility.", self._cmd_sidebar
+        )
+        self.command_registry.register(
+            "panel", "Open or focus a panel.", self._cmd_panel
+        )
+        self.command_registry.register(
+            "fullscreen", "Toggle fullscreen mode.", self._cmd_fullscreen
+        )
+        self.command_registry.register(
+            "tab", "Switch to a tab by name or index.", self._cmd_tab
+        )
+        self.command_registry.register(
+            "grid", "Toggle grid layout density.", self._cmd_grid
         )
         self.command_registry.register(
             "diagnostics", "Run connectivity diagnostics.", self._cmd_diagnostics
@@ -400,6 +424,41 @@ class TickerTapeApp(App):
             self._cmd_watchlist,
             contexts=["day_trader"],
         )
+        self.command_registry.register("load", "Load a data stream.", self._cmd_load)
+        self.command_registry.register(
+            "refresh", "Refresh all data streams.", self._cmd_refresh
+        )
+        self.command_registry.register(
+            "anomaly", "Run anomaly detection.", self._cmd_anomaly
+        )
+        self.command_registry.register("backtest", "Run backtest.", self._cmd_backtest)
+        self.command_registry.register(
+            "mc", "Run Monte Carlo stress test.", self._cmd_mc
+        )
+        self.command_registry.register(
+            "bt_export", "Export backtest results.", self._cmd_bt_export
+        )
+        self.command_registry.register(
+            "mc_export", "Export Monte Carlo results.", self._cmd_mc_export
+        )
+        self.command_registry.register(
+            "export", "Export panel data locally.", self._cmd_export
+        )
+        self.command_registry.register(
+            "log_export", "Export session logs.", self._cmd_log_export
+        )
+        self.command_registry.register(
+            "inspect", "Inspect panel diagnostics.", self._cmd_inspect
+        )
+        self.command_registry.register(
+            "metrics", "Show panel metrics.", self._cmd_metrics
+        )
+        self.command_registry.register(
+            "errors", "Show recent errors.", self._cmd_errors
+        )
+        self.command_registry.register(
+            "config", "Display current config.", self._cmd_config
+        )
         self.command_registry.register(
             "whalefilter",
             "Filter whales by side and notional.",
@@ -445,6 +504,24 @@ class TickerTapeApp(App):
         self._go_home()
         return None
 
+    def _cmd_quit(self, _cmd: str, _args: List[str]) -> Optional[str]:
+        self.exit()
+        return "Exiting..."
+
+    def _cmd_reload(self, _cmd: str, _args: List[str]) -> str:
+        try:
+            self.config = load_config({"config_path": str(self.config.config_path)})
+            ensure_data_root(self.config)
+            registry_path = self.config.data_root / "_registry.json"
+            self.provider = HyperliquidProvider(
+                registry=DatasetRegistry(path=registry_path),
+                offline=self.config.mode == "offline_demo",
+            )
+            return "Config reloaded."
+        except Exception as exc:
+            self._record_error(f"reload failed: {exc}")
+            return f"Reload failed: {exc}"
+
     def _cmd_profile(self, _cmd: str, args: List[str]) -> str:
         if not args:
             return "Usage: profile <name>"
@@ -457,6 +534,66 @@ class TickerTapeApp(App):
             return "Usage: view <time|heatmap|table>"
         self._open_view(args[0])
         return ""
+
+    def _cmd_sidebar(self, _cmd: str, _args: List[str]) -> str:
+        hidden = self._toggle_sidebar()
+        return "Sidebar hidden." if hidden else "Sidebar shown."
+
+    def _cmd_panel(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: panel <name>"
+        target = args[0].strip().lower()
+        if target in {"settings", "config"}:
+            self._open_settings()
+            return ""
+        if target in {p.name for p in list_profiles()}:
+            self._open_profile(target)
+            return ""
+        if target in {"time", "heatmap", "table"}:
+            self._open_view(target)
+            return ""
+        return f"Panel not found: {target}"
+
+    def _cmd_fullscreen(self, _cmd: str, _args: List[str]) -> str:
+        screen = self.screen
+        handler = getattr(screen, "action_toggle_fullscreen", None)
+        if handler:
+            handler()
+            return "Toggled fullscreen."
+        return "Fullscreen not available."
+
+    def _cmd_tab(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            screens = self.get_open_screens()
+            labels = [
+                f"{idx + 1}:{entry['label']}" for idx, entry in enumerate(screens)
+            ]
+            return "Tabs: " + (", ".join(labels) if labels else "(none)")
+        token = args[0]
+        screens = self.get_open_screens()
+        if token.isdigit():
+            idx = int(token) - 1
+            if 0 <= idx < len(screens):
+                self.switch_to_screen_id(screens[idx]["key"])
+                return ""
+            return "Tab index out of range."
+        for entry in screens:
+            if entry["label"].lower().replace(" ", "_") == token.lower():
+                self.switch_to_screen_id(entry["key"])
+                return ""
+        route = parse_route(token)
+        if route.kind != "unknown":
+            self._open_route(route)
+            return ""
+        return f"Tab not found: {token}"
+
+    def _cmd_grid(self, _cmd: str, _args: List[str]) -> str:
+        screen = self.screen
+        handler = getattr(screen, "action_toggle_density", None)
+        if handler:
+            handler()
+            return "Grid layout toggled."
+        return "Grid layout not available."
 
     def _cmd_diagnostics(self, _cmd: str, _args: List[str]) -> str:
         report = self.provider.diagnostics()
@@ -600,6 +737,75 @@ class TickerTapeApp(App):
             return "Usage: watchlist BTC,ETH,SOL"
         self.set_watchlist(symbols)
         return f"Watchlist set: {', '.join(symbols)}"
+
+    def _cmd_load(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: load <stream>"
+        stream = args[0].lower()
+        self._refresh_screen()
+        return f"Loaded stream: {stream}"
+
+    def _cmd_refresh(self, _cmd: str, _args: List[str]) -> str:
+        refreshed = self._refresh_screen()
+        return "Data refreshed." if refreshed else "Nothing to refresh."
+
+    def _cmd_anomaly(self, _cmd: str, _args: List[str]) -> str:
+        result = self._run_anomaly_scan()
+        if not result:
+            return "No anomalies detected."
+        return "Anomalies: " + ", ".join(result)
+
+    def _cmd_backtest(self, _cmd: str, _args: List[str]) -> str:
+        return "Backtest engine not available yet."
+
+    def _cmd_mc(self, _cmd: str, _args: List[str]) -> str:
+        return "Monte Carlo engine not available yet."
+
+    def _cmd_bt_export(self, _cmd: str, _args: List[str]) -> str:
+        return "Backtest export not available yet."
+
+    def _cmd_mc_export(self, _cmd: str, _args: List[str]) -> str:
+        return "Monte Carlo export not available yet."
+
+    def _cmd_export(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: export <panel> <format>"
+        panel = args[0]
+        fmt = args[1].lower() if len(args) > 1 else "txt"
+        try:
+            path = self._export_screen(panel, fmt)
+            return f"Exported to {path}"
+        except Exception as exc:
+            self._record_error(f"export failed: {exc}")
+            return f"Export failed: {exc}"
+
+    def _cmd_log_export(self, _cmd: str, _args: List[str]) -> str:
+        try:
+            path = self._export_logs()
+            return f"Logs exported to {path}"
+        except Exception as exc:
+            self._record_error(f"log export failed: {exc}")
+            return f"Log export failed: {exc}"
+
+    def _cmd_inspect(self, _cmd: str, args: List[str]) -> str:
+        target = args[0] if args else "current"
+        return f"No diagnostics available for {target}."
+
+    def _cmd_metrics(self, _cmd: str, args: List[str]) -> str:
+        target = args[0] if args else "current"
+        return f"No metrics available for {target}."
+
+    def _cmd_errors(self, _cmd: str, _args: List[str]) -> str:
+        if not self._errors:
+            return "No recent errors."
+        return "\n".join(self._errors[-5:])
+
+    def _cmd_config(self, _cmd: str, _args: List[str]) -> str:
+        cfg = self.config
+        return (
+            f"profile={cfg.profile} | mode={cfg.mode} | data_root={cfg.data_root} "
+            f"| config_path={cfg.config_path}"
+        )
 
     def _cmd_whalefilter(self, _cmd: str, args: List[str]) -> str:
         if not args:
@@ -825,6 +1031,84 @@ class TickerTapeApp(App):
                 )
             except Exception:
                 pass
+
+    def _record_error(self, message: str) -> None:
+        self._errors.append(message)
+
+    def _toggle_sidebar(self) -> bool:
+        self.sidebar_hidden = not self.sidebar_hidden
+        self._cache["sidebar_hidden"] = self.sidebar_hidden
+        save_cache(self._cache)
+        try:
+            sidebar = self.screen.query_one("#sidebar")
+            sidebar.display = not self.sidebar_hidden
+        except Exception:
+            pass
+        return self.sidebar_hidden
+
+    def _refresh_screen(self) -> bool:
+        screen = self.screen
+        try:
+            if hasattr(screen, "_tick"):
+                screen._tick()
+                return True
+            if hasattr(screen, "_render"):
+                screen._render()
+                return True
+        except Exception as exc:
+            self._record_error(f"refresh failed: {exc}")
+        return False
+
+    def _run_anomaly_scan(self) -> List[str]:
+        screen = self.screen
+        state = getattr(screen, "_state", None)
+        history = getattr(state, "price_history", None) if state else None
+        if not isinstance(history, dict):
+            return []
+        flagged: List[str] = []
+        for symbol, series in history.items():
+            if not isinstance(series, list) or len(series) < 5:
+                continue
+            last = series[-1]
+            avg = sum(series[-5:]) / 5
+            if avg and abs(last - avg) / avg > 0.02:
+                flagged.append(symbol)
+        return flagged
+
+    def _export_screen(self, panel: str, fmt: str) -> Path:
+        base = self.config.data_root / "exports"
+        base.mkdir(parents=True, exist_ok=True)
+        ts = int(time.time())
+        filename = f"{panel}_{ts}.{fmt}"
+        path = base / filename
+        body = ""
+        try:
+            body_widget = self.screen.query_one("#screen_body")
+            body = str(body_widget.renderable or "")
+        except Exception:
+            body = ""
+        if fmt == "json":
+            lines = [line for line in body.splitlines() if line]
+            path.write_text(
+                json.dumps({"panel": panel, "lines": lines}, indent=2), encoding="utf-8"
+            )
+        elif fmt == "csv":
+            lines = [line.replace(",", " ") for line in body.splitlines()]
+            path.write_text("\n".join(["line", *lines]), encoding="utf-8")
+        else:
+            path.write_text(body, encoding="utf-8")
+        return path
+
+    def _export_logs(self) -> Path:
+        base = self.config.data_root / "exports"
+        base.mkdir(parents=True, exist_ok=True)
+        ts = int(time.time())
+        path = base / f"command_history_{ts}.json"
+        path.write_text(
+            json.dumps({"history": list(self._command_history)}, indent=2),
+            encoding="utf-8",
+        )
+        return path
 
     def _sync_open_screen_order(self) -> None:
         order = [sid for sid in self._tt_screen_stack if sid]

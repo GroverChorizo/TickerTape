@@ -132,6 +132,8 @@ class BaseScreen(Screen):
         self.sidebar.set_active(active_key)
         compact = layout in {"layout-narrow", "layout-compact"}
         self.sidebar.set_compact(compact)
+        hidden = bool(getattr(self.app, "sidebar_hidden", False))
+        self.sidebar.display = not hidden
 
         tabs = [
             TabItem(key=entry.key, label=entry.label, short=entry.short)
