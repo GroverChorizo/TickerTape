@@ -9,7 +9,10 @@ import stat
 import subprocess
 import sys
 
-import yaml
+try:
+    import yaml
+except Exception:  # pragma: no cover - fallback when PyYAML is unavailable
+    yaml = None
 
 
 ENV_PATH_VARS = ("TICKER_TAPE_SECRETS_PATH", "TICKERTAPE_SECRETS_PATH")
@@ -49,7 +52,10 @@ def load_secrets(path: Path) -> Dict[str, Any]:
     except Exception:
         return {}
     try:
-        payload = yaml.safe_load(text) or {}
+        if yaml is None:
+            payload = _parse_simple_yaml(text)
+        else:
+            payload = yaml.safe_load(text) or {}
     except Exception:
         return {}
     return payload if isinstance(payload, dict) else {}
@@ -105,3 +111,19 @@ def _placeholder_yaml() -> str:
         'moondev_api_key: ""\n'
         'exchange_api_secret: ""\n'
     )
+
+
+def _parse_simple_yaml(text: str) -> Dict[str, Any]:
+    """Minimal YAML parser for key: value pairs (fallback when PyYAML is missing)."""
+    payload: Dict[str, Any] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip()
+        if not key:
+            continue
+        value = value.strip().strip('"').strip("'")
+        payload[key] = value
+    return payload
