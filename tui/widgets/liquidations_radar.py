@@ -1,11 +1,18 @@
 """Liquidations radar panel for Liquidation Hunter."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 import time
 from typing import List, Optional
 
-from tui.render.palette import build_text, heading_line, last_updated_line, muted_line, panel_header
+from tui.render.palette import (
+    build_text,
+    heading_line,
+    last_updated_line,
+    muted_line,
+    panel_header,
+)
 from tui.render.sparkline import sparkline
 from tui.feeds.base import FeedResult
 from .panel_base import PanelBase
@@ -17,7 +24,9 @@ class LiquidationsRadarPanel(PanelBase):
         self.feed_result = FeedResult(status="loading")
         self._selected_symbol: Optional[str] = None
 
-    def update_feed(self, result: FeedResult, *, selected_symbol: Optional[str] = None) -> None:
+    def update_feed(
+        self, result: FeedResult, *, selected_symbol: Optional[str] = None
+    ) -> None:
         self.feed_result = result
         if selected_symbol:
             self._selected_symbol = selected_symbol
@@ -58,7 +67,9 @@ class LiquidationsRadarPanel(PanelBase):
         ]
         self.update_text(build_text(lines))
 
-    def _render_error(self, error: str, hint: str, updated_ts_ms: Optional[int]) -> None:
+    def _render_error(
+        self, error: str, hint: str, updated_ts_ms: Optional[int]
+    ) -> None:
         self.set_status_class("error")
         lines = [
             panel_header(self.title, "error", self.palette),
@@ -76,23 +87,33 @@ class LiquidationsRadarPanel(PanelBase):
         events = payload.get("events", []) if isinstance(payload, dict) else []
         errors = payload.get("errors", []) if isinstance(payload, dict) else []
 
-        self.set_status_class("disconnected" if result.status == "disconnected" else "ok")
+        self.set_status_class(
+            "disconnected" if result.status == "disconnected" else "ok"
+        )
         status_value = "disconnected" if result.status == "disconnected" else "ok"
         lines: List[tuple[str, str]] = []
         lines.append(panel_header(self.title, status_value, self.palette))
         lines.append(last_updated_line(result.updated_ts_ms, self.palette))
         if result.status == "disconnected" or result.is_lkg:
             stale = _fmt_stale(result.updated_ts_ms)
-            lines.append(muted_line(f"Showing last known data. Stale {stale}", self.palette))
+            lines.append(
+                muted_line(f"Showing last known data. Stale {stale}", self.palette)
+            )
         if isinstance(errors, list) and errors:
-            lines.append(muted_line("Partial errors: " + "; ".join(errors[:2]), self.palette))
+            lines.append(
+                muted_line("Partial errors: " + "; ".join(errors[:2]), self.palette)
+            )
 
         lines.append(heading_line("Rolling totals", self.palette))
         for label in ("1m", "5m", "15m"):
             window = rollups.get(label, {}) if isinstance(rollups, dict) else {}
             lines.append(self._format_rollup(label, window))
 
-        spark = sparkline(series.get("notional", []), width=16) if isinstance(series, dict) else ""
+        spark = (
+            sparkline(series.get("notional", []), width=16)
+            if isinstance(series, dict)
+            else ""
+        )
         if spark:
             lines.append((f"Notional trend: {spark}", self.palette.text.primary))
 
@@ -120,7 +141,11 @@ class LiquidationsRadarPanel(PanelBase):
         else:
             recent = events
             if self._selected_symbol:
-                recent = [e for e in events if str(e.get("symbol") or "").upper() == self._selected_symbol]
+                recent = [
+                    e
+                    for e in events
+                    if str(e.get("symbol") or "").upper() == self._selected_symbol
+                ]
             for event in recent[:6]:
                 lines.append(self._format_event(event))
 
@@ -142,7 +167,9 @@ class LiquidationsRadarPanel(PanelBase):
         symbol = event.get("symbol", "?")
         side = event.get("side", "?")
         notional = _fmt_usd(event.get("notional_usd"))
-        style = self.palette.accent.green if side == "long_liq" else self.palette.accent.red
+        style = (
+            self.palette.accent.green if side == "long_liq" else self.palette.accent.red
+        )
         return (f"[{ts}] {symbol} {side} {notional}", style)
 
 

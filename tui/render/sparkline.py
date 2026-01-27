@@ -1,4 +1,5 @@
 """Simple text sparkline utilities for panels."""
+
 from __future__ import annotations
 
 from typing import Iterable, List

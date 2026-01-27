@@ -1,4 +1,5 @@
 """Safe feed primitives for TickerTape TUI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -53,11 +54,21 @@ class BaseFeed:
     def fetch_result(self) -> FeedResult:
         if self.offline:
             return self._record_result(
-                FeedResult(status="disconnected", data=self._lkg, error="offline mode", updated_ts_ms=self._last_update_ts),
+                FeedResult(
+                    status="disconnected",
+                    data=self._lkg,
+                    error="offline mode",
+                    updated_ts_ms=self._last_update_ts,
+                ),
             )
         if self._stop:
             return self._record_result(
-                FeedResult(status="disconnected", data=self._lkg, error="stopped", updated_ts_ms=self._last_update_ts),
+                FeedResult(
+                    status="disconnected",
+                    data=self._lkg,
+                    error="stopped",
+                    updated_ts_ms=self._last_update_ts,
+                ),
             )
         try:
             payload = self.fetch()
@@ -79,7 +90,9 @@ class BaseFeed:
         self._lkg = payload
         self._last_update_ts = now_ms
         self._backoff = 1.0
-        return self._record_result(FeedResult(status="ok", data=payload, updated_ts_ms=now_ms))
+        return self._record_result(
+            FeedResult(status="ok", data=payload, updated_ts_ms=now_ms)
+        )
 
     def next_delay(self, last_status: str) -> float:
         if last_status == "ok":

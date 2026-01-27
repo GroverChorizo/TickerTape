@@ -1,11 +1,18 @@
 """Live event stream panel."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import List
 
 from ..feeds.base import FeedResult
-from tui.render.palette import build_text, format_last_good, last_updated_line, muted_line, panel_header
+from tui.render.palette import (
+    build_text,
+    format_last_good,
+    last_updated_line,
+    muted_line,
+    panel_header,
+)
 from .panel_base import PanelBase
 from .wallet_panel import WalletsDiscovered
 
@@ -82,7 +89,10 @@ class EventStream(PanelBase):
             lines = [
                 panel_header(self.title, "empty", self.palette),
                 last_updated_line(updated_ts_ms, self.palette),
-                muted_line("Waiting for event stream. No recent events available.", self.palette),
+                muted_line(
+                    "Waiting for event stream. No recent events available.",
+                    self.palette,
+                ),
             ]
             self.update_text(build_text(lines))
             return
@@ -92,13 +102,23 @@ class EventStream(PanelBase):
         styled_lines.append(panel_header(self.title, status_value, self.palette))
         styled_lines.append(last_updated_line(updated_ts_ms, self.palette))
         if status == "disconnected" or is_lkg:
-            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
+            styled_lines.append(
+                muted_line(
+                    f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}",
+                    self.palette,
+                )
+            )
         for event in list(reversed(events))[:10]:
             ts = event.get("timestamp_ms") or hint_ts(event)
             symbol = event.get("symbol", "?")
             side = event.get("side", "?")
             size = event.get("size", "?")
-            styled_lines.append((f"[{fmt_ts(ts)}] {symbol} {side} size={size}", self.palette.text.primary))
+            styled_lines.append(
+                (
+                    f"[{fmt_ts(ts)}] {symbol} {side} size={size}",
+                    self.palette.text.primary,
+                )
+            )
         self.update_text(build_text(styled_lines))
         wallets = _extract_wallets(events)
         if wallets:

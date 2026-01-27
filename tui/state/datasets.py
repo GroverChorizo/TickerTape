@@ -1,4 +1,5 @@
 """Dataset registry helpers for the TUI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,14 +37,18 @@ def load_datasets(registry: DatasetRegistry) -> Dict[str, DatasetInfo]:
     return out
 
 
-def dataset_timeframes(datasets: Dict[str, DatasetInfo], dataset_name: str) -> List[str]:
+def dataset_timeframes(
+    datasets: Dict[str, DatasetInfo], dataset_name: str
+) -> List[str]:
     info = datasets.get(dataset_name)
     if not info:
         return []
     return info.timeframes
 
 
-def latest_timeframe(datasets: Dict[str, DatasetInfo], dataset_name: str) -> Optional[str]:
+def latest_timeframe(
+    datasets: Dict[str, DatasetInfo], dataset_name: str
+) -> Optional[str]:
     info = datasets.get(dataset_name)
     if not info or not info.timeframes:
         return None

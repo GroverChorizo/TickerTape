@@ -1,4 +1,5 @@
 """Hyperliquid provider backed by MoonDev API."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
@@ -23,8 +24,12 @@ class HyperliquidProvider:
     ) -> None:
         self._client = client or MoonDevClient(base_url=base_url)
         self._registry = registry or DatasetRegistry()
-        self._liquidations_feed = LiquidationsRadarFeed(self._client, registry=self._registry, offline=offline)
-        self._market_feed = MarketDataFeed(self._client, registry=self._registry, offline=offline)
+        self._liquidations_feed = LiquidationsRadarFeed(
+            self._client, registry=self._registry, offline=offline
+        )
+        self._market_feed = MarketDataFeed(
+            self._client, registry=self._registry, offline=offline
+        )
 
     def close(self) -> None:
         self._client.close()

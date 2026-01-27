@@ -4,6 +4,7 @@
 - Enforce runtime validation in __post_init__
 - Keep meta deterministic and JSON-serializable (Optional[Dict[str, str]])
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
@@ -18,6 +19,7 @@ def _iso(dt: datetime) -> str:
     if dt.tzinfo is None or dt.utcoffset() is None:
         raise ValueError("datetime must be timezone-aware UTC")
     return dt.astimezone(timezone.utc).isoformat()
+
 
 @dataclass(frozen=True)
 class TradeEvent:
@@ -70,6 +72,7 @@ class LiquidationEvent:
             for k, v in self.meta.items():
                 if not isinstance(k, str) or not isinstance(v, str):
                     raise TypeError("LiquidationEvent.meta must be Dict[str, str]")
+
     def to_dict(self) -> Dict:
         d = asdict(self)
         d["timestamp"] = _iso(self.timestamp)
@@ -94,6 +97,7 @@ class FundingEvent:
             for k, v in self.meta.items():
                 if not isinstance(k, str) or not isinstance(v, str):
                     raise TypeError("FundingEvent.meta must be Dict[str, str]")
+
     def to_dict(self) -> Dict:
         d = asdict(self)
         d["timestamp"] = _iso(self.timestamp)
@@ -125,6 +129,7 @@ class Candle:
             for k, v in self.meta.items():
                 if not isinstance(k, str) or not isinstance(v, str):
                     raise TypeError("Candle.meta must be Dict[str, str]")
+
     def to_dict(self) -> Dict:
         d = asdict(self)
         d["timestamp"] = _iso(self.timestamp)

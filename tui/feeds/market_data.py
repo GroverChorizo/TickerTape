@@ -1,4 +1,5 @@
 """Market data feed for the DayTrader profile."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
@@ -11,6 +12,7 @@ from .hyperliquid import HyperliquidClient
 
 logger = logging.getLogger(__name__)
 
+
 class MarketDataFeed(BaseFeed):
     def __init__(
         self,
@@ -22,10 +24,14 @@ class MarketDataFeed(BaseFeed):
         selected_coin: str = "BTC",
         coin_cycle: Optional[List[str]] = None,
     ) -> None:
-        super().__init__(name="market_data", poll_interval=poll_interval, offline=offline)
+        super().__init__(
+            name="market_data", poll_interval=poll_interval, offline=offline
+        )
         self.client = client
         self.selected_coin = selected_coin.upper()
-        self.coin_cycle = [c.upper() for c in (coin_cycle or ["BTC", "ETH", "SOL", "XRP", "DOGE"])]
+        self.coin_cycle = [
+            c.upper() for c in (coin_cycle or ["BTC", "ETH", "SOL", "XRP", "DOGE"])
+        ]
         if self.selected_coin not in self.coin_cycle:
             self.coin_cycle.insert(0, self.selected_coin)
         self._registry = registry
@@ -85,7 +91,9 @@ class MarketDataFeed(BaseFeed):
             except Exception as exc:
                 errors.append(f"prices: {exc}")
                 disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
-                logger.warning({"event": "market_data_prices_failed", "error": str(exc)})
+                logger.warning(
+                    {"event": "market_data_prices_failed", "error": str(exc)}
+                )
             self._last_fetch["prices"] = now
 
         if self._due(now, "quick"):
@@ -111,7 +119,9 @@ class MarketDataFeed(BaseFeed):
             except Exception as exc:
                 errors.append(f"orderbook: {exc}")
                 disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
-                logger.warning({"event": "market_data_orderbook_failed", "error": str(exc)})
+                logger.warning(
+                    {"event": "market_data_orderbook_failed", "error": str(exc)}
+                )
             self._last_fetch["orderbook"] = now
 
         if self._due(now, "candles"):
@@ -128,7 +138,13 @@ class MarketDataFeed(BaseFeed):
             except Exception as exc:
                 errors.append(f"candles_1h: {exc}")
                 disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
-                logger.warning({"event": "market_data_candles_failed", "error": str(exc), "interval": "1h"})
+                logger.warning(
+                    {
+                        "event": "market_data_candles_failed",
+                        "error": str(exc),
+                        "interval": "1h",
+                    }
+                )
 
             try:
                 candles_1m = self.client.get_json(
@@ -143,7 +159,13 @@ class MarketDataFeed(BaseFeed):
             except Exception as exc:
                 errors.append(f"candles_1m: {exc}")
                 disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
-                logger.warning({"event": "market_data_candles_failed", "error": str(exc), "interval": "1m"})
+                logger.warning(
+                    {
+                        "event": "market_data_candles_failed",
+                        "error": str(exc),
+                        "interval": "1m",
+                    }
+                )
             self._last_fetch["candles"] = now
 
         if errors and not updated_any:
@@ -170,7 +192,10 @@ class MarketDataFeed(BaseFeed):
         return (now - self._last_fetch[key]) >= self._intervals[key]
 
     def _has_any_data(self, payload: Dict[str, Any]) -> bool:
-        return any(payload.get(key) for key in ["top_coins", "quick", "orderbook", "candles_1h", "candles_1m"])
+        return any(
+            payload.get(key)
+            for key in ["top_coins", "quick", "orderbook", "candles_1h", "candles_1m"]
+        )
 
     def _persist_snapshot(self, payload: Dict[str, Any]) -> None:
         if not self._registry:
@@ -194,17 +219,31 @@ class MarketDataFeed(BaseFeed):
                 self._registry,
             )
         except Exception as exc:
-            logger.warning({"event": "market_data_snapshot_write_failed", "error": str(exc)})
+            logger.warning(
+                {"event": "market_data_snapshot_write_failed", "error": str(exc)}
+            )
 
 
 def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
     items = raw
     if isinstance(raw, dict):
-        items = raw.get("data") or raw.get("prices") or raw.get("coins") or raw.get("result") or raw.get("snapshot")
+        items = (
+            raw.get("data")
+            or raw.get("prices")
+            or raw.get("coins")
+            or raw.get("result")
+            or raw.get("snapshot")
+        )
     if isinstance(items, dict):
         funding_map = raw.get("funding_rates") if isinstance(raw, dict) else None
         oi_map = raw.get("open_interest") if isinstance(raw, dict) else None
-        ts = _coerce_int(raw.get("timestamp_ms") or raw.get("timestamp") or raw.get("time")) if isinstance(raw, dict) else None
+        ts = (
+            _coerce_int(
+                raw.get("timestamp_ms") or raw.get("timestamp") or raw.get("time")
+            )
+            if isinstance(raw, dict)
+            else None
+        )
         parsed: List[Dict[str, Any]] = []
         for symbol, price in items.items():
             parsed.append(
@@ -212,8 +251,12 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
                     "symbol": _coerce_str(symbol) or "?",
                     "last": _coerce_float(price),
                     "mid": None,
-                    "funding": _coerce_float(funding_map.get(symbol)) if isinstance(funding_map, dict) else None,
-                    "open_interest": _coerce_float(oi_map.get(symbol)) if isinstance(oi_map, dict) else None,
+                    "funding": _coerce_float(funding_map.get(symbol))
+                    if isinstance(funding_map, dict)
+                    else None,
+                    "open_interest": _coerce_float(oi_map.get(symbol))
+                    if isinstance(oi_map, dict)
+                    else None,
                     "timestamp_ms": ts,
                 }
             )
@@ -224,17 +267,29 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
     for entry in items:
         if not isinstance(entry, dict):
             continue
-        symbol = _coerce_str(entry.get("symbol") or entry.get("coin") or entry.get("asset"))
+        symbol = _coerce_str(
+            entry.get("symbol") or entry.get("coin") or entry.get("asset")
+        )
         if not symbol:
             continue
         parsed.append(
             {
                 "symbol": symbol,
-                "last": _coerce_float(entry.get("last") or entry.get("price") or entry.get("mark")),
-                "mid": _coerce_float(entry.get("mid") or entry.get("mid_price") or entry.get("midPrice")),
-                "funding": _coerce_float(entry.get("funding") or entry.get("funding_rate") or entry.get("fundingRate")),
+                "last": _coerce_float(
+                    entry.get("last") or entry.get("price") or entry.get("mark")
+                ),
+                "mid": _coerce_float(
+                    entry.get("mid") or entry.get("mid_price") or entry.get("midPrice")
+                ),
+                "funding": _coerce_float(
+                    entry.get("funding")
+                    or entry.get("funding_rate")
+                    or entry.get("fundingRate")
+                ),
                 "open_interest": _coerce_float(
-                    entry.get("open_interest") or entry.get("openInterest") or entry.get("oi")
+                    entry.get("open_interest")
+                    or entry.get("openInterest")
+                    or entry.get("oi")
                 ),
                 "timestamp_ms": _coerce_int(
                     entry.get("timestamp_ms")
@@ -252,13 +307,26 @@ def _parse_quick_price(raw: Any, symbol: str) -> Optional[Dict[str, Any]]:
         return None
     payload = {
         "symbol": symbol,
-        "best_bid": _coerce_float(raw.get("best_bid") or raw.get("bestBid") or raw.get("bid")),
-        "best_ask": _coerce_float(raw.get("best_ask") or raw.get("bestAsk") or raw.get("ask")),
-        "mid": _coerce_float(raw.get("mid") or raw.get("mid_price") or raw.get("midPrice")),
-        "spread": _coerce_float(raw.get("spread") or raw.get("spread_bps") or raw.get("spreadBps")),
-        "timestamp_ms": _coerce_int(raw.get("timestamp_ms") or raw.get("timestamp") or raw.get("time")),
+        "best_bid": _coerce_float(
+            raw.get("best_bid") or raw.get("bestBid") or raw.get("bid")
+        ),
+        "best_ask": _coerce_float(
+            raw.get("best_ask") or raw.get("bestAsk") or raw.get("ask")
+        ),
+        "mid": _coerce_float(
+            raw.get("mid") or raw.get("mid_price") or raw.get("midPrice")
+        ),
+        "spread": _coerce_float(
+            raw.get("spread") or raw.get("spread_bps") or raw.get("spreadBps")
+        ),
+        "timestamp_ms": _coerce_int(
+            raw.get("timestamp_ms") or raw.get("timestamp") or raw.get("time")
+        ),
     }
-    if not any(payload.get(key) is not None for key in ["best_bid", "best_ask", "mid", "spread"]):
+    if not any(
+        payload.get(key) is not None
+        for key in ["best_bid", "best_ask", "mid", "spread"]
+    ):
         return None
     return payload
 
@@ -302,8 +370,12 @@ def _parse_book_side(raw: Any, depth: int) -> List[Dict[str, Any]]:
         price: Optional[float] = None
         size: Optional[float] = None
         if isinstance(entry, dict):
-            price = _coerce_float(entry.get("price") or entry.get("px") or entry.get("p"))
-            size = _coerce_float(entry.get("size") or entry.get("qty") or entry.get("s"))
+            price = _coerce_float(
+                entry.get("price") or entry.get("px") or entry.get("p")
+            )
+            size = _coerce_float(
+                entry.get("size") or entry.get("qty") or entry.get("s")
+            )
         elif isinstance(entry, (list, tuple)) and len(entry) >= 2:
             price = _coerce_float(entry[0])
             size = _coerce_float(entry[1])
@@ -328,7 +400,12 @@ def _parse_candles(raw: Any) -> List[Dict[str, Any]]:
 
 def _parse_candle_entry(entry: Any) -> Optional[Dict[str, Any]]:
     if isinstance(entry, dict):
-        ts = _coerce_int(entry.get("t") or entry.get("time") or entry.get("timestamp") or entry.get("ts"))
+        ts = _coerce_int(
+            entry.get("t")
+            or entry.get("time")
+            or entry.get("timestamp")
+            or entry.get("ts")
+        )
         if ts is None:
             return None
         return {

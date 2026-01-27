@@ -1,4 +1,5 @@
 """Typed models for liquidation data."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -96,7 +97,11 @@ class LiquidationSnapshot:
 
     @classmethod
     def from_payload(cls, payload: Dict[str, Any]) -> "LiquidationSnapshot":
-        events = [LiquidationEvent.from_dict(e) for e in payload.get("events", []) if isinstance(e, dict)]
+        events = [
+            LiquidationEvent.from_dict(e)
+            for e in payload.get("events", [])
+            if isinstance(e, dict)
+        ]
         rollups = {
             key: LiquidationRollup.from_dict(key, data)
             for key, data in (payload.get("rollups", {}) or {}).items()
@@ -110,7 +115,11 @@ class LiquidationSnapshot:
             reason=str(cascade_raw.get("reason") or ""),
         )
         capture_raw = payload.get("capture", {}) or {}
-        capture = CaptureStatus.from_dict(capture_raw) if isinstance(capture_raw, dict) else CaptureStatus.from_dict({})
+        capture = (
+            CaptureStatus.from_dict(capture_raw)
+            if isinstance(capture_raw, dict)
+            else CaptureStatus.from_dict({})
+        )
         return cls(
             events=events,
             rollups=rollups,

@@ -1,4 +1,5 @@
 """Profile selection widget."""
+
 from __future__ import annotations
 
 from textual.widgets import OptionList

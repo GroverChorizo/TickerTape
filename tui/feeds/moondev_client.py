@@ -1,4 +1,5 @@
 """MoonDev API client with auth injection and safe error reporting."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -47,11 +48,15 @@ class MoonDevClient:
     def close(self) -> None:
         self._client.close()
 
-    def get_json(self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+    def get_json(
+        self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any
+    ) -> Any:
         url = self._url_builder.build(endpoint_key, **kwargs)
         return self._request("GET", url, params=params)
 
-    def post_json(self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any) -> Any:
+    def post_json(
+        self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any
+    ) -> Any:
         url = self._url_builder.build(endpoint_key, **kwargs)
         return self._request("POST", url, json=payload)
 
@@ -94,11 +99,15 @@ class MoonDevClient:
                     time.sleep(self._backoff(attempt))
                     continue
                 if 400 <= response.status_code < 500:
-                    raise RuntimeError(_format_http_error(method, sanitized_url, response))
+                    raise RuntimeError(
+                        _format_http_error(method, sanitized_url, response)
+                    )
                 try:
                     return response.json()
                 except Exception:
-                    raise RuntimeError(_format_json_error(method, sanitized_url, response))
+                    raise RuntimeError(
+                        _format_json_error(method, sanitized_url, response)
+                    )
             except Exception as exc:
                 if self._httpx and isinstance(exc, self._httpx.RequestError):
                     last_exc = exc
@@ -106,7 +115,7 @@ class MoonDevClient:
                     logger.warning(
                         {
                             "event": "http_error",
-                            "url": _sanitize_url(url, kwargs.get('params'), False),
+                            "url": _sanitize_url(url, kwargs.get("params"), False),
                             "attempt": attempt,
                             "error": str(exc),
                         }
@@ -136,7 +145,9 @@ class MoonDevClient:
         params = dict(kwargs.pop("params", {}) or {})
         if use_query_param:
             params["api_key"] = headers.get("X-API-Key", "")
-        response = self._client.request(method, url, headers=headers, params=params, **kwargs)
+        response = self._client.request(
+            method, url, headers=headers, params=params, **kwargs
+        )
         return response, use_query_param, params
 
     @staticmethod
@@ -173,4 +184,6 @@ def _format_json_error(method: str, url: str, response: Any) -> str:
     except Exception:
         snippet = ""
     snippet = snippet.replace("\r", " ").replace("\n", " ")[:200]
-    return f"{method} {url} -> HTTP {response.status_code} (json decode error): {snippet}"
+    return (
+        f"{method} {url} -> HTTP {response.status_code} (json decode error): {snippet}"
+    )

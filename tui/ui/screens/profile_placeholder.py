@@ -1,4 +1,5 @@
 """Placeholder screen for profiles not yet implemented."""
+
 from __future__ import annotations
 
 from tui.ui.screens.base import BaseScreen
@@ -6,7 +7,9 @@ from tui.ui.screens.base import BaseScreen
 
 class PlaceholderProfileScreen(BaseScreen):
     def __init__(self, profile_name: str, label: str) -> None:
-        super().__init__(screen_id=f"profile_{profile_name}", title=label, context="profile")
+        super().__init__(
+            screen_id=f"profile_{profile_name}", title=label, context="profile"
+        )
         self._profile_name = profile_name
         self._label = label
 

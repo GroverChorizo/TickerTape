@@ -1,14 +1,32 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 from datetime import datetime, timezone, timedelta
 from backend.liquidations_feed import LiquidationsFeed
 from backend.models import LiquidationEvent
 
 
-def make_event(ts: datetime, symbol: str, side: str, price: float, size: float, exchange: str = None):
+def make_event(
+    ts: datetime,
+    symbol: str,
+    side: str,
+    price: float,
+    size: float,
+    exchange: str = None,
+):
     meta = {"exchange": exchange} if exchange else None
-    return LiquidationEvent(timestamp=ts, symbol=symbol, side=side, price=price, size=size, liq_id="x", meta=meta)
+    return LiquidationEvent(
+        timestamp=ts,
+        symbol=symbol,
+        side=side,
+        price=price,
+        size=size,
+        liq_id="x",
+        meta=meta,
+    )
 
 
 def test_compute_snapshot_basic():
@@ -26,4 +44,4 @@ def test_compute_snapshot_basic():
     snap = feed.compute_snapshot("1h", window_start, window_end)
     assert snap["count"] == 3
     assert snap["total_notional"] > 0
-    assert any(s["symbol"] == "BTCUSD" for s in snap["top_symbols"]) 
+    assert any(s["symbol"] == "BTCUSD" for s in snap["top_symbols"])

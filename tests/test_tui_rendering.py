@@ -5,7 +5,6 @@ pytest.importorskip("textual")
 pytest.importorskip("httpx")
 
 
-
 textual = pytest.importorskip("textual")
 
 from textual.app import App, ComposeResult
@@ -37,10 +36,14 @@ def test_liquidations_panel_handles_empty_payload():
 def test_liquidations_panel_handles_disconnected_lkg():
     panel = LiquidationsPanel()
     app = _TestApp(panel)
-    payload = {"snapshot": {"total_notional": 1000000, "count": 5, "cascade_detected": False}}
+    payload = {
+        "snapshot": {"total_notional": 1000000, "count": 5, "cascade_detected": False}
+    }
 
     async def _run() -> None:
         async with app.run_test():
-            panel.update_feed(FeedResult(status="disconnected", data=payload, is_lkg=True))
+            panel.update_feed(
+                FeedResult(status="disconnected", data=payload, is_lkg=True)
+            )
 
     asyncio.run(_run())

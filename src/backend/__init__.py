@@ -1,6 +1,7 @@
 """Backend package for Hyperliquid Quant Terminal.
 Exposes models, network client, cache, and validators.
 """
+
 from .logging_config import setup_logging
 from .storage import DatasetRegistry
 
@@ -20,4 +21,3 @@ __all__ = [
     "alerts",
     "query_helpers",
 ]
-

@@ -1,4 +1,5 @@
 """Alert stream state for the TUI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

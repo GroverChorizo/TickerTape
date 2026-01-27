@@ -2,6 +2,7 @@
 
 Provides a small scheduler to run snapshot emission on configured cadences, and a `run_once` helper for CLI/tools.
 """
+
 from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
@@ -15,7 +16,12 @@ logger = logging.getLogger(__name__)
 
 
 class SnapshotScheduler:
-    def __init__(self, feed: LiquidationsFeed, registry: DatasetRegistry, cadences: Optional[Dict[str, int]] = None) -> None:
+    def __init__(
+        self,
+        feed: LiquidationsFeed,
+        registry: DatasetRegistry,
+        cadences: Optional[Dict[str, int]] = None,
+    ) -> None:
         self.feed = feed
         self.registry = registry
         self.cadences = cadences or DEFAULT_CADENCE_SECONDS
@@ -23,7 +29,13 @@ class SnapshotScheduler:
         self._running = False
 
     async def _worker(self, timeframe: str, interval_seconds: int) -> None:
-        logger.info({"event": "snapshot_worker_start", "timeframe": timeframe, "interval": interval_seconds})
+        logger.info(
+            {
+                "event": "snapshot_worker_start",
+                "timeframe": timeframe,
+                "interval": interval_seconds,
+            }
+        )
         while self._running:
             now = datetime.now(timezone.utc)
             # align window to cadence: floor to multiple
@@ -33,10 +45,20 @@ class SnapshotScheduler:
             window_start_ms = window_start * 1000
             window_end_ms = window_end * 1000
             provenance = {"run_id": f"snapshot_{timeframe}_{window_start_ms}"}
-            snapshot = self.feed.compute_snapshot(timeframe, window_start_ms, window_end_ms, provenance=provenance)
+            snapshot = self.feed.compute_snapshot(
+                timeframe, window_start_ms, window_end_ms, provenance=provenance
+            )
             # write to parquet and register
-            path = partition_and_write("liquidations_snapshots", timeframe, window_start_ms, [snapshot], self.registry)
-            logger.info({"event": "snapshot_emitted", "timeframe": timeframe, "path": str(path)})
+            path = partition_and_write(
+                "liquidations_snapshots",
+                timeframe,
+                window_start_ms,
+                [snapshot],
+                self.registry,
+            )
+            logger.info(
+                {"event": "snapshot_emitted", "timeframe": timeframe, "path": str(path)}
+            )
             await asyncio.sleep(interval_seconds)
 
     def start(self) -> None:
@@ -54,7 +76,12 @@ class SnapshotScheduler:
         self._tasks = {}
 
 
-def run_once(feed: LiquidationsFeed, registry: DatasetRegistry, timeframe: str, window_start_ts_ms: Optional[int] = None) -> str:
+def run_once(
+    feed: LiquidationsFeed,
+    registry: DatasetRegistry,
+    timeframe: str,
+    window_start_ts_ms: Optional[int] = None,
+) -> str:
     """Run a single snapshot emission for the given timeframe.
 
     If window_start_ts_ms is None, align to current UTC timeframe.
@@ -72,6 +99,10 @@ def run_once(feed: LiquidationsFeed, registry: DatasetRegistry, timeframe: str, 
     window_end = window_start + interval
     window_start_ms = window_start * 1000
     provenance = {"run_id": f"snapshot_{timeframe}_{window_start_ms}"}
-    snapshot = feed.compute_snapshot(timeframe, window_start_ms, window_end * 1000, provenance=provenance)
-    path = partition_and_write("liquidations_snapshots", timeframe, window_start_ms, [snapshot], registry)
+    snapshot = feed.compute_snapshot(
+        timeframe, window_start_ms, window_end * 1000, provenance=provenance
+    )
+    path = partition_and_write(
+        "liquidations_snapshots", timeframe, window_start_ms, [snapshot], registry
+    )
     return str(path)

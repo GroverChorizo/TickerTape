@@ -1,4 +1,5 @@
 """Profile definitions and defaults for the TickerTape TUI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -46,7 +47,13 @@ PROFILES: Dict[str, ProfileConfig] = {
         name="liquidation_hunter",
         label="Liquidation Hunter",
         description="Stress indicators, cascades, and liquidations focus.",
-        focus_panels=["liquidations_radar", "liquidations_top", "liquidations_context", "capture_status", "alerts"],
+        focus_panels=[
+            "liquidations_radar",
+            "liquidations_top",
+            "liquidations_context",
+            "capture_status",
+            "alerts",
+        ],
         default_panel_order=LIQUIDATION_HUNTER_ORDER,
     ),
     "whale_watcher": ProfileConfig(
@@ -60,7 +67,14 @@ PROFILES: Dict[str, ProfileConfig] = {
         name="funding_arbitrage",
         label="Funding Arbitrage",
         description="Funding rate extremes, divergences, and positioning focus.",
-        focus_panels=["funding", "positions", "liquidations", "event_stream", "alerts", "research"],
+        focus_panels=[
+            "funding",
+            "positions",
+            "liquidations",
+            "event_stream",
+            "alerts",
+            "research",
+        ],
         default_panel_order=DEFAULT_PANEL_ORDER,
     ),
 }

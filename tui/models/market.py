@@ -1,4 +1,5 @@
 """Typed models for market context data."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -20,7 +21,9 @@ class MarketContext:
         symbol = symbol.upper()
         quick = payload.get("quick") if isinstance(payload, dict) else None
         top = _find_top_symbol(payload, symbol)
-        last_price = _coerce_float((quick or {}).get("mid")) or _coerce_float((quick or {}).get("best_bid"))
+        last_price = _coerce_float((quick or {}).get("mid")) or _coerce_float(
+            (quick or {}).get("best_bid")
+        )
         if last_price is None and top:
             last_price = _coerce_float(top.get("last") or top.get("mid"))
         best_bid = _coerce_float((quick or {}).get("best_bid"))

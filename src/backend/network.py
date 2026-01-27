@@ -5,6 +5,7 @@
 - Retries on transient errors (5xx, timeouts); do NOT retry on 4xx
 - No raw payload logging; only metadata and sanitized summaries
 """
+
 from __future__ import annotations
 import time
 from typing import Any, Dict, Optional
@@ -69,7 +70,9 @@ class NetworkClient:
         path = ENDPOINT_PATHS[endpoint_key]
         return f"{self.base_url.rstrip('/')}{path}"
 
-    def get(self, endpoint_key: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    def get(
+        self, endpoint_key: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         url = self._build_url(endpoint_key)
         attempt = 0
         last_exc: Optional[Exception] = None
@@ -94,35 +97,65 @@ class NetworkClient:
                 if 500 <= resp.status_code < 600:
                     last_exc = RuntimeError(f"Server error: {resp.status_code}")
                     logger.warning(
-                        {"event": "http_transient_error", "endpoint": endpoint_key, "status": resp.status_code, "attempt": attempt}
+                        {
+                            "event": "http_transient_error",
+                            "endpoint": endpoint_key,
+                            "status": resp.status_code,
+                            "attempt": attempt,
+                        }
                     )
                     time.sleep(BACKOFF_FACTOR * (2 ** (attempt - 1)))
                     continue
 
                 if 400 <= resp.status_code < 500:
                     # Client errors are not retried
-                    logger.error({"event": "http_client_error", "endpoint": endpoint_key, "status": resp.status_code})
+                    logger.error(
+                        {
+                            "event": "http_client_error",
+                            "endpoint": endpoint_key,
+                            "status": resp.status_code,
+                        }
+                    )
                     # httpx.Response.raise_for_status() raises HTTPStatusError; emulate that for test doubles
-                    raise httpx.HTTPStatusError(f"Client error: {resp.status_code}", request=None, response=None)
+                    raise httpx.HTTPStatusError(
+                        f"Client error: {resp.status_code}", request=None, response=None
+                    )
 
                 # Success
                 try:
                     return resp.json()
                 except Exception as e:
-                    logger.error({"event": "json_decode_error", "endpoint": endpoint_key, "err": str(e)})
+                    logger.error(
+                        {
+                            "event": "json_decode_error",
+                            "endpoint": endpoint_key,
+                            "err": str(e),
+                        }
+                    )
                     raise
             except httpx.RequestError as e:
                 # Network-level transient error; retry
                 last_exc = e
-                logger.warning({"event": "network_error", "endpoint": endpoint_key, "err": str(e), "attempt": attempt})
+                logger.warning(
+                    {
+                        "event": "network_error",
+                        "endpoint": endpoint_key,
+                        "err": str(e),
+                        "attempt": attempt,
+                    }
+                )
                 time.sleep(BACKOFF_FACTOR * (2 ** (attempt - 1)))
                 continue
             except Exception as e:
                 # Non-retriable or unknown
-                logger.error({"event": "fetch_error", "endpoint": endpoint_key, "err": str(e)})
+                logger.error(
+                    {"event": "fetch_error", "endpoint": endpoint_key, "err": str(e)}
+                )
                 raise
         # Exhausted retries
-        logger.error(f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}")
+        logger.error(
+            f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}"
+        )
         raise ConnectionError(f"Failed to fetch {endpoint_key}")
 
     def post(self, endpoint_key: str, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -148,29 +181,59 @@ class NetworkClient:
                 if resp.status_code == 429 or 500 <= resp.status_code < 600:
                     last_exc = RuntimeError(f"Server error: {resp.status_code}")
                     logger.warning(
-                        {"event": "http_transient_error", "endpoint": endpoint_key, "status": resp.status_code, "attempt": attempt}
+                        {
+                            "event": "http_transient_error",
+                            "endpoint": endpoint_key,
+                            "status": resp.status_code,
+                            "attempt": attempt,
+                        }
                     )
                     time.sleep(BACKOFF_FACTOR * (2 ** (attempt - 1)))
                     continue
 
                 if 400 <= resp.status_code < 500:
-                    logger.error({"event": "http_client_error", "endpoint": endpoint_key, "status": resp.status_code})
-                    raise httpx.HTTPStatusError(f"Client error: {resp.status_code}", request=None, response=None)
+                    logger.error(
+                        {
+                            "event": "http_client_error",
+                            "endpoint": endpoint_key,
+                            "status": resp.status_code,
+                        }
+                    )
+                    raise httpx.HTTPStatusError(
+                        f"Client error: {resp.status_code}", request=None, response=None
+                    )
 
                 try:
                     return resp.json()
                 except Exception as e:
-                    logger.error({"event": "json_decode_error", "endpoint": endpoint_key, "err": str(e)})
+                    logger.error(
+                        {
+                            "event": "json_decode_error",
+                            "endpoint": endpoint_key,
+                            "err": str(e),
+                        }
+                    )
                     raise
             except httpx.RequestError as e:
                 last_exc = e
-                logger.warning({"event": "network_error", "endpoint": endpoint_key, "err": str(e), "attempt": attempt})
+                logger.warning(
+                    {
+                        "event": "network_error",
+                        "endpoint": endpoint_key,
+                        "err": str(e),
+                        "attempt": attempt,
+                    }
+                )
                 time.sleep(BACKOFF_FACTOR * (2 ** (attempt - 1)))
                 continue
             except Exception as e:
-                logger.error({"event": "fetch_error", "endpoint": endpoint_key, "err": str(e)})
+                logger.error(
+                    {"event": "fetch_error", "endpoint": endpoint_key, "err": str(e)}
+                )
                 raise
-        logger.error(f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}")
+        logger.error(
+            f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}"
+        )
         raise ConnectionError(f"Failed to fetch {endpoint_key}")
 
     def close(self) -> None:

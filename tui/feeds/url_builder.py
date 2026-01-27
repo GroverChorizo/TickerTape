@@ -1,4 +1,5 @@
 """Endpoint-aware URL builder for MoonDev Hyperliquid data feeds."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -21,7 +22,9 @@ ENDPOINT_SPECS: Dict[str, EndpointSpec] = {
     "price": EndpointSpec("/api/price/{symbol}", symbol_case="upper"),
     "orderbook": EndpointSpec("/api/orderbook/{symbol}", symbol_case="upper"),
     "candles": EndpointSpec("/api/candles/{symbol}", symbol_case="upper"),
-    "hip3_ticks": EndpointSpec("/api/hip3_ticks/{dex}_{ticker}.json", ticker_case="lower"),
+    "hip3_ticks": EndpointSpec(
+        "/api/hip3_ticks/{dex}_{ticker}.json", ticker_case="lower"
+    ),
     "binance_funding": EndpointSpec("/api/binance_funding.json"),
 }
 

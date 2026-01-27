@@ -1,4 +1,5 @@
 """Alerts panel showing backend alerts."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -16,7 +17,9 @@ class AlertPanel(PanelBase):
     def refresh_panel(self) -> None:
         if not self.stream.connected:
             if not self.stream.alerts:
-                self.update_text("Alert stream disconnected. Start backend alert notifier to receive alerts.")
+                self.update_text(
+                    "Alert stream disconnected. Start backend alert notifier to receive alerts."
+                )
                 return
         if not self.stream.alerts:
             self.update_text("No alerts received.")

@@ -3,6 +3,7 @@
 - Uses a minimal JSON formatter with no sensitive payloads
 - Imported by package __init__ to configure logging at import time
 """
+
 from __future__ import annotations
 import logging
 import sys
@@ -10,6 +11,7 @@ import json
 from typing import Any
 
 logger = logging.getLogger("hyperliquid.backend")
+
 
 class JsonFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -23,7 +25,7 @@ class JsonFormatter(logging.Formatter):
             "func": record.funcName,
             "line": record.lineno,
         }
-        return json.dumps(obj, separators=(',', ':'))
+        return json.dumps(obj, separators=(",", ":"))
 
 
 def setup_logging(level: int = logging.INFO) -> None:

@@ -1,4 +1,5 @@
 """Diagnostics collection for the TUI."""
+
 from __future__ import annotations
 
 from dataclasses import asdict
@@ -19,12 +20,12 @@ def _version(pkg: str) -> str:
     except Exception:
         return "unknown"
 
+
 def _path_posix(p: Path | None) -> str | None:
     if p is None:
         return None
     # Force stable, cross-OS display paths for diagnostics
     return p.as_posix().replace("\\", "/")
-
 
 
 def _path_posix(p: Path | None) -> str | None:
@@ -36,7 +37,9 @@ def _path_posix(p: Path | None) -> str | None:
 
 def collect_diagnostics(config: TuiConfig, registry: DatasetRegistry) -> Dict[str, Any]:
     datasets = registry.list_datasets()
-    dataset_counts = {name: len(meta.get("partitions", [])) for name, meta in datasets.items()}
+    dataset_counts = {
+        name: len(meta.get("partitions", [])) for name, meta in datasets.items()
+    }
     return {
         "python": sys.version.split()[0],
         "platform": platform.platform(),

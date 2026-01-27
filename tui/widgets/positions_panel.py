@@ -1,4 +1,5 @@
 """Positions panel for top longs/shorts."""
+
 from __future__ import annotations
 
 from typing import List

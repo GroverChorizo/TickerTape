@@ -4,6 +4,7 @@
 - Paths are resolved with pathlib to prevent traversal
 - Metadata sidecar stores content hash, schema_version, and timestamps
 """
+
 from __future__ import annotations
 from typing import Any, Dict, Optional
 from pathlib import Path
@@ -51,7 +52,9 @@ class LocalCache:
     def save(self, key: str, obj: Any) -> None:
         path = self._path_for(key)
         # Deterministic JSON serialization
-        payload = json.dumps(obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        payload = json.dumps(
+            obj, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+        ).encode("utf-8")
         content_hash = _content_hash(payload)
         path.write_bytes(payload)
 
@@ -65,7 +68,9 @@ class LocalCache:
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
         meta_path = self._meta_path_for(key)
-        meta_path.write_text(json.dumps(meta, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+        meta_path.write_text(
+            json.dumps(meta, sort_keys=True, separators=(",", ":")), encoding="utf-8"
+        )
 
     def load(self, key: str) -> Any:
         path = self._path_for(key)

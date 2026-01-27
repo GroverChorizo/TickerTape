@@ -1,4 +1,5 @@
 """Stream supervisor for backend feeds."""
+
 from __future__ import annotations
 
 import asyncio
@@ -45,9 +46,13 @@ class StreamSupervisor:
                     payload = feed.fetch()
                     feed.update(payload)
                     backoff = 1.0
-                    delay = feed.poll_interval if feed.state.status != "error" else backoff
+                    delay = (
+                        feed.poll_interval if feed.state.status != "error" else backoff
+                    )
             except Exception as exc:
-                logger.warning({"event": "feed_error", "feed": feed.name, "error": str(exc)})
+                logger.warning(
+                    {"event": "feed_error", "feed": feed.name, "error": str(exc)}
+                )
                 if isinstance(feed, TuiFeedBase):
                     feed.fetch_result()
                     backoff = min(backoff * 2, feed.max_backoff)
@@ -71,4 +76,6 @@ class StreamSupervisor:
                 feed.fetch_result()
             else:
                 feed.set_error(str(exc))
-            logger.warning({"event": "feed_error", "feed": feed.name, "error": str(exc)})
+            logger.warning(
+                {"event": "feed_error", "feed": feed.name, "error": str(exc)}
+            )

@@ -1,10 +1,18 @@
 """Whale activity panel."""
+
 from __future__ import annotations
 
 from typing import List
 
 from ..feeds.base import FeedResult
-from tui.render.palette import build_text, format_last_good, heading_line, last_updated_line, muted_line, panel_header
+from tui.render.palette import (
+    build_text,
+    format_last_good,
+    heading_line,
+    last_updated_line,
+    muted_line,
+    panel_header,
+)
 from .panel_base import PanelBase
 from .wallet_panel import WalletsDiscovered
 
@@ -95,16 +103,38 @@ class WhalePanel(PanelBase):
         styled_lines.append(panel_header(self.title, status_value, self.palette))
         styled_lines.append(last_updated_line(updated_ts_ms, self.palette))
         if status == "disconnected" or is_lkg:
-            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
+            styled_lines.append(
+                muted_line(
+                    f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}",
+                    self.palette,
+                )
+            )
         styled_lines.append(heading_line("Recent whale trades:", self.palette))
         for event in list(reversed(filtered or trades))[:5]:
             symbol = event.get("symbol") or event.get("coin") or "?"
             side = event.get("side") or event.get("direction") or "?"
-            size = event.get("size") or event.get("amount") or event.get("sz") or event.get("qty") or "?"
+            size = (
+                event.get("size")
+                or event.get("amount")
+                or event.get("sz")
+                or event.get("qty")
+                or "?"
+            )
             price = event.get("price") or event.get("px") or "?"
-            wallet = event.get("wallet") or event.get("wallet_address") or event.get("address")
-            wallet_hint = f" wallet={wallet}" if isinstance(wallet, str) and wallet else ""
-            styled_lines.append((f"- {symbol} {side} size={size} price={price}{wallet_hint}", self.palette.accent.cyan))
+            wallet = (
+                event.get("wallet")
+                or event.get("wallet_address")
+                or event.get("address")
+            )
+            wallet_hint = (
+                f" wallet={wallet}" if isinstance(wallet, str) and wallet else ""
+            )
+            styled_lines.append(
+                (
+                    f"- {symbol} {side} size={size} price={price}{wallet_hint}",
+                    self.palette.accent.cyan,
+                )
+            )
         self.update_text(build_text(styled_lines))
         wallets = _extract_wallets(trades)
         if wallets:
@@ -122,7 +152,9 @@ def _extract_wallets(events: List[dict]) -> List[str]:
 
 
 def _meets_min_notional(event: dict, threshold: float) -> bool:
-    size = event.get("size") or event.get("amount") or event.get("sz") or event.get("qty")
+    size = (
+        event.get("size") or event.get("amount") or event.get("sz") or event.get("qty")
+    )
     price = event.get("price") or event.get("px")
     notional = event.get("notional") or event.get("value") or event.get("usd_value")
     try:

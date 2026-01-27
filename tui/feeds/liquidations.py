@@ -1,4 +1,5 @@
 """Liquidation radar feed for Liquidation Hunter profile."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,7 +39,9 @@ class LiquidationsRadarFeed(BaseFeed):
         poll_interval: float = 5.0,
         offline: bool = False,
     ) -> None:
-        super().__init__(name="liquidations_radar", poll_interval=poll_interval, offline=offline)
+        super().__init__(
+            name="liquidations_radar", poll_interval=poll_interval, offline=offline
+        )
         self.client = client
         self.registry = registry
         self.capture_enabled = False
@@ -105,17 +108,25 @@ class LiquidationsRadarFeed(BaseFeed):
             raise RuntimeError("; ".join(error_messages))
         return payload
 
-    def _capture_if_enabled(self, events: List[LiquidationEvent], now_ms: int) -> Dict[str, Any]:
+    def _capture_if_enabled(
+        self, events: List[LiquidationEvent], now_ms: int
+    ) -> Dict[str, Any]:
         if self.capture_enabled and events:
             records = [event.__dict__ for event in events]
             try:
-                partition_and_write(self._dataset_name, self._timeframe, now_ms, records, self.registry)
+                partition_and_write(
+                    self._dataset_name, self._timeframe, now_ms, records, self.registry
+                )
                 self._last_export_ts = now_ms
             except Exception:
                 pass
         dataset_key = f"feed={self._dataset_name}"
         datasets = self.registry.list_datasets()
-        parts = datasets.get(dataset_key, {}).get("partitions", []) if isinstance(datasets, dict) else []
+        parts = (
+            datasets.get(dataset_key, {}).get("partitions", [])
+            if isinstance(datasets, dict)
+            else []
+        )
         size_bytes = 0
         for part in parts:
             try:
@@ -143,7 +154,12 @@ class LiquidationsRadarFeed(BaseFeed):
 
 def _extract_event_list(raw: Any) -> List[Dict[str, Any]]:
     if isinstance(raw, dict):
-        events = raw.get("liquidations") or raw.get("events") or raw.get("data") or raw.get("rows")
+        events = (
+            raw.get("liquidations")
+            or raw.get("events")
+            or raw.get("data")
+            or raw.get("rows")
+        )
         if isinstance(events, list):
             return [e for e in events if isinstance(e, dict)]
     if isinstance(raw, list):
@@ -155,7 +171,9 @@ def _extract_largest_events(raw: Any) -> List[Dict[str, Any]]:
     if not isinstance(raw, dict):
         return []
     windows = raw.get("windows", {})
-    window = windows.get("24h", windows.get("4h", {})) if isinstance(windows, dict) else {}
+    window = (
+        windows.get("24h", windows.get("4h", {})) if isinstance(windows, dict) else {}
+    )
     largest = window.get("largest") if isinstance(window, dict) else None
     if isinstance(largest, list):
         return [e for e in largest if isinstance(e, dict)]
@@ -166,15 +184,24 @@ def _normalize_timeframe_stats(raw: Any) -> Dict[str, Any]:
     stats = raw.get("stats", raw) if isinstance(raw, dict) else {}
     return {
         "total_count": _first_int(stats, ["total_count", "count", "total"]),
-        "total_notional": _first_float(stats, ["total_value_usd", "total_usd", "total_value", "total_volume", "total"]),
+        "total_notional": _first_float(
+            stats,
+            ["total_value_usd", "total_usd", "total_value", "total_volume", "total"],
+        ),
         "long_count": _first_int(stats, ["long_count", "longs", "long_liqs"]),
         "short_count": _first_int(stats, ["short_count", "shorts", "short_liqs"]),
-        "long_notional": _first_float(stats, ["long_value_usd", "long_usd", "long_value", "long_volume"]),
-        "short_notional": _first_float(stats, ["short_value_usd", "short_usd", "short_value", "short_volume"]),
+        "long_notional": _first_float(
+            stats, ["long_value_usd", "long_usd", "long_value", "long_volume"]
+        ),
+        "short_notional": _first_float(
+            stats, ["short_value_usd", "short_usd", "short_value", "short_volume"]
+        ),
     }
 
 
-def _normalize_events(raw_events: Iterable[Dict[str, Any]], source: str) -> List[LiquidationEvent]:
+def _normalize_events(
+    raw_events: Iterable[Dict[str, Any]], source: str
+) -> List[LiquidationEvent]:
     events: List[LiquidationEvent] = []
     for entry in raw_events:
         evt = _normalize_event(entry, source)
@@ -191,13 +218,22 @@ def _normalize_event(entry: Dict[str, Any], source: str) -> Optional[Liquidation
         or entry.get("time")
         or entry.get("t")
     )
-    symbol = _coerce_str(entry.get("symbol") or entry.get("coin") or entry.get("asset") or entry.get("ticker"))
+    symbol = _coerce_str(
+        entry.get("symbol")
+        or entry.get("coin")
+        or entry.get("asset")
+        or entry.get("ticker")
+    )
     if not ts or not symbol:
         return None
-    side_raw = _coerce_str(entry.get("side") or entry.get("direction") or entry.get("type") or "")
+    side_raw = _coerce_str(
+        entry.get("side") or entry.get("direction") or entry.get("type") or ""
+    )
     side = _normalize_side(side_raw)
     price = _coerce_float(entry.get("price") or entry.get("px"))
-    size = _coerce_float(entry.get("size") or entry.get("sz") or entry.get("qty") or entry.get("amount"))
+    size = _coerce_float(
+        entry.get("size") or entry.get("sz") or entry.get("qty") or entry.get("amount")
+    )
     notional = _coerce_float(
         entry.get("value_usd")
         or entry.get("usd_value")
@@ -206,7 +242,9 @@ def _normalize_event(entry: Dict[str, Any], source: str) -> Optional[Liquidation
     )
     if notional is None and price is not None and size is not None:
         notional = price * size
-    wallet = _coerce_str(entry.get("address") or entry.get("wallet") or entry.get("user"))
+    wallet = _coerce_str(
+        entry.get("address") or entry.get("wallet") or entry.get("user")
+    )
     return LiquidationEvent(
         ts_ms=ts,
         symbol=symbol,
@@ -228,7 +266,9 @@ def _normalize_side(raw: Optional[str]) -> str:
     return "unknown"
 
 
-def _compute_rollups(events: List[LiquidationEvent], now_ms: int) -> Dict[str, Dict[str, Any]]:
+def _compute_rollups(
+    events: List[LiquidationEvent], now_ms: int
+) -> Dict[str, Dict[str, Any]]:
     rollups: Dict[str, Dict[str, Any]] = {}
     for label, window_ms in ROLLING_WINDOWS_MS.items():
         window = _filter_window(events, now_ms, window_ms)
@@ -236,7 +276,9 @@ def _compute_rollups(events: List[LiquidationEvent], now_ms: int) -> Dict[str, D
     return rollups
 
 
-def _filter_window(events: List[LiquidationEvent], now_ms: int, window_ms: int) -> List[LiquidationEvent]:
+def _filter_window(
+    events: List[LiquidationEvent], now_ms: int, window_ms: int
+) -> List[LiquidationEvent]:
     start = now_ms - window_ms
     return [e for e in events if e.ts_ms >= start]
 
@@ -257,7 +299,13 @@ def _aggregate_events(events: List[LiquidationEvent]) -> Dict[str, Any]:
     }
 
 
-def _bucket_series(events: List[LiquidationEvent], now_ms: int, *, window_ms: int = 15 * 60_000, bucket_ms: int = 60_000) -> Dict[str, List[float]]:
+def _bucket_series(
+    events: List[LiquidationEvent],
+    now_ms: int,
+    *,
+    window_ms: int = 15 * 60_000,
+    bucket_ms: int = 60_000,
+) -> Dict[str, List[float]]:
     start = now_ms - window_ms
     bucket_count = max(int(window_ms / bucket_ms), 1)
     totals = [0.0 for _ in range(bucket_count)]
@@ -272,7 +320,9 @@ def _bucket_series(events: List[LiquidationEvent], now_ms: int, *, window_ms: in
     return {"notional": totals, "count": counts}
 
 
-def _cascade_risk(rollups: Dict[str, Dict[str, Any]], series: Dict[str, List[float]]) -> Dict[str, Any]:
+def _cascade_risk(
+    rollups: Dict[str, Dict[str, Any]], series: Dict[str, List[float]]
+) -> Dict[str, Any]:
     counts = series.get("count", [])
     notional = series.get("notional", [])
     if len(counts) < 3:
@@ -291,7 +341,10 @@ def _cascade_risk(rollups: Dict[str, Dict[str, Any]], series: Dict[str, List[flo
     level = "LOW"
     if recent_count >= max(3.0, avg_count * 2) and recent_notional >= avg_notional * 2:
         level = "HIGH"
-    elif recent_count >= max(2.0, avg_count * 1.5) or recent_notional >= avg_notional * 1.5:
+    elif (
+        recent_count >= max(2.0, avg_count * 1.5)
+        or recent_notional >= avg_notional * 1.5
+    ):
         level = "MED"
     return {
         "level": level,
@@ -300,21 +353,29 @@ def _cascade_risk(rollups: Dict[str, Dict[str, Any]], series: Dict[str, List[flo
     }
 
 
-def _top_symbols(events: List[LiquidationEvent], now_ms: int, window_ms: int) -> List[Dict[str, Any]]:
+def _top_symbols(
+    events: List[LiquidationEvent], now_ms: int, window_ms: int
+) -> List[Dict[str, Any]]:
     window = _filter_window(events, now_ms, window_ms)
     bucket: Dict[str, Dict[str, Any]] = {}
     for event in window:
-        stats = bucket.setdefault(event.symbol, {"symbol": event.symbol, "notional": 0.0, "count": 0})
+        stats = bucket.setdefault(
+            event.symbol, {"symbol": event.symbol, "notional": 0.0, "count": 0}
+        )
         stats["count"] += 1
         stats["notional"] += event.notional_usd or 0.0
-    return sorted(bucket.values(), key=lambda item: item.get("notional", 0.0), reverse=True)
+    return sorted(
+        bucket.values(), key=lambda item: item.get("notional", 0.0), reverse=True
+    )
 
 
 def _top_symbols_from_stats(raw: Any) -> List[Dict[str, Any]]:
     if not isinstance(raw, dict):
         return []
     windows = raw.get("windows", {})
-    window = windows.get("24h", windows.get("4h", {})) if isinstance(windows, dict) else {}
+    window = (
+        windows.get("24h", windows.get("4h", {})) if isinstance(windows, dict) else {}
+    )
     by_coin = window.get("by_coin") or {}
     if not isinstance(by_coin, dict):
         return []
@@ -325,7 +386,9 @@ def _top_symbols_from_stats(raw: Any) -> List[Dict[str, Any]]:
         rows.append(
             {
                 "symbol": symbol,
-                "notional": _first_float(data, ["total_value_usd", "total_value", "total_usd"]),
+                "notional": _first_float(
+                    data, ["total_value_usd", "total_value", "total_usd"]
+                ),
                 "count": _first_int(data, ["count", "total_count"]),
             }
         )

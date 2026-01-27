@@ -21,7 +21,14 @@ class DummyClient:
         self.calls = []
 
     def request(self, method, url, headers=None, params=None, **kwargs):
-        self.calls.append({"method": method, "url": url, "headers": headers or {}, "params": params or {}})
+        self.calls.append(
+            {
+                "method": method,
+                "url": url,
+                "headers": headers or {},
+                "params": params or {},
+            }
+        )
         return self.responses.pop(0)
 
     def close(self):

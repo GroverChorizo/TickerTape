@@ -4,6 +4,7 @@
 - Compute snapshots per timeframe (10m, 1h, 4h, 24h)
 - Export snapshot record dict suitable for Parquet/registry
 """
+
 from __future__ import annotations
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
@@ -32,15 +33,33 @@ class LiquidationsFeed:
     def add_event(self, event: LiquidationEvent) -> None:
         """Append an event to the buffer."""
         self._buffer.append(event)
-        logger.debug({"event": "liquidation_received", "symbol": event.symbol, "size": event.size})
+        logger.debug(
+            {
+                "event": "liquidation_received",
+                "symbol": event.symbol,
+                "size": event.size,
+            }
+        )
 
     def clear_buffer(self) -> None:
         self._buffer = []
 
-    def _events_in_window(self, start_ts_ms: int, end_ts_ms: int) -> List[LiquidationEvent]:
-        return [e for e in self._buffer if start_ts_ms <= int(e.timestamp.timestamp() * 1000) < end_ts_ms]
+    def _events_in_window(
+        self, start_ts_ms: int, end_ts_ms: int
+    ) -> List[LiquidationEvent]:
+        return [
+            e
+            for e in self._buffer
+            if start_ts_ms <= int(e.timestamp.timestamp() * 1000) < end_ts_ms
+        ]
 
-    def compute_snapshot(self, timeframe: str, window_start_ts_ms: int, window_end_ts_ms: int, provenance: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
+    def compute_snapshot(
+        self,
+        timeframe: str,
+        window_start_ts_ms: int,
+        window_end_ts_ms: int,
+        provenance: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
         """Compute snapshot KPIs from buffered events in [window_start, window_end).
 
         Returns a dict with required fields.
@@ -65,10 +84,16 @@ class LiquidationsFeed:
             if exch:
                 exchange_notional[exch] += e.size * e.price
 
-        top_symbols = sorted(symbol_notional.items(), key=lambda x: x[1], reverse=True)[:10]
-        top_exchanges = sorted(exchange_notional.items(), key=lambda x: x[1], reverse=True)[:10]
+        top_symbols = sorted(symbol_notional.items(), key=lambda x: x[1], reverse=True)[
+            :10
+        ]
+        top_exchanges = sorted(
+            exchange_notional.items(), key=lambda x: x[1], reverse=True
+        )[:10]
 
-        side_notional_list = [{"side": k, "notional": v} for k, v in side_notional.items()]
+        side_notional_list = [
+            {"side": k, "notional": v} for k, v in side_notional.items()
+        ]
 
         # simple cascade / velocity detection: compute events per 60s buckets and detect spikes
         buckets = defaultdict(int)
@@ -84,7 +109,11 @@ class LiquidationsFeed:
             mean = statistics.mean(counts)
             stdev = statistics.pstdev(counts) if len(counts) > 1 else 0.0
             max_bucket = max(counts)
-            velocity_score = (max_bucket - mean) / (stdev + 1e-9) if stdev > 0 else float(max_bucket - mean)
+            velocity_score = (
+                (max_bucket - mean) / (stdev + 1e-9)
+                if stdev > 0
+                else float(max_bucket - mean)
+            )
             if max_bucket >= max(5, mean + 3 * stdev):
                 cascade_detected = True
 
@@ -104,11 +133,30 @@ class LiquidationsFeed:
             "run_id": provenance.get("run_id") if provenance else str(uuid.uuid4()),
             "provenance": provenance or {},
         }
-        logger.info({"event": "snapshot_computed", "timeframe": timeframe, "window_start": window_start_ts_ms, "count": count})
+        logger.info(
+            {
+                "event": "snapshot_computed",
+                "timeframe": timeframe,
+                "window_start": window_start_ts_ms,
+                "count": count,
+            }
+        )
         return snapshot
 
-    def compute_and_clear(self, timeframe: str, window_start_ts_ms: int, window_end_ts_ms: int, provenance: Optional[Dict[str, str]] = None) -> Dict[str, Any]:
-        s = self.compute_snapshot(timeframe, window_start_ts_ms, window_end_ts_ms, provenance)
+    def compute_and_clear(
+        self,
+        timeframe: str,
+        window_start_ts_ms: int,
+        window_end_ts_ms: int,
+        provenance: Optional[Dict[str, str]] = None,
+    ) -> Dict[str, Any]:
+        s = self.compute_snapshot(
+            timeframe, window_start_ts_ms, window_end_ts_ms, provenance
+        )
         # Optionally remove events in window from buffer (we keep for now to allow multiple timeframes)
-        self._buffer = [e for e in self._buffer if int(e.timestamp.timestamp() * 1000) >= window_end_ts_ms]
+        self._buffer = [
+            e
+            for e in self._buffer
+            if int(e.timestamp.timestamp() * 1000) >= window_end_ts_ms
+        ]
         return s

@@ -1,6 +1,9 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 import pytest
 
 httpx = pytest.importorskip("httpx")
@@ -12,9 +15,10 @@ pytest.importorskip("httpx")
 
 
 class DummyResponse:
-    def __init__(self, status_code:int, json_obj=None):
+    def __init__(self, status_code: int, json_obj=None):
         self.status_code = status_code
         self._json = json_obj or {}
+
     def json(self):
         return self._json
 
@@ -24,12 +28,14 @@ class DummyClient:
         # responses: list of either Exception or DummyResponse
         self._responses = responses
         self.calls = 0
+
     def get(self, url, params=None):
         resp = self._responses[self.calls]
         self.calls += 1
         if isinstance(resp, Exception):
             raise resp
         return resp
+
     def close(self):
         pass
 

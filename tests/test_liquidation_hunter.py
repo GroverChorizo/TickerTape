@@ -7,7 +7,11 @@ from textual.app import App, ComposeResult
 
 from backend.storage import DatasetRegistry
 from tui.feeds.base import FeedResult
-from tui.feeds.liquidations import LiquidationsRadarFeed, _normalize_event, _normalize_timeframe_stats
+from tui.feeds.liquidations import (
+    LiquidationsRadarFeed,
+    _normalize_event,
+    _normalize_timeframe_stats,
+)
 from tui.widgets.liquidations_radar import LiquidationsRadarPanel
 from tui.state.profiles import get_profile
 
@@ -60,7 +64,9 @@ def test_liquidation_timeframe_stats_minimal():
 
 def test_liquidation_panel_error_includes_http_status():
     panel = LiquidationsRadarPanel()
-    error_line = "GET https://api.moondev.com/api/liquidations/1h.json -> HTTP 404: Not Found"
+    error_line = (
+        "GET https://api.moondev.com/api/liquidations/1h.json -> HTTP 404: Not Found"
+    )
     result = FeedResult(status="error", error=error_line)
 
     app = _PanelApp(panel)
@@ -77,7 +83,12 @@ def test_liquidation_panel_error_includes_http_status():
 
 def test_liquidation_hunter_profile_panels():
     profile = get_profile("liquidation_hunter")
-    for panel_id in ["liquidations_radar", "liquidations_top", "liquidations_context", "capture_status"]:
+    for panel_id in [
+        "liquidations_radar",
+        "liquidations_top",
+        "liquidations_context",
+        "capture_status",
+    ]:
         assert panel_id in profile.default_panel_order
 
 

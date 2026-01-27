@@ -1,4 +1,5 @@
 """Hyperliquid feed adapters for the TUI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -33,21 +34,34 @@ class HyperliquidClient:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.retries = retries
-        self._client = MoonDevClient(base_url=self.base_url, timeout=timeout, retries=retries)
+        self._client = MoonDevClient(
+            base_url=self.base_url, timeout=timeout, retries=retries
+        )
 
     def close(self) -> None:
         self._client.close()
 
-    def get_json(self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+    def get_json(
+        self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any
+    ) -> Any:
         return self._client.get_json(endpoint_key, params=params, **kwargs)
 
-    def post_json(self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any) -> Any:
+    def post_json(
+        self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any
+    ) -> Any:
         return self._client.post_json(endpoint_key, payload, **kwargs)
 
 
 class LiquidationsFeed(BaseFeed):
-    def __init__(self, client: HyperliquidClient, poll_interval: float = 5.0, offline: bool = False) -> None:
-        super().__init__(name="liquidations", poll_interval=poll_interval, offline=offline)
+    def __init__(
+        self,
+        client: HyperliquidClient,
+        poll_interval: float = 5.0,
+        offline: bool = False,
+    ) -> None:
+        super().__init__(
+            name="liquidations", poll_interval=poll_interval, offline=offline
+        )
         self.client = client
 
     def fetch(self) -> Dict[str, Any]:
@@ -56,7 +70,12 @@ class LiquidationsFeed(BaseFeed):
 
 
 class WhaleTradesFeed(BaseFeed):
-    def __init__(self, client: HyperliquidClient, poll_interval: float = 4.0, offline: bool = False) -> None:
+    def __init__(
+        self,
+        client: HyperliquidClient,
+        poll_interval: float = 4.0,
+        offline: bool = False,
+    ) -> None:
         super().__init__(name="whales", poll_interval=poll_interval, offline=offline)
         self.client = client
 
@@ -83,7 +102,6 @@ class FundingRatesFeed(BaseFeed):
         self._registry = registry
         self._dataset_name = dataset_name
         self._timeframe = timeframe
-
 
     def fetch(self) -> Dict[str, Any]:
         end_ms = int(time.time() * 1000)
@@ -118,12 +136,21 @@ class FundingRatesFeed(BaseFeed):
                 self._registry,
             )
         except Exception as exc:
-            logger.warning({"event": "funding_snapshot_write_failed", "error": str(exc)})
+            logger.warning(
+                {"event": "funding_snapshot_write_failed", "error": str(exc)}
+            )
 
 
 class EventStreamFeed(BaseFeed):
-    def __init__(self, client: HyperliquidClient, poll_interval: float = 4.0, offline: bool = False) -> None:
-        super().__init__(name="event_stream", poll_interval=poll_interval, offline=offline)
+    def __init__(
+        self,
+        client: HyperliquidClient,
+        poll_interval: float = 4.0,
+        offline: bool = False,
+    ) -> None:
+        super().__init__(
+            name="event_stream", poll_interval=poll_interval, offline=offline
+        )
         self.client = client
 
     def fetch(self) -> Dict[str, Any]:
@@ -149,7 +176,9 @@ def _format_json_error(method: str, url: str, response: Any) -> str:
     except Exception:
         snippet = ""
     snippet = snippet.replace("\r", " ").replace("\n", " ")[:200]
-    return f"{method} {url} -> HTTP {response.status_code} (json decode error): {snippet}"
+    return (
+        f"{method} {url} -> HTTP {response.status_code} (json decode error): {snippet}"
+    )
 
 
 def _parse_funding_history(raw: Any) -> List[FundingPoint]:
@@ -180,12 +209,16 @@ def _normalize_whale_events(raw: Any) -> List[Dict[str, Any]]:
         if not isinstance(entry, dict):
             continue
         event = {
-            "timestamp_ms": entry.get("timestamp_ms") or entry.get("timestamp") or entry.get("time"),
+            "timestamp_ms": entry.get("timestamp_ms")
+            or entry.get("timestamp")
+            or entry.get("time"),
             "symbol": entry.get("symbol") or entry.get("coin"),
             "side": entry.get("side") or entry.get("direction"),
             "size": entry.get("size") or entry.get("amount") or entry.get("qty"),
             "price": entry.get("price"),
-            "wallet": entry.get("wallet") or entry.get("wallet_address") or entry.get("address"),
+            "wallet": entry.get("wallet")
+            or entry.get("wallet_address")
+            or entry.get("address"),
             "raw": entry,
         }
         events.append(event)
@@ -196,7 +229,12 @@ def _normalize_events(raw: Any) -> List[Dict[str, Any]]:
     events: List[Dict[str, Any]] = []
     data = raw
     if isinstance(raw, dict):
-        data = raw.get("events") or raw.get("data") or raw.get("items") or raw.get("results")
+        data = (
+            raw.get("events")
+            or raw.get("data")
+            or raw.get("items")
+            or raw.get("results")
+        )
     if not isinstance(data, list):
         return events
     for entry in data:
@@ -211,7 +249,12 @@ def _normalize_events(raw: Any) -> List[Dict[str, Any]]:
             or entry.get("event_type")
             or entry.get("type")
         )
-        side = entry.get("side") or entry.get("direction") or entry.get("action") or entry.get("type")
+        side = (
+            entry.get("side")
+            or entry.get("direction")
+            or entry.get("action")
+            or entry.get("type")
+        )
         size = (
             entry.get("size")
             or entry.get("amount")
@@ -223,11 +266,16 @@ def _normalize_events(raw: Any) -> List[Dict[str, Any]]:
         )
         events.append(
             {
-                "timestamp_ms": entry.get("timestamp_ms") or entry.get("timestamp") or entry.get("time"),
+                "timestamp_ms": entry.get("timestamp_ms")
+                or entry.get("timestamp")
+                or entry.get("time"),
                 "symbol": symbol or "event",
                 "side": side or "?",
                 "size": size if size is not None else "?",
-                "wallet": entry.get("wallet") or entry.get("wallet_address") or entry.get("address") or entry.get("user"),
+                "wallet": entry.get("wallet")
+                or entry.get("wallet_address")
+                or entry.get("address")
+                or entry.get("user"),
                 "raw": entry,
             }
         )

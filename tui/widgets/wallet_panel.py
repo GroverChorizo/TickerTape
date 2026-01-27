@@ -1,4 +1,5 @@
 """Wallet selection and detail panels."""
+
 from __future__ import annotations
 
 from typing import Dict, Iterable, List

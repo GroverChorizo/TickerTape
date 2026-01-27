@@ -1,4 +1,5 @@
 """Semantic theme palettes for the TUI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

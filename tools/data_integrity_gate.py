@@ -89,7 +89,9 @@ def load_config(config_path: Optional[Path]) -> dict:
         return {}
 
 
-def iter_files(root: Path, exclude_dirs: set[str], include_exts: set[str]) -> Iterable[Path]:
+def iter_files(
+    root: Path, exclude_dirs: set[str], include_exts: set[str]
+) -> Iterable[Path]:
     for p in root.rglob("*"):
         if p.is_dir():
             continue
@@ -161,8 +163,6 @@ def is_allowed(f: Finding, allowlist: list[dict], root: Path) -> bool:
     return False
 
 
-
-
 def _hygiene_checks(root: Path, cfg: dict) -> Tuple[List[str], List[str], List[str]]:
     """Return (missing_gitignore_patterns, missing_required_files, present_forbidden_files)."""
     req_patterns = cfg.get("required_gitignore_patterns", [])
@@ -197,7 +197,11 @@ def _is_non_prod_path(root: Path, file_path: Path) -> bool:
     return ("tests" in parts) or ("docs" in parts)
 
 
-def run_checks(root: Path = Path("."), config_path: str = ".data_integrity_gate.json", ci: bool = False) -> bool:
+def run_checks(
+    root: Path = Path("."),
+    config_path: str = ".data_integrity_gate.json",
+    ci: bool = False,
+) -> bool:
     """
     Run the gate checks programmatically.
 
@@ -208,12 +212,17 @@ def run_checks(root: Path = Path("."), config_path: str = ".data_integrity_gate.
     # Load config file from the provided root ONLY. Do not search parent folders.
     cfg_path = root / config_path
     if not cfg_path.exists():
-        raise RuntimeError(f"Data Integrity Gate misconfigured: config not found at {cfg_path}")
+        raise RuntimeError(
+            f"Data Integrity Gate misconfigured: config not found at {cfg_path}"
+        )
 
     config = load_config(cfg_path)
 
     exclude_dirs = set(config.get("exclude_dirs", [])) | DEFAULT_EXCLUDE_DIRS
-    include_exts = set(ext.lower() for ext in config.get("include_exts", [])) or DEFAULT_INCLUDE_EXTS
+    include_exts = (
+        set(ext.lower() for ext in config.get("include_exts", []))
+        or DEFAULT_INCLUDE_EXTS
+    )
     allowlist = config.get("allowlist", [])
 
     compiled: List[Tuple[str, re.Pattern]] = []
@@ -232,7 +241,6 @@ def run_checks(root: Path = Path("."), config_path: str = ".data_integrity_gate.
         if r.exists():
             files_to_scan.extend(iter_files(r, exclude_dirs, include_exts))
 
-
     # 1) Scan everything
     findings: List[Finding] = []
     for fpath in files_to_scan:
@@ -247,10 +255,14 @@ def run_checks(root: Path = Path("."), config_path: str = ".data_integrity_gate.
         filtered_findings.append(ff)
 
     # 3) Apply allowlist
-    filtered_findings = [x for x in filtered_findings if not is_allowed(x, allowlist, root)]
+    filtered_findings = [
+        x for x in filtered_findings if not is_allowed(x, allowlist, root)
+    ]
 
     # 4) Hygiene checks
-    missing_patterns, missing_required, present_forbidden = _hygiene_checks(root, config)
+    missing_patterns, missing_required, present_forbidden = _hygiene_checks(
+        root, config
+    )
 
     ok = True
 
@@ -285,19 +297,25 @@ def run_checks(root: Path = Path("."), config_path: str = ".data_integrity_gate.
             print(f"- {f.category}: {rel}:{f.line_no}  pattern=/{f.pattern}/")
             print(f"  {f.line}\n")
         if len(filtered_findings) > 500:
-            print(f"[integrity] ... plus {len(filtered_findings) - 500} more findings (truncated).")
+            print(
+                f"[integrity] ... plus {len(filtered_findings) - 500} more findings (truncated)."
+            )
 
     if ci:
         return False
 
-    print("\n[gate] If a finding is intentional, add an allowlist rule in .data_integrity_gate.json with a reason.")
+    print(
+        "\n[gate] If a finding is intentional, add an allowlist rule in .data_integrity_gate.json with a reason."
+    )
     return False
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=".", help="Repo root to scan (default: .)")
-    ap.add_argument("--config", default=".data_integrity_gate.json", help="JSON config path")
+    ap.add_argument(
+        "--config", default=".data_integrity_gate.json", help="JSON config path"
+    )
     ap.add_argument("--ci", action="store_true", help="CI mode (non-interactive)")
     args = ap.parse_args()
 

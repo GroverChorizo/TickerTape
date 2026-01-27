@@ -3,6 +3,7 @@
 - Writes partitioned Parquet files under data/parquet/
 - Registers dataset partitions in a local JSON registry
 """
+
 from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, Iterable
@@ -49,16 +50,26 @@ class DatasetRegistry:
             return {"datasets": {}}
 
     def _write(self, data: Dict[str, Any]) -> None:
-        self.path.write_text(json.dumps(data, sort_keys=True, indent=2), encoding="utf-8")
+        self.path.write_text(
+            json.dumps(data, sort_keys=True, indent=2), encoding="utf-8"
+        )
 
-    def register_partition(self, dataset_name: str, partition_relative_path: str) -> None:
+    def register_partition(
+        self, dataset_name: str, partition_relative_path: str
+    ) -> None:
         data = self._read()
         datasets = data.setdefault("datasets", {})
         ds = datasets.setdefault(dataset_name, {})
         parts = ds.setdefault("partitions", [])
         if partition_relative_path not in parts:
             parts.append(partition_relative_path)
-            logger.info({"event": "register_partition", "dataset": dataset_name, "partition": partition_relative_path})
+            logger.info(
+                {
+                    "event": "register_partition",
+                    "dataset": dataset_name,
+                    "partition": partition_relative_path,
+                }
+            )
             self._write(data)
 
     def list_datasets(self) -> Dict[str, Any]:
@@ -96,14 +107,25 @@ def write_parquet(records: Iterable[Dict[str, Any]], output_path: Path) -> None:
         return
 
 
-def partition_and_write(dataset: str, timeframe: str, window_start_ts: int, records: Iterable[Dict[str, Any]], registry: DatasetRegistry) -> Path:
+def partition_and_write(
+    dataset: str,
+    timeframe: str,
+    window_start_ts: int,
+    records: Iterable[Dict[str, Any]],
+    registry: DatasetRegistry,
+) -> Path:
     """Write records into partitioned path and register it.
 
     Partition layout: data/parquet/feed={dataset}/timeframe={timeframe}/date=YYYY-MM-DD/part-<ts>.parquet
     """
     ts_dt = datetime.utcfromtimestamp(window_start_ts / 1000)
     date_str = ts_dt.strftime("%Y-%m-%d")
-    base = BASE_PARQUET_ROOT / f"feed={dataset}" / f"timeframe={timeframe}" / f"date={date_str}"
+    base = (
+        BASE_PARQUET_ROOT
+        / f"feed={dataset}"
+        / f"timeframe={timeframe}"
+        / f"date={date_str}"
+    )
     out_fn = f"part-{window_start_ts}.parquet"
     out_path = base / out_fn
     write_parquet(records, out_path)

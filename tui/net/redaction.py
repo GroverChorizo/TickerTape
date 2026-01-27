@@ -48,13 +48,15 @@ def redact_url(url: str, sensitive_keys: Iterable[str] | None = None) -> str:
 
         redacted_query = urlencode(query_items, doseq=True)
 
-        return urlunsplit((
-            parts.scheme,
-            parts.netloc,
-            parts.path,
-            redacted_query,
-            parts.fragment,
-        ))
+        return urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc,
+                parts.path,
+                redacted_query,
+                parts.fragment,
+            )
+        )
     except Exception:
         # Fail closed — never echo the original string
         return "<redacted-url>"

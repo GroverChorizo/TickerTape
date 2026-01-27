@@ -1,4 +1,5 @@
 """Liquidation Hunter profile screen."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -14,7 +15,11 @@ from tui.render.sparkline import sparkline, heat_bar
 
 class LiquidationHunterScreen(BaseScreen):
     def __init__(self) -> None:
-        super().__init__(screen_id="profile_liquidation", title="Liquidation Hunter", context="liquidation")
+        super().__init__(
+            screen_id="profile_liquidation",
+            title="Liquidation Hunter",
+            context="liquidation",
+        )
         self._next_liq_fetch = 0.0
         self._next_market_fetch = 0.0
         self._liq_result: Optional[FeedResult] = None
@@ -37,7 +42,12 @@ class LiquidationHunterScreen(BaseScreen):
             self._liq_result = result
             self._next_liq_fetch = now + provider.liquidation_next_delay(result.status)
             if isinstance(result.data, LiquidationSnapshot):
-                store.update_snapshot("liquidation_hunter", "snapshot", result.data, ts_ms=result.updated_ts_ms)
+                store.update_snapshot(
+                    "liquidation_hunter",
+                    "snapshot",
+                    result.data,
+                    ts_ms=result.updated_ts_ms,
+                )
                 cache_snapshot = getattr(self.app, "cache_snapshot", None)
                 if cache_snapshot:
                     cache_snapshot("liquidation_hunter", "snapshot", result.data)
@@ -55,7 +65,11 @@ class LiquidationHunterScreen(BaseScreen):
     def _render(self) -> None:
         now_ms = int(time.time() * 1000)
         result = self._liq_result
-        snapshot = result.data if isinstance(result and result.data, LiquidationSnapshot) else None
+        snapshot = (
+            result.data
+            if isinstance(result and result.data, LiquidationSnapshot)
+            else None
+        )
         status_label = _status_label(result)
         status_line = _status_line(result, now_ms)
         self.set_status(status_line)
@@ -63,9 +77,16 @@ class LiquidationHunterScreen(BaseScreen):
         lines: List[str] = []
         lines.append(f"Liquidations Radar [{status_label}]")
 
-        if result and result.error and result.status in {"error", "disconnected"} and not snapshot:
+        if (
+            result
+            and result.error
+            and result.status in {"error", "disconnected"}
+            and not snapshot
+        ):
             lines.append(f"ERROR: {result.error}")
-            lines.append("Hint: verify API key + connectivity. Data will retry with backoff.")
+            lines.append(
+                "Hint: verify API key + connectivity. Data will retry with backoff."
+            )
             self.body.update("\n".join(lines))
             return
 
@@ -81,7 +102,9 @@ class LiquidationHunterScreen(BaseScreen):
             spark = sparkline(snapshot.series_notional, width=30)
             if spark:
                 lines.append(f"Notional sparkline: {spark}")
-            lines.append(f"Cascade risk: {snapshot.cascade.level} ({snapshot.cascade.reason})")
+            lines.append(
+                f"Cascade risk: {snapshot.cascade.level} ({snapshot.cascade.reason})"
+            )
             if result and result.error and result.is_lkg:
                 lines.append(f"Last error: {result.error}")
                 lines.append("Showing last known good data.")
@@ -92,7 +115,9 @@ class LiquidationHunterScreen(BaseScreen):
                     f"{_fmt_ts(event.ts_ms)} {event.symbol:<6} {event.side:<9} ${event.notional_usd or 0:,.0f}"
                 )
             lines.append("")
-            lines_top, symbols = _render_top_symbols(snapshot, getattr(self.app, "selected_symbol", "BTC"))
+            lines_top, symbols = _render_top_symbols(
+                snapshot, getattr(self.app, "selected_symbol", "BTC")
+            )
             lines.extend(lines_top)
             updater = getattr(self.app, "set_top_symbols", None)
             if updater:
@@ -102,13 +127,17 @@ class LiquidationHunterScreen(BaseScreen):
             lines.append("")
             lines.extend(_render_capture_status(snapshot))
             lines.append("")
-            lines.append("Commands: view time | view heatmap | view table | select <symbol|#> | capture on|off")
+            lines.append(
+                "Commands: view time | view heatmap | view table | select <symbol|#> | capture on|off"
+            )
         else:
             lines.append("Waiting for liquidation data...")
         self.body.update("\n".join(lines))
 
 
-def _render_top_symbols(snapshot: LiquidationSnapshot, selected_symbol: str) -> tuple[List[str], List[str]]:
+def _render_top_symbols(
+    snapshot: LiquidationSnapshot, selected_symbol: str
+) -> tuple[List[str], List[str]]:
     lines: List[str] = ["Top symbols (15m)"]
     top = snapshot.top_symbols.get("15m") or snapshot.top_symbols.get("5m") or []
     max_val = max([float(row.get("notional") or 0.0) for row in top], default=1.0)
@@ -117,7 +146,9 @@ def _render_top_symbols(snapshot: LiquidationSnapshot, selected_symbol: str) -> 
         symbol = str(row.get("symbol") or "?")
         marker = "*" if symbol.upper() == (selected_symbol or "").upper() else " "
         bar = heat_bar(float(row.get("notional") or 0.0), max_val, width=14)
-        lines.append(f"{idx:>2}. {marker}{symbol:<6} {bar} ${float(row.get('notional') or 0.0):,.0f}")
+        lines.append(
+            f"{idx:>2}. {marker}{symbol:<6} {bar} ${float(row.get('notional') or 0.0):,.0f}"
+        )
         symbols.append(symbol)
     if not top:
         lines.append("No symbol aggregates yet.")
@@ -179,7 +210,9 @@ def _status_line(result: Optional[FeedResult], now_ms: int) -> str:
         return "Status: loading | HTTP: pending"
     updated = result.updated_ts_ms
     if updated:
-        updated_str = datetime.fromtimestamp(updated / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        updated_str = datetime.fromtimestamp(updated / 1000, tz=timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S UTC"
+        )
     else:
         updated_str = "unknown"
     stale = ""

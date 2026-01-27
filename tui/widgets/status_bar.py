@@ -1,4 +1,5 @@
 """Status bar widget for TickerTape."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

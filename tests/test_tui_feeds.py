@@ -68,4 +68,7 @@ def test_funding_feed_persists_snapshot(tmp_path, monkeypatch):
     parts = datasets["feed=funding_rates"]["partitions"]
     assert parts
     stored_path = parquet_root / parts[0]
-    assert stored_path.exists() or stored_path.with_suffix(stored_path.suffix + ".ndjson").exists()
+    assert (
+        stored_path.exists()
+        or stored_path.with_suffix(stored_path.suffix + ".ndjson").exists()
+    )

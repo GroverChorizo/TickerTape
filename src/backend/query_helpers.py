@@ -4,6 +4,7 @@
 - load_latest_snapshot: find latest partition for feed/timeframe and read parquet or ndjson
 - query_recent_events: naive read of events partition files within time window
 """
+
 from __future__ import annotations
 from typing import Any, Dict, List, Optional
 from pathlib import Path
@@ -31,6 +32,7 @@ def _read_parquet_or_ndjson(path: Path) -> List[Dict[str, Any]]:
 
     try:
         import pyarrow.parquet as pq
+
         tbl = pq.read_table(str(path))
         data = [dict(row) for row in tbl.to_pylist()]
         return data
@@ -46,7 +48,9 @@ def _read_parquet_or_ndjson(path: Path) -> List[Dict[str, Any]]:
         raise
 
 
-def load_latest_snapshot(registry: DatasetRegistry, dataset_name: str, timeframe: str) -> Optional[Dict[str, Any]]:
+def load_latest_snapshot(
+    registry: DatasetRegistry, dataset_name: str, timeframe: str
+) -> Optional[Dict[str, Any]]:
     ds = registry.list_datasets().get(dataset_name)
     if not ds:
         return None
@@ -79,11 +83,15 @@ def load_latest_snapshot(registry: DatasetRegistry, dataset_name: str, timeframe
         rows = _read_parquet_or_ndjson(path_to_use)
         return rows[-1] if rows else None
     except Exception as e:
-        logger.error({"event": "read_snapshot_failed", "err": str(e), "path": str(path_to_use)})
+        logger.error(
+            {"event": "read_snapshot_failed", "err": str(e), "path": str(path_to_use)}
+        )
         return None
 
 
-def query_recent_events(registry: DatasetRegistry, dataset_name: str, since_ts_ms: int) -> List[Dict[str, Any]]:
+def query_recent_events(
+    registry: DatasetRegistry, dataset_name: str, since_ts_ms: int
+) -> List[Dict[str, Any]]:
     ds = registry.list_datasets().get(dataset_name)
     if not ds:
         return []
@@ -97,7 +105,11 @@ def query_recent_events(registry: DatasetRegistry, dataset_name: str, since_ts_m
             continue
         for r in rows:
             # event-like rows may have timestamp fields
-            ts = r.get("window_start_ts_ms") or r.get("timestamp_ms") or r.get("timestamp")
+            ts = (
+                r.get("window_start_ts_ms")
+                or r.get("timestamp_ms")
+                or r.get("timestamp")
+            )
             if ts is None:
                 out.append(r)
                 continue

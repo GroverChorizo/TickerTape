@@ -1,4 +1,5 @@
 """Capture/export status panel for liquidation data."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -53,23 +54,44 @@ class CaptureStatusPanel(PanelBase):
         capture = payload.get("capture") if isinstance(payload, dict) else None
         enabled = capture.get("enabled") if isinstance(capture, dict) else False
         status_value = "ok" if enabled else "empty"
-        self.set_status_class("disconnected" if self.feed_result.status == "disconnected" else status_value)
+        self.set_status_class(
+            "disconnected"
+            if self.feed_result.status == "disconnected"
+            else status_value
+        )
         header_status = "ok" if enabled else "empty"
         lines = [
             panel_header(self.title, header_status, self.palette),
             last_updated_line(self.feed_result.updated_ts_ms, self.palette),
         ]
         if self.feed_result.status == "disconnected" or self.feed_result.is_lkg:
-            lines.append(muted_line(f"Showing last known data. Stale {_fmt_stale(self.feed_result.updated_ts_ms)}", self.palette))
+            lines.append(
+                muted_line(
+                    f"Showing last known data. Stale {_fmt_stale(self.feed_result.updated_ts_ms)}",
+                    self.palette,
+                )
+            )
         if not isinstance(capture, dict):
             lines.append(muted_line("Capture data unavailable.", self.palette))
             self.update_text(build_text(lines))
             return
         on_off = "ON" if enabled else "OFF"
         lines.append((f"Capture: {on_off}", self.palette.text.primary))
-        lines.append((f"Output: {capture.get('base_path', '-')}", self.palette.text.primary))
-        lines.append((f"Files: {capture.get('file_count', 0)} | Size: {_fmt_bytes(capture.get('total_bytes'))}", self.palette.text.primary))
-        lines.append((f"Last export: {_fmt_ts(capture.get('last_export_ts_ms'))}", self.palette.text.primary))
+        lines.append(
+            (f"Output: {capture.get('base_path', '-')}", self.palette.text.primary)
+        )
+        lines.append(
+            (
+                f"Files: {capture.get('file_count', 0)} | Size: {_fmt_bytes(capture.get('total_bytes'))}",
+                self.palette.text.primary,
+            )
+        )
+        lines.append(
+            (
+                f"Last export: {_fmt_ts(capture.get('last_export_ts_ms'))}",
+                self.palette.text.primary,
+            )
+        )
         lines.append(muted_line("Backtests use local data only.", self.palette))
         self.update_text(build_text(lines))
 

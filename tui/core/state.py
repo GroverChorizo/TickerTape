@@ -1,4 +1,5 @@
 """In-memory state store for profile snapshots."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -33,14 +34,18 @@ class StateStore:
             self._profiles[name] = ProfileState()
         return self._profiles[name]
 
-    def update_snapshot(self, profile: str, key: str, data: Any, *, ts_ms: Optional[int] = None) -> None:
+    def update_snapshot(
+        self, profile: str, key: str, data: Any, *, ts_ms: Optional[int] = None
+    ) -> None:
         snap = self.profile(profile).get_snapshot(key)
         snap.data = data
         snap.last_update_ms = ts_ms or int(time.time() * 1000)
         snap.last_error = None
         snap.backoff_s = 0.0
 
-    def set_error(self, profile: str, key: str, error: str, *, backoff_s: float = 0.0) -> None:
+    def set_error(
+        self, profile: str, key: str, error: str, *, backoff_s: float = 0.0
+    ) -> None:
         snap = self.profile(profile).get_snapshot(key)
         snap.last_error = error
         snap.backoff_s = backoff_s

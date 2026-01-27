@@ -2,17 +2,20 @@
 Institutional Mode configuration for backend quant engine.
 Enforces local-only, no network, no synthetic/modified data, no financial advice/live trading defaults.
 """
+
 import logging
 import yaml
 import os
 
 logger = logging.getLogger("institutional_mode")
 
+
 class InstitutionalModeConfig:
     """
     Configuration and enforcement for Institutional Mode.
     Reads from YAML config or environment variable.
     """
+
     CONFIG_PATH = os.path.join(os.path.dirname(__file__), "institutional_mode.yaml")
     ENV_VAR = "INSTITUTIONAL_MODE"
 
@@ -50,6 +53,7 @@ class InstitutionalModeConfig:
         """
         if not cls.enabled:
             raise RuntimeError("Institutional Mode is required but not enabled.")
+
 
 # Auto-load config on import
 InstitutionalModeConfig.load()

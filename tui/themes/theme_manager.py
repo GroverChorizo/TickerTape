@@ -1,10 +1,16 @@
 """Theme manager persistence per profile using session state."""
+
 from __future__ import annotations
 
 from typing import Optional
 
 from .palettes import DEFAULT_THEME_ID, Palette, get_palette, list_palettes
-from tui.state.session import ProfileState, SessionState, load_session_state, save_session_state
+from tui.state.session import (
+    ProfileState,
+    SessionState,
+    load_session_state,
+    save_session_state,
+)
 
 
 class ThemeManager:

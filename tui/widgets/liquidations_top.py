@@ -1,10 +1,17 @@
 """Top symbols panel for liquidation heat slice."""
+
 from __future__ import annotations
 
 import time
 from typing import List, Optional
 
-from tui.render.palette import build_text, heading_line, last_updated_line, muted_line, panel_header
+from tui.render.palette import (
+    build_text,
+    heading_line,
+    last_updated_line,
+    muted_line,
+    panel_header,
+)
 from tui.render.sparkline import heat_bar
 from tui.feeds.base import FeedResult
 from .panel_base import PanelBase
@@ -17,7 +24,9 @@ class LiquidationsTopPanel(PanelBase):
         self.selected_symbol: Optional[str] = None
         self._symbols_15m: List[str] = []
 
-    def update_feed(self, result: FeedResult, *, selected_symbol: Optional[str] = None) -> None:
+    def update_feed(
+        self, result: FeedResult, *, selected_symbol: Optional[str] = None
+    ) -> None:
         self.feed_result = result
         if selected_symbol:
             self.selected_symbol = selected_symbol
@@ -80,13 +89,22 @@ class LiquidationsTopPanel(PanelBase):
         top_15m = top.get("15m", []) if isinstance(top, dict) else []
         top_5m = top.get("5m", []) if isinstance(top, dict) else []
 
-        self.set_status_class("disconnected" if self.feed_result.status == "disconnected" else "ok")
-        status_value = "disconnected" if self.feed_result.status == "disconnected" else "ok"
+        self.set_status_class(
+            "disconnected" if self.feed_result.status == "disconnected" else "ok"
+        )
+        status_value = (
+            "disconnected" if self.feed_result.status == "disconnected" else "ok"
+        )
         lines: List[tuple[str, str]] = []
         lines.append(panel_header(self.title, status_value, self.palette))
         lines.append(last_updated_line(self.feed_result.updated_ts_ms, self.palette))
         if self.feed_result.status == "disconnected" or self.feed_result.is_lkg:
-            lines.append(muted_line(f"Showing last known data. Stale {_fmt_stale(self.feed_result.updated_ts_ms)}", self.palette))
+            lines.append(
+                muted_line(
+                    f"Showing last known data. Stale {_fmt_stale(self.feed_result.updated_ts_ms)}",
+                    self.palette,
+                )
+            )
 
         label_15m = "Top symbols (15m)"
         if not isinstance(top_15m, list) or not top_15m:
@@ -99,7 +117,9 @@ class LiquidationsTopPanel(PanelBase):
         lines.append(muted_line("Select: /liqs select <symbol|#>", self.palette))
         self.update_text(build_text(lines))
 
-    def _render_top_list(self, rows: List[dict], *, update_cache: bool) -> List[tuple[str, str]]:
+    def _render_top_list(
+        self, rows: List[dict], *, update_cache: bool
+    ) -> List[tuple[str, str]]:
         if not isinstance(rows, list) or not rows:
             return [muted_line("No data.", self.palette)]
         max_value = max((row.get("notional") or 0.0) for row in rows) or 1.0
@@ -109,7 +129,9 @@ class LiquidationsTopPanel(PanelBase):
             symbol = str(row.get("symbol") or "?")
             symbols.append(symbol)
             bar = heat_bar(float(row.get("notional") or 0.0), max_value, width=10)
-            marker = ">" if self.selected_symbol and symbol == self.selected_symbol else " "
+            marker = (
+                ">" if self.selected_symbol and symbol == self.selected_symbol else " "
+            )
             out.append((f"{marker}{idx}. {symbol:<6} {bar}", self.palette.text.primary))
         if update_cache:
             self._symbols_15m = symbols

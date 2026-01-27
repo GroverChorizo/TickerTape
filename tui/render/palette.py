@@ -1,4 +1,5 @@
 """Rich rendering helpers for theme palettes."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -58,7 +59,10 @@ def status_style(status: str, palette: Palette) -> str:
 
 
 def status_line(status: str, palette: Palette) -> Tuple[str, str]:
-    return (f"Status: {format_status_label(status)}", f"bold {status_style(status, palette)}")
+    return (
+        f"Status: {format_status_label(status)}",
+        f"bold {status_style(status, palette)}",
+    )
 
 
 def heading_line(label: str, palette: Palette) -> Tuple[str, str]:
@@ -80,7 +84,10 @@ def panel_header(title: str, status: str, palette: Palette) -> Text:
     header = Text()
     header.append(title, style=f"bold {palette.text.primary}")
     header.append(" ")
-    header.append(f"[{format_status_label(status)}]", style=f"bold {status_style(status, palette)}")
+    header.append(
+        f"[{format_status_label(status)}]",
+        style=f"bold {status_style(status, palette)}",
+    )
     return header
 
 

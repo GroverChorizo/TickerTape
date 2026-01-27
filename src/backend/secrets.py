@@ -53,6 +53,7 @@ _ENV_VARS = ["HL_DONT_SHARE_PATH", "HLDONT_SHARE_PATH", "TICKERTAPE_SECRETS_PATH
 _MOONDEV_ENV = "MOONDEV_API_KEY"
 _CONFIG_ENV = "TICKERTAPE_CONFIG_PATH"
 
+
 # Represents the location of secrets home and file
 @dataclass
 class SecretsLocation:
@@ -66,16 +67,29 @@ def _default_config_path() -> Path:
         base = Path(os.environ.get("APPDATA", Path.home()))
         return base / "TickerTape" / "config.env"
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "TickerTape" / "config.env"
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "TickerTape"
+            / "config.env"
+        )
     base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     return base / "tickertape" / "config.env"
+
 
 def _default_config_path() -> Path:
     if sys.platform.startswith("win"):
         base = Path(os.environ.get("APPDATA", Path.home()))
         return base / "TickerTape" / "config.env"
     if sys.platform == "darwin":
-        return Path.home() / "Library" / "Application Support" / "TickerTape" / "config.env"
+        return (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "TickerTape"
+            / "config.env"
+        )
     base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
     return base / "tickertape" / "config.env"
 
@@ -127,7 +141,9 @@ def _default_secrets_home_dir() -> Path:
         return _windows_appdata_dir() / "TickerTape" / "secrets"
 
     if "darwin" in system or "mac" in system:
-        return Path.home() / "Library" / "Application Support" / "TickerTape" / "secrets"
+        return (
+            Path.home() / "Library" / "Application Support" / "TickerTape" / "secrets"
+        )
 
     # Linux and everything else
     xdg_config = os.environ.get("XDG_CONFIG_HOME")
@@ -172,6 +188,7 @@ def default_secrets_file_path(path: Optional[Path] = None) -> Path:
         return Path(path).expanduser().resolve()
     home = ensure_secrets_home_exists()
     return (home / _DEFAULT_FILENAME).resolve()
+
 
 # Backwards-compatible alias for older tests/callers
 _DEFAULT_PATH = default_secrets_file_path()
@@ -305,4 +322,9 @@ def moondev_config_help() -> str:
     )
 
 
-__all__ = ["load_secrets", "_DEFAULT_PATH", "resolve_moondev_api_key", "moondev_config_help"]
+__all__ = [
+    "load_secrets",
+    "_DEFAULT_PATH",
+    "resolve_moondev_api_key",
+    "moondev_config_help",
+]

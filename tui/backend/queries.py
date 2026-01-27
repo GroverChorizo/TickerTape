@@ -1,4 +1,5 @@
 """Query helpers used by the TUI."""
+
 from __future__ import annotations
 
 from typing import Any, Dict, List
@@ -11,5 +12,7 @@ def list_registry_datasets(registry: DatasetRegistry) -> Dict[str, Any]:
     return list_datasets(registry)
 
 
-def recent_events(registry: DatasetRegistry, dataset: str, since_ts_ms: int) -> List[Dict[str, Any]]:
+def recent_events(
+    registry: DatasetRegistry, dataset: str, since_ts_ms: int
+) -> List[Dict[str, Any]]:
     return query_recent_events(registry, dataset, since_ts_ms)

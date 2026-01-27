@@ -1,4 +1,5 @@
 """Bootstrap data for first run."""
+
 from __future__ import annotations
 
 import logging

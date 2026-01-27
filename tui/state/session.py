@@ -1,4 +1,5 @@
 """Local session persistence for profile/layout state."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -67,13 +68,19 @@ def load_session_state() -> SessionState:
 
 def save_session_state(state: SessionState) -> None:
     _ensure_state_dir()
-    STATE_PATH.write_text(json.dumps(state.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+    STATE_PATH.write_text(
+        json.dumps(state.to_dict(), indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 def get_profile_state(state: SessionState, profile_name: str) -> ProfileState:
     if profile_name not in state.profiles:
         from .profiles import PROFILES
 
-        default_order = PROFILES.get(profile_name).default_panel_order if profile_name in PROFILES else DEFAULT_PANEL_ORDER
+        default_order = (
+            PROFILES.get(profile_name).default_panel_order
+            if profile_name in PROFILES
+            else DEFAULT_PANEL_ORDER
+        )
         state.profiles[profile_name] = ProfileState(panel_order=list(default_order))
     return state.profiles[profile_name]

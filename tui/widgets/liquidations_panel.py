@@ -1,11 +1,18 @@
 """Liquidations panel: live liquidation stats."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
 from typing import List
 
 from ..feeds.base import FeedResult
-from tui.render.palette import build_text, format_last_good, last_updated_line, muted_line, panel_header
+from tui.render.palette import (
+    build_text,
+    format_last_good,
+    last_updated_line,
+    muted_line,
+    panel_header,
+)
 from .panel_base import PanelBase
 
 
@@ -92,22 +99,39 @@ class LiquidationsPanel(PanelBase):
             last_updated_line(updated_ts_ms, self.palette),
         ]
         if status == "disconnected" or is_lkg:
-            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
+            styled_lines.append(
+                muted_line(
+                    f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}",
+                    self.palette,
+                )
+            )
         total = snapshot.get("total_notional")
         count = snapshot.get("count")
         cascade = snapshot.get("cascade_detected")
         velocity = snapshot.get("velocity_score")
         computed = snapshot.get("computed_at_ts_ms") or snapshot.get("timestamp_ms")
-        styled_lines.append((f"Total notional: {self._fmt_money(total)}", self.palette.text.primary))
-        styled_lines.append((f"Count: {count if count is not None else 'n/a'}", self.palette.text.primary))
-        styled_lines.append((f"Cascade: {'YES' if cascade else 'no'}", self.palette.text.primary))
+        styled_lines.append(
+            (f"Total notional: {self._fmt_money(total)}", self.palette.text.primary)
+        )
+        styled_lines.append(
+            (
+                f"Count: {count if count is not None else 'n/a'}",
+                self.palette.text.primary,
+            )
+        )
+        styled_lines.append(
+            (f"Cascade: {'YES' if cascade else 'no'}", self.palette.text.primary)
+        )
         if velocity is not None:
             styled_lines.append((f"Velocity: {velocity}", self.palette.text.primary))
-        styled_lines.append((f"Updated: {self._fmt_ts(computed)}", self.palette.text.muted))
+        styled_lines.append(
+            (f"Updated: {self._fmt_ts(computed)}", self.palette.text.muted)
+        )
         top_symbols = snapshot.get("top_symbols", [])
         if isinstance(top_symbols, list) and top_symbols:
             top_fmt = ", ".join(
-                f"{item.get('symbol', '?')} {self._fmt_money(item.get('notional'))}" for item in top_symbols[:3]
+                f"{item.get('symbol', '?')} {self._fmt_money(item.get('notional'))}"
+                for item in top_symbols[:3]
             )
             styled_lines.append((f"Top symbols: {top_fmt}", self.palette.text.primary))
         self.update_text(build_text(styled_lines))

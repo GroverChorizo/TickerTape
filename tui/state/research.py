@@ -1,4 +1,5 @@
 """Research job orchestration for backtests, sweeps, Monte Carlo, and walk-forward runs."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -87,7 +88,9 @@ class ResearchQueue:
     def _save(self) -> None:
         self._ensure_paths()
         RESEARCH_STATE_PATH.write_text(
-            json.dumps({"jobs": [job.to_dict() for job in self.jobs]}, indent=2, sort_keys=True),
+            json.dumps(
+                {"jobs": [job.to_dict() for job in self.jobs]}, indent=2, sort_keys=True
+            ),
             encoding="utf-8",
         )
 
@@ -183,7 +186,10 @@ class ResearchQueue:
     def run_if_configured(self, job: ResearchJob) -> None:
         runner = os.environ.get("TICKERTAPE_BACKTEST_RUNNER")
         if not runner:
-            self.mark_blocked(job.job_id, "No backtest runner configured (TICKERTAPE_BACKTEST_RUNNER).")
+            self.mark_blocked(
+                job.job_id,
+                "No backtest runner configured (TICKERTAPE_BACKTEST_RUNNER).",
+            )
             return
         self.mark_running(job.job_id)
         result_path = str(RESEARCH_RESULTS_DIR / f"{job.job_id}.json")

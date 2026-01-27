@@ -1,4 +1,5 @@
 """Home screen with profile navigation."""
+
 from __future__ import annotations
 
 from tui.ui.screens.base import BaseScreen
@@ -11,7 +12,9 @@ class HomeScreen(BaseScreen):
 
     def on_mount(self) -> None:
         self.set_header("Home | TickerTape")
-        self.set_status("Type 'help' for commands. Use 'profile <name>' or 'profile/<name>' to open a profile.")
+        self.set_status(
+            "Type 'help' for commands. Use 'profile <name>' or 'profile/<name>' to open a profile."
+        )
         lines = ["Available profiles:"]
         for profile in list_profiles():
             lines.append(f"- {profile.name}: {profile.description}")

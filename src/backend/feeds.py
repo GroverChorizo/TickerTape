@@ -2,6 +2,7 @@
 
 These are minimal, with schemas and empty polling loops. They register datasets in the DatasetRegistry when instantiated.
 """
+
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, Optional, List

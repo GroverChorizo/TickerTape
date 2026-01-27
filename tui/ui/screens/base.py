@@ -1,4 +1,5 @@
 """Base screen for TickerTape profiles."""
+
 from __future__ import annotations
 
 from textual.screen import Screen

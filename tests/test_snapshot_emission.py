@@ -1,6 +1,9 @@
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 from pathlib import Path
 from backend.storage import DatasetRegistry
 from backend.liquidations_feed import LiquidationsFeed
@@ -13,6 +16,7 @@ def test_run_once_writes_partition(tmp_path, monkeypatch):
     monkeypatch.setenv("PYTHONPATH", "")
     # Monkeypatch module constant
     from src.backend import storage
+
     storage.BASE_PARQUET_ROOT = base
 
     registry = DatasetRegistry(path=base / "_registry.json")
@@ -34,6 +38,7 @@ def test_tools_run_ingestion_cli(tmp_path, monkeypatch):
     base = tmp_path / "data" / "parquet"
     from tools.run_ingestion_impl import run_ingestion_impl
     from src.backend import storage
+
     storage.BASE_PARQUET_ROOT = base
     run_ingestion_impl("liquidations_dashboard", once=True)
 

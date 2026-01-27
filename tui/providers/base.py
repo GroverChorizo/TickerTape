@@ -1,4 +1,5 @@
 """Provider interface and error wrappers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

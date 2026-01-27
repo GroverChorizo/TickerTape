@@ -4,8 +4,7 @@ from tui.feeds.url_builder import EndpointUrlBuilder
 def test_url_builder_endpoint_normalization():
     builder = EndpointUrlBuilder("https://api.moondev.com")
     assert (
-        builder.build("price", symbol="btc")
-        == "https://api.moondev.com/api/price/BTC"
+        builder.build("price", symbol="btc") == "https://api.moondev.com/api/price/BTC"
     )
     assert (
         builder.build("orderbook", symbol="Eth")

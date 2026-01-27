@@ -1,4 +1,5 @@
 """View screens for Liquidation Hunter."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -11,7 +12,9 @@ from tui.models.liquidations import LiquidationSnapshot
 
 class LiquidationTimeSeriesView(BaseScreen):
     def __init__(self) -> None:
-        super().__init__(screen_id="view_liq_time", title="Liquidations Time Series", context="views")
+        super().__init__(
+            screen_id="view_liq_time", title="Liquidations Time Series", context="views"
+        )
 
     def on_mount(self) -> None:
         self.set_header("Liquidations | Time Series")
@@ -32,7 +35,9 @@ class LiquidationTimeSeriesView(BaseScreen):
 
 class LiquidationHeatmapView(BaseScreen):
     def __init__(self) -> None:
-        super().__init__(screen_id="view_liq_heat", title="Liquidations Heatmap", context="views")
+        super().__init__(
+            screen_id="view_liq_heat", title="Liquidations Heatmap", context="views"
+        )
 
     def on_mount(self) -> None:
         self.set_header("Liquidations | Heatmap")
@@ -57,7 +62,9 @@ class LiquidationHeatmapView(BaseScreen):
 
 class LiquidationTableView(BaseScreen):
     def __init__(self) -> None:
-        super().__init__(screen_id="view_liq_table", title="Liquidations Table", context="views")
+        super().__init__(
+            screen_id="view_liq_table", title="Liquidations Table", context="views"
+        )
 
     def on_mount(self) -> None:
         self.set_header("Liquidations | Table")
@@ -72,9 +79,13 @@ class LiquidationTableView(BaseScreen):
             return
         lines = ["Time | Symbol | Side | Notional"]
         for event in snapshot.events[:20]:
-            ts = datetime.fromtimestamp(event.ts_ms / 1000, tz=timezone.utc).strftime("%H:%M:%S")
+            ts = datetime.fromtimestamp(event.ts_ms / 1000, tz=timezone.utc).strftime(
+                "%H:%M:%S"
+            )
             notional = event.notional_usd or 0.0
-            lines.append(f"{ts} | {event.symbol:<6} | {event.side:<9} | ${notional:,.0f}")
+            lines.append(
+                f"{ts} | {event.symbol:<6} | {event.side:<9} | ${notional:,.0f}"
+            )
         body.update("\n".join(lines))
 
 

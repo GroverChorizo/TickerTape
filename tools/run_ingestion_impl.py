@@ -1,10 +1,14 @@
 """Implementation for run_ingestion CLI used in tests and CI."""
+
 from __future__ import annotations
 import logging
 
 import sys
 import os
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+
+sys.path.insert(
+    0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+)
 from backend.storage import DatasetRegistry
 from backend.liquidations_feed import LiquidationsFeed
 from backend.snapshotter import run_once
