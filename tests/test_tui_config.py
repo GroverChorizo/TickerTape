@@ -4,7 +4,13 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from tui.config import TuiConfig, config_needs_setup, ensure_data_root, load_config, save_config
+from tui.config import (
+    TuiConfig,
+    config_needs_setup,
+    ensure_data_root,
+    load_config,
+    save_config,
+)
 
 
 def test_config_round_trip(tmp_path, monkeypatch):
@@ -15,12 +21,16 @@ def test_config_round_trip(tmp_path, monkeypatch):
         data_root=data_root,
         profile="day_trader",
         secrets_path=None,
+        alerts={"whale_trades": True},
+        panel_overrides={"day_trader": ["liquidations"]},
         config_path=config_path,
     )
     save_config(config)
     loaded = load_config({"config_path": str(config_path)})
     assert loaded.mode == "offline_demo"
     assert loaded.data_root == data_root
+    assert loaded.alerts.get("whale_trades") is True
+    assert loaded.panel_overrides.get("day_trader") == ["liquidations"]
 
 
 def test_ensure_data_root(tmp_path):
@@ -29,6 +39,8 @@ def test_ensure_data_root(tmp_path):
         data_root=tmp_path / "parquet",
         profile="day_trader",
         secrets_path=None,
+        alerts={},
+        panel_overrides={},
         config_path=tmp_path / "config.json",
     )
     ensure_data_root(config)
@@ -41,6 +53,8 @@ def test_config_needs_setup(tmp_path):
         data_root=tmp_path / "parquet",
         profile="day_trader",
         secrets_path=None,
+        alerts={},
+        panel_overrides={},
         config_path=tmp_path / "config.json",
     )
     assert config_needs_setup(config)

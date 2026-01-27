@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Dict, Optional
 import json
@@ -18,8 +18,10 @@ class TuiConfig:
     mode: str
     data_root: Path
     profile: str
-    secrets_path: Optional[Path]
     config_path: Path
+    secrets_path: Optional[Path]
+    alerts: Dict[str, bool] = field(default_factory=dict)
+    panel_overrides: Dict[str, list[str]] = field(default_factory=dict)
 
     def to_dict(self) -> Dict:
         payload = asdict(self)
@@ -76,11 +78,23 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
         or os.environ.get("TICKERTAPE_SECRETS_PATH")
         or payload.get("secrets_path")
     )
+    alerts = payload.get("alerts") or {}
+    panel_overrides = payload.get("panel_overrides") or {}
+    if not isinstance(alerts, dict):
+        alerts = {}
+    if not isinstance(panel_overrides, dict):
+        panel_overrides = {}
     return TuiConfig(
         mode=mode,
         data_root=data_root,
         profile=profile,
         secrets_path=Path(secrets_path) if secrets_path else None,
+        alerts={str(k): bool(v) for k, v in alerts.items()},
+        panel_overrides={
+            str(k): [str(x) for x in v]
+            for k, v in panel_overrides.items()
+            if isinstance(v, list)
+        },
         config_path=path,
     )
 

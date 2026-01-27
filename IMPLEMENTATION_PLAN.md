@@ -95,7 +95,7 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-070 | Wizard flow | 1. Implement multi-step wizard with screens: Welcome, Profile Selection, Theme Selection, Dashboard Customization, Alerts Configuration, Completion. 2. Persist selections to a config file. | Running the wizard from a fresh install guides the user through all steps; selections are stored and loaded on next launch. | `tui/wizard.py`, `tui/config.py`, `tests/ui/test_wizard.py` | L | Partial - wizard module exists but not integrated with new multi-screen flow or persistence requirements. |
+| TT-070 | Wizard flow | 1. Implement multi-step wizard with screens: Welcome, Profile Selection, Theme Selection, Dashboard Customization, Alerts Configuration, Completion. 2. Persist selections to a config file. | Running the wizard from a fresh install guides the user through all steps; selections are stored and loaded on next launch. | `tui/wizard.py`, `tui/config.py`, `tests/test_tui_config.py`, `tests/test_tui_bootstrap.py` | L | Done - wizard now includes six steps with panel/alert selection and persists to config/session. |
 | TT-071 | Settings panel | 1. Implement a Settings screen accessible via `Ctrl+,` that allows users to change profile, theme, panels and alerts. 2. Save changes to config and update UI accordingly. | Changing settings updates the application without restart; tests confirm persistence. | `tui/ui/screens/settings.py`, `tests/ui/test_settings.py` | M | Not started |
 
 ### Epic 9 - Multi-Exchange Funding Panel
