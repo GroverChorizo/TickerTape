@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List
 
+from rich.text import Text
 from textual.widgets import Static
+
+from tui.themes.palettes import Palette, cypherpunk_default
 
 
 @dataclass(frozen=True)
@@ -20,6 +23,7 @@ class TabCarousel(Static):
         super().__init__("", **kwargs)
         self._tabs: List[TabEntry] = list(tabs or [])
         self._active_index: int = 0
+        self._palette: Palette = cypherpunk_default
         self._render()
 
     def set_tabs(self, tabs: Iterable[TabEntry]) -> None:
@@ -53,15 +57,23 @@ class TabCarousel(Static):
             return ""
         return self._tabs[self._active_index].key
 
+    def set_palette(self, palette: Palette) -> None:
+        self._palette = palette
+        self._render()
+
     def _render(self) -> None:
         if not self._tabs:
             self.update("")
             return
-        parts: List[str] = []
+        text = Text()
         for idx, tab in enumerate(self._tabs):
+            if idx:
+                text.append(" | ", style=self._palette.text.muted)
             label = f"{tab.shortcut} {tab.label}"
-            if idx == self._active_index:
-                parts.append(f"[{label}]")
-            else:
-                parts.append(label)
-        self.update(" | ".join(parts))
+            style = (
+                f"bold {self._palette.accent.cyan}"
+                if idx == self._active_index
+                else self._palette.text.muted
+            )
+            text.append(label, style=style)
+        self.update(text)

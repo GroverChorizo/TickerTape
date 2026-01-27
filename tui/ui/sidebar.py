@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, List
 
+from rich.text import Text
 from textual.widgets import Static
+
+from tui.themes.palettes import Palette, cypherpunk_default
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,7 @@ class Sidebar(Static):
         self._entries: List[SidebarEntry] = list(entries or [])
         self._active_key: str = "home"
         self._compact: bool = False
+        self._palette: Palette = cypherpunk_default
         self._render()
 
     def set_entries(self, entries: Iterable[SidebarEntry]) -> None:
@@ -35,10 +39,21 @@ class Sidebar(Static):
         self._compact = compact
         self._render()
 
+    def set_palette(self, palette: Palette) -> None:
+        self._palette = palette
+        self._render()
+
     def _render(self) -> None:
-        lines: List[str] = []
-        for entry in self._entries:
+        text = Text()
+        for idx, entry in enumerate(self._entries):
+            if idx:
+                text.append("\n")
             label = entry.short if self._compact else entry.label
             marker = ">" if entry.key == self._active_key else " "
-            lines.append(f"{marker} {label}")
-        self.update("\n".join(lines))
+            style = (
+                f"bold {self._palette.accent.cyan}"
+                if entry.key == self._active_key
+                else self._palette.text.muted
+            )
+            text.append(f"{marker} {label}", style=style)
+        self.update(text)

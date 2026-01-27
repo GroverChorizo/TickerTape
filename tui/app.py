@@ -164,6 +164,8 @@ class TickerTapeApp(App):
             carousel = self.screen.query_one("#tab_carousel")
             carousel.styles.background = palette.bg.panel
             carousel.styles.color = palette.text.primary
+            if hasattr(carousel, "set_palette"):
+                carousel.set_palette(palette)
         except Exception:
             pass
         try:
@@ -176,6 +178,8 @@ class TickerTapeApp(App):
             sidebar = self.screen.query_one("#sidebar")
             sidebar.styles.background = palette.bg.panel
             sidebar.styles.color = palette.text.primary
+            if hasattr(sidebar, "set_palette"):
+                sidebar.set_palette(palette)
         except Exception:
             pass
         try:
@@ -199,6 +203,8 @@ class TickerTapeApp(App):
             tabbar = self.screen.query_one("#tabbar")
             tabbar.styles.background = palette.bg.panel
             tabbar.styles.color = palette.text.primary
+            if hasattr(tabbar, "set_palette"):
+                tabbar.set_palette(palette)
         except Exception:
             pass
         try:

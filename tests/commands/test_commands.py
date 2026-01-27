@@ -7,9 +7,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from tui.app import TickerTapeApp
 from tui.config import TuiConfig, save_config
+from tui.core import cache as cache_store
 
 
 def _make_app(tmp_path):
+    cache_store.CACHE_PATH = tmp_path / "cache.json"
     config = TuiConfig(
         mode="offline_demo",
         data_root=tmp_path / "data",
