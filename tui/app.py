@@ -1,13 +1,16 @@
-"""TickerTape TUI application."""
+"""TickerTape multi-screen, command-driven TUI."""
 from __future__ import annotations
 
 import argparse
-import asyncio
-import logging
 import shlex
 import sys
 from pathlib import Path
-from typing import Dict, List
+from typing import List, Optional
+
+from textual.app import App
+from textual import events
+from textual.widgets import Input
+
 
 def ensure_src_on_path() -> Path:
     repo_root = Path(__file__).resolve().parents[1]
@@ -15,593 +18,410 @@ def ensure_src_on_path() -> Path:
     if str(src) not in sys.path:
         sys.path.insert(0, str(src))
     return repo_root
-ensure_src_on_path()
 
 
-def _coerce_log_extra(kwargs: dict) -> dict:
-    extra = dict(kwargs.pop("extra", {}))
-    extra.update(kwargs)
-    return extra
+ROOT = ensure_src_on_path()
 
-
-def _log_system(self: logging.Logger, message: str = "", *args, **kwargs) -> None:
-    extra = _coerce_log_extra(kwargs)
-    self.info(message or "", *args, extra=extra)
-
-
-def _log_call(self: logging.Logger, message: str = "", *args, **kwargs) -> None:
-    extra = _coerce_log_extra(kwargs)
-    self.info(message or "", *args, extra=extra)
-
-
-def _adapter_system(self: logging.LoggerAdapter, message: str = "", *args, **kwargs) -> None:
-    extra = _coerce_log_extra(kwargs)
-    self.logger.info(message or "", *args, extra=extra)
-
-
-def _adapter_call(self: logging.LoggerAdapter, message: str = "", *args, **kwargs) -> None:
-    extra = _coerce_log_extra(kwargs)
-    self.logger.info(message or "", *args, extra=extra)
-
-
-logging.Logger.system = _log_system  # type: ignore[attr-defined]
-logging.Logger.__call__ = _log_call  # type: ignore[assignment]
-logging.LoggerAdapter.system = _adapter_system  # type: ignore[attr-defined]
-logging.LoggerAdapter.__call__ = _adapter_call  # type: ignore[assignment]
-
-from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
-from textual.widgets import Input, Static
-
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from .backend.registry import get_registry
-from .bootstrap import bootstrap_data
-from .config import TuiConfig, config_needs_setup, ensure_data_root, load_config, save_config
-from .diagnostics import collect_diagnostics
-from .wizard import StartupWizard
-from .roadmap import RoadmapScreen
-from .state.alerts import AlertStream
-from .state.datasets import load_datasets
-from .state.profiles import get_profile
-from .state.research import ResearchQueue
-from .state.session import get_profile_state, load_session_state, save_session_state
-from .widgets.alert_panel import AlertPanel
-from .widgets.backtest_panel import BacktestPanel
-from .widgets.event_stream import EventStream
-from .widgets.market_data_panel import MarketDataPanel
-from .widgets.funding_panel import FundingPanel
-from .widgets.liquidations_panel import LiquidationsPanel
-from .widgets.liquidations_radar import LiquidationsRadarPanel
-from .widgets.liquidations_top import LiquidationsTopPanel
-from .widgets.liquidations_context import LiquidationsContextPanel
-from .widgets.capture_status import CaptureStatusPanel
-from .widgets.profile_selector import ProfileSelector, ProfileSelected
-from .widgets.status_bar import StatusBar
-from .widgets.whale_panel import WhalePanel
-from .widgets.wallet_panel import WalletPanel, WalletDetailPanel, WalletSelected, WalletsDiscovered
-from backend.network import NetworkClient
-from backend.secrets import moondev_config_help
-from tui.themes.palettes import Palette
+from tui.core.cache import load_cache, save_cache
+from tui.core.commands import CommandRegistry
+from tui.core.router import Route, parse_route
+from tui.core.state import StateStore
+from tui.providers.hyperliquid import HyperliquidProvider
+from tui.state.profiles import get_profile, list_profiles
 from tui.themes.theme_manager import ThemeManager
-from tui.feeds.hyperliquid import (
-    EventStreamFeed,
-    HyperliquidClient,
-    LiquidationsFeed,
-    WhaleTradesFeed,
+from tui.config import TuiConfig, config_needs_setup, ensure_data_root, load_config, save_config
+from tui.state.session import load_session_state, save_session_state, get_profile_state
+from tui.ui.screens.home import HomeScreen
+from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
+from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
+from tui.ui.screens.views import (
+    LiquidationHeatmapView,
+    LiquidationTableView,
+    LiquidationTimeSeriesView,
 )
-from tui.feeds.liquidations import LiquidationsRadarFeed
-from tui.feeds.funding import MultiExchangeFundingFeed
-from tui.feeds.market_data import MarketDataFeed
-from .streaming import StreamSupervisor
-from .widgets.panel_base import PanelBase
+from backend.storage import DatasetRegistry
 
 
 class TickerTapeApp(App):
     CSS_PATH = "tui.css"
-    BINDINGS = [
-        ("ctrl+p", "focus_command", "Focus command"),
-        ("ctrl+1", "toggle_panel('liquidations')", "Toggle liquidations"),
-        ("ctrl+2", "toggle_panel('funding')", "Toggle funding"),
-        ("ctrl+3", "toggle_panel('whales')", "Toggle whales"),
-        ("ctrl+4", "toggle_panel('event_stream')", "Toggle event stream"),
-        ("ctrl+5", "toggle_panel('alerts')", "Toggle alerts"),
-        ("ctrl+6", "toggle_panel('research')", "Toggle research"),
-        ("c", "cycle_coin", "Cycle coin"),
-        ("r", "refresh_panels", "Refresh panels"),
-        ("p", "open_plan", "Open roadmap"),
-    ]
+    BINDINGS = [("ctrl+p", "focus_command", "Focus command"), ("ctrl+h", "go_home", "Home")]
 
     def __init__(self, config: TuiConfig) -> None:
         super().__init__()
         self.config = config
-        self.registry = get_registry()
+        self.state_store = StateStore()
+        self.command_registry = CommandRegistry()
         self.session_state = load_session_state()
-        if self.config.profile:
-            self.session_state.active_profile = self.config.profile
-        profile_state = get_profile_state(self.session_state, self.session_state.active_profile)
-        self._selected_symbol = (profile_state.selected_symbol or "BTC").upper()
-        self.alert_stream = AlertStream()
-        self.research_queue = ResearchQueue()
-        self.streams = StreamSupervisor()
-        self.client = NetworkClient()
-        self.live_client = HyperliquidClient()
-        self.liquidations_stats_feed = LiquidationsFeed(self.live_client, offline=self.config.mode == "offline_demo")
-        self.liquidations_radar_feed = LiquidationsRadarFeed(
-            self.live_client,
-            registry=self.registry,
-            poll_interval=5.0,
-            offline=self.config.mode == "offline_demo",
-        )
-        self.market_data_feed = MarketDataFeed(
-            self.live_client,
-            registry=self.registry,
-            offline=self.config.mode == "offline_demo",
-        )
-        self.market_data_feed.set_selected_coin(self._selected_symbol)
-        self.funding_feed = MultiExchangeFundingFeed(
-            hyperliquid_client=self.client,
-            moondev_client=self.live_client,
-            registry=self.registry,
-            coins=None,
-            poll_interval=10.0,
-            offline=self.config.mode == "offline_demo",
-        )
-        self.whales_feed = WhaleTradesFeed(self.live_client, offline=self.config.mode == "offline_demo")
-        self.events_feed = EventStreamFeed(self.live_client, offline=self.config.mode == "offline_demo")
-        self.streams.register(self.liquidations_stats_feed)
-        self.streams.register(self.liquidations_radar_feed)
-        self.streams.register(self.market_data_feed)
-        self.streams.register(self.funding_feed)
-        self.streams.register(self.whales_feed)
-        self.streams.register(self.events_feed)
-        self._panels: Dict[str, Static] = {}
-        self._last_snapshot_ts: int | None = None
-        self._logger = logging.getLogger(__name__)
         self.theme_manager = ThemeManager(self.session_state)
-        self._palette: Palette = self.theme_manager.current()
-
-    def compose(self) -> ComposeResult:
-        active_profile = self.session_state.active_profile
-        profile = get_profile(active_profile)
-        yield Static("TickerTape", id="title")
-        with Horizontal(id="body"):
-            with Vertical(id="left"):
-                yield Static("Profiles", classes="section")
-                yield ProfileSelector(active_profile)
-                yield Static("Command shortcuts", classes="section")
-                yield Static(
-                    "ctrl+p command | /profile <name> | /backtest run | /backtest sweep | /secrets",
-                    classes="help",
-                )
-            with Vertical(id="center"):
-                liquidations = LiquidationsPanel()
-                liquidations_radar = LiquidationsRadarPanel()
-                liquidations_top = LiquidationsTopPanel()
-                liquidations_context = LiquidationsContextPanel()
-                capture_status = CaptureStatusPanel()
-                positions = MarketDataPanel()
-                funding = FundingPanel()
-                whales = WhalePanel()
-                events = EventStream()
-                research = BacktestPanel(self.research_queue)
-                self._panels = {
-                    "liquidations": liquidations,
-                    "liquidations_radar": liquidations_radar,
-                    "liquidations_top": liquidations_top,
-                    "liquidations_context": liquidations_context,
-                    "capture_status": capture_status,
-                    "positions": positions,
-                    "funding": funding,
-                    "whales": whales,
-                    "event_stream": events,
-                    "research": research,
-                }
-                self._apply_palette_to_panels(self._palette)
-                order = get_profile_state(self.session_state, profile.name).panel_order
-                for panel_id in order:
-                    panel = self._panels.get(panel_id)
-                    if panel is not None:
-                        yield panel
-            with Vertical(id="right"):
-                alert_panel = AlertPanel(self.alert_stream)
-                self._panels["alerts"] = alert_panel
-                yield alert_panel
-                wallet_panel = WalletPanel()
-                self._panels["wallets"] = wallet_panel
-                yield wallet_panel
-                wallet_detail = WalletDetailPanel()
-                self._panels["wallet_detail"] = wallet_detail
-                yield wallet_detail
-        with Vertical(id="footer"):
-            yield Input(placeholder="Command palette: /profile, /backtest, /montecarlo, /walkforward", id="command")
-            yield StatusBar(id="status")
-            yield Static("Ctrl+P command | Ctrl+1-6 panels | C cycle coin | R refresh | P roadmap", id="shortcuts")
+        self._cache = load_cache()
+        self._cache.setdefault("preferences", {"refresh_interval_s": 1.0})
+        self._screen_stack: List[str] = []
+        self._command_history: List[str] = []
+        self._history_index: int = 0
+        self._top_symbols: List[str] = []
+        self.selected_symbol = self._load_selected_symbol()
+        registry_path = self.config.data_root / "_registry.json"
+        self.provider = HyperliquidProvider(
+            registry=DatasetRegistry(path=registry_path),
+            offline=self.config.mode == "offline_demo",
+        )
+        self._register_commands()
+        self._load_cached_snapshots()
 
     def on_mount(self) -> None:
-        self.apply_palette(self._palette)
-        self.alert_stream.start()
-        self.set_interval(5, self.refresh_panels)
-        self.set_interval(2, self.refresh_status)
-        self.apply_profile(self.session_state.active_profile)
+        self.apply_palette(self.theme_manager.current())
+        self._push_screen(HomeScreen())
         if getattr(self, "_show_wizard", False):
-            self.call_later(self._open_wizard)
-        self.streams.start()
+            self.notify("Setup required. Run with --setup to configure.", severity="warning")
 
     def on_shutdown(self) -> None:
-        self.streams.stop()
         try:
-            self.client.close()
+            self.provider.close()
         except Exception:
             pass
-        try:
-            self.live_client.close()
-        except Exception:
-            pass
+        save_cache(self._cache)
 
-    def refresh_panels(self) -> None:
-        liquidations = self._panels.get("liquidations")
-        if isinstance(liquidations, LiquidationsPanel):
-            self._safe_refresh(
-                liquidations,
-                "liquidations",
-                lambda: liquidations.update_feed(self.liquidations_stats_feed.latest()),
-            )
-            self._last_snapshot_ts = self.liquidations_stats_feed.latest().updated_ts_ms
-        liquidations_radar = self._panels.get("liquidations_radar")
-        if isinstance(liquidations_radar, LiquidationsRadarPanel):
-            self._safe_refresh(
-                liquidations_radar,
-                "liquidations_radar",
-                lambda: liquidations_radar.update_feed(self.liquidations_radar_feed.latest(), selected_symbol=self._selected_symbol),
-            )
-            self._last_snapshot_ts = self.liquidations_radar_feed.latest().updated_ts_ms or self._last_snapshot_ts
-        liquidations_top = self._panels.get("liquidations_top")
-        if isinstance(liquidations_top, LiquidationsTopPanel):
-            self._safe_refresh(
-                liquidations_top,
-                "liquidations_top",
-                lambda: liquidations_top.update_feed(self.liquidations_radar_feed.latest(), selected_symbol=self._selected_symbol),
-            )
-        liquidations_context = self._panels.get("liquidations_context")
-        if isinstance(liquidations_context, LiquidationsContextPanel):
-            self._safe_refresh(
-                liquidations_context,
-                "liquidations_context",
-                lambda: liquidations_context.update_context(
-                    selected_symbol=self._selected_symbol,
-                    liquidation_result=self.liquidations_radar_feed.latest(),
-                    market_result=self.market_data_feed.latest(),
-                    funding_result=self.funding_feed.latest(),
-                ),
-            )
-        capture_status = self._panels.get("capture_status")
-        if isinstance(capture_status, CaptureStatusPanel):
-            self._safe_refresh(
-                capture_status,
-                "capture_status",
-                lambda: capture_status.update_feed(self.liquidations_radar_feed.latest()),
-            )
-        positions = self._panels.get("positions")
-        if isinstance(positions, MarketDataPanel):
-            self._safe_refresh(positions, "positions", lambda: positions.update_feed(self.market_data_feed.latest()))
-        funding = self._panels.get("funding")
-        if isinstance(funding, FundingPanel):
-            self._safe_refresh(funding, "funding", lambda: funding.update_feed(self.funding_feed.latest()))
-        whales = self._panels.get("whales")
-        if isinstance(whales, WhalePanel):
-            self._safe_refresh(whales, "whales", lambda: whales.update_feed(self.whales_feed.latest()))
-        events = self._panels.get("event_stream")
-        if isinstance(events, EventStream):
-            self._safe_refresh(events, "event_stream", lambda: events.update_feed(self.events_feed.latest()))
-        alerts = self._panels.get("alerts")
-        if isinstance(alerts, AlertPanel):
-            self._safe_refresh(alerts, "alerts", alerts.refresh_panel)
-        research = self._panels.get("research")
-        if isinstance(research, BacktestPanel):
-            self._safe_refresh(research, "research", research.refresh_panel)
-
-    def _safe_refresh(self, panel: Static, name: str, fn) -> None:
-        try:
-            fn()
-        except Exception as exc:
-            self._logger.exception("Panel refresh failed: %s", name)
-            if hasattr(panel, "update_text"):
-                panel.update_text(f"Panel error. Press R to retry. ({type(exc).__name__})")
-            else:
-                panel.update(f"Panel error. Press R to retry. ({type(exc).__name__})")
-
-    def refresh_status(self) -> None:
-        try:
-            status = self.query_one(StatusBar)
-        except Exception:
-            return
-        datasets = load_datasets(self.registry)
-        backend_ok = bool(datasets)
-        status.update_status(
-            profile=self.session_state.active_profile,
-            backend_ok=backend_ok,
-            active_jobs=len([j for j in self.research_queue.jobs if j.status in {"queued", "running"}]),
-            last_snapshot_ts=self._last_snapshot_ts,
-            alert_count=len(self.alert_stream.alerts),
-            alert_connected=self.alert_stream.connected,
-            feeds="local",
-        )
-
-    def apply_profile(self, profile_name: str) -> None:
-        profile = get_profile(profile_name)
-        for panel_id, panel in self._panels.items():
-            if panel_id in profile.focus_panels:
-                panel.remove_class("dim")
-                if isinstance(panel, PanelBase):
-                    panel.set_focus(True)
-            else:
-                panel.add_class("dim")
-                if isinstance(panel, PanelBase):
-                    panel.set_focus(False)
-        self.theme_manager.set_active_profile(profile_name)
-        self._palette = self.theme_manager.current()
-        self.apply_palette(self._palette)
-        profile_state = get_profile_state(self.session_state, profile.name)
-        for panel_id in profile.default_panel_order:
-            if panel_id not in profile_state.panel_order:
-                profile_state.panel_order.append(panel_id)
-        if profile_state.selected_symbol:
-            self._selected_symbol = profile_state.selected_symbol.upper()
-            self.market_data_feed.set_selected_coin(self._selected_symbol)
-        self.session_state.active_profile = profile_name
-        save_session_state(self.session_state)
-
-    def on_profile_selected(self, message: ProfileSelected) -> None:
-        self.apply_profile(message.profile_name)
-
-    def on_wallets_discovered(self, message: WalletsDiscovered) -> None:
-        panel = self._panels.get("wallets")
-        if isinstance(panel, WalletPanel):
-            panel.update_wallets(message.addresses, message.source)
-
-    def on_wallet_selected(self, message: WalletSelected) -> None:
-        panel = self._panels.get("wallet_detail")
-        if isinstance(panel, WalletDetailPanel):
-            panel.update_wallet(message.address, message.source)
-
-    def action_focus_command(self) -> None:
-        self.query_one("#command", Input).focus()
-
-    def action_toggle_panel(self, panel_id: str) -> None:
-        panel = self._panels.get(panel_id)
-        if not panel:
-            self.notify(f"Unknown panel {panel_id}", severity="warning")
-            return
-        panel.display = not panel.display
-        profile_state = get_profile_state(self.session_state, self.session_state.active_profile)
-        profile_state.collapsed[panel_id] = not panel.display
-        save_session_state(self.session_state)
-
-    def action_refresh_panels(self) -> None:
-        self.refresh_panels()
-
-    def action_cycle_coin(self) -> None:
-        coin = self.market_data_feed.cycle_coin()
-        self.notify(f"Selected coin: {coin}")
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        command = event.value.strip()
-        event.input.value = ""
-        if not command:
-            return
-        self.handle_command(command)
-
-    def handle_command(self, command: str) -> None:
-        tokens = shlex.split(command)
-        if not tokens:
-            return
-        if tokens[0].startswith(":") or tokens[0].startswith("/"):
-            tokens[0] = tokens[0][1:]
-        cmd = tokens[0]
-        args = tokens[1:]
-        if cmd == "profile":
-            if not args:
-                self.notify("Usage: /profile <name>", severity="warning")
-                return
-            self.apply_profile(args[0])
-            return
-        if cmd in {"backtest", "montecarlo", "walkforward"}:
-            self.handle_research_command(cmd, args)
-            return
-        if cmd == "panel" and args:
-            if args[0] == "toggle" and len(args) > 1:
-                self.action_toggle_panel(args[1])
-                return
-        if cmd == "diag":
-            self._show_diagnostics()
-            return
-        if cmd == "ingest":
-            self._run_ingest_once()
-            return
-        if cmd == "plan":
-            self._open_roadmap()
-            return
-        if cmd == "setup":
-            self._open_wizard()
-            return
-        if cmd == "theme":
-            if not args or args[0] == "list":
-                themes = ", ".join(self.theme_manager.available())
-                self.notify(f"Available themes: {themes}")
-                return
-            if args[0] == "set" and len(args) > 1:
-                self.theme_manager.set_active_profile(self.session_state.active_profile)
-                self.theme_manager.apply(self, args[1])
-                self.notify(f"Theme set to {self.theme_manager.current_id()}")
-                return
-            self.notify("Usage: /theme list | /theme set <name>", severity="warning")
-            return
-        if cmd in {"liqs", "liquidations"}:
-            if not args:
-                self.notify("Usage: /liqs select <symbol|#>", severity="warning")
-                return
-            if args[0] == "select" and len(args) > 1:
-                symbol = self._resolve_liquidation_symbol(args[1])
-                if not symbol:
-                    self.notify("Symbol not found in top list.", severity="warning")
-                    return
-                self._set_liquidation_symbol(symbol)
-                return
-            self.notify("Usage: /liqs select <symbol|#>", severity="warning")
-            return
-        if cmd == "capture":
-            if not args:
-                status = "ON" if self.liquidations_radar_feed.capture_enabled else "OFF"
-                self.notify(f"Capture is {status}. Use /capture on|off to toggle.")
-                return
-            if args[0] in {"on", "off"}:
-                enabled = args[0] == "on"
-                self.liquidations_radar_feed.set_capture_enabled(enabled)
-                self.notify(f"Capture {'enabled' if enabled else 'disabled'}.")
-                return
-            self.notify("Usage: /capture on|off", severity="warning")
-            return
-        if cmd == "coin":
-            if not args:
-                self.notify("Usage: /coin <symbol>", severity="warning")
-                return
-            self.market_data_feed.set_selected_coin(args[0])
-            self.notify(f"Selected coin set to {self.market_data_feed.selected_coin}")
-            return
-        if cmd in {"secrets", "configure"}:
-            self.notify(moondev_config_help(), severity="warning")
-            return
-        self.notify("Unknown command", severity="warning")
-
-    def _resolve_liquidation_symbol(self, token: str) -> str | None:
-        panel = self._panels.get("liquidations_top")
-        if isinstance(panel, LiquidationsTopPanel):
-            return panel.resolve_symbol(token)
-        return token.strip().upper() if token else None
-
-    def _set_liquidation_symbol(self, symbol: str) -> None:
-        symbol = symbol.strip().upper()
-        if not symbol:
-            return
-        self._selected_symbol = symbol
-        self.market_data_feed.set_selected_coin(symbol)
-        profile_state = get_profile_state(self.session_state, self.session_state.active_profile)
-        profile_state.selected_symbol = symbol
-        save_session_state(self.session_state)
-        self.notify(f"Selected symbol: {symbol}")
-
-    def _show_diagnostics(self) -> None:
-        data = collect_diagnostics(self.config, self.registry)
-        lines = [f"{k}: {v}" for k, v in data.items()]
-        self.console.print("\n".join(lines))
-        self.notify("Diagnostics printed to console.")
-
-    def _run_ingest_once(self) -> None:
-        self.notify("Running ingestion once...")
-        asyncio.create_task(asyncio.to_thread(bootstrap_data, self.config))
-
-    def _open_wizard(self) -> None:
-        wizard = StartupWizard(self.config.config_path)
-        self.push_screen(wizard)
-
-    def action_open_plan(self) -> None:
-        self._open_roadmap()
-
-    def _open_roadmap(self) -> None:
-        self.push_screen(RoadmapScreen())
-
-    def apply_palette(self, palette: Palette) -> None:
-        self._palette = palette
+    def apply_palette(self, palette) -> None:
         self.styles.background = palette.bg.primary
         self.styles.color = palette.text.primary
+        self._apply_palette_to_screen(palette)
+
+    def _apply_palette_to_screen(self, palette) -> None:
         try:
-            title = self.query_one("#title")
-            title.styles.background = palette.bg.panel
-            title.styles.color = palette.accent.cyan
+            header = self.screen.query_one("#screen_header")
+            header.styles.background = palette.bg.panel
+            header.styles.color = palette.accent.cyan
         except Exception:
             pass
-        self._apply_palette_to_panels(palette)
+        try:
+            status = self.screen.query_one("#status_strip")
+            status.styles.color = palette.text.muted
+        except Exception:
+            pass
+        try:
+            body = self.screen.query_one("#screen_body")
+            body.styles.background = palette.bg.primary
+            body.styles.color = palette.text.primary
+        except Exception:
+            pass
+        try:
+            command = self.screen.query_one("#command")
+            command.styles.background = palette.bg.panel
+            command.styles.color = palette.text.primary
+        except Exception:
+            pass
+        try:
+            cmd_status = self.screen.query_one("#command_status")
+            cmd_status.styles.color = palette.text.muted
+        except Exception:
+            pass
 
-    def _apply_palette_to_panels(self, palette: Palette) -> None:
-        for panel in self._panels.values():
-            if isinstance(panel, PanelBase):
-                panel.set_palette(palette)
+    def action_focus_command(self) -> None:
+        try:
+            self.screen.command_bar.input.focus()
+        except Exception:
+            pass
 
-    def handle_research_command(self, job_type: str, args: List[str]) -> None:
+    def action_go_home(self) -> None:
+        self._go_home()
+
+    def dispatch_command(self, raw: str, *, context: str) -> None:
+        text = raw.strip()
+        if not text:
+            return
+        self._record_history(text)
+
+        route = parse_route(text)
+        if route.kind != "unknown":
+            self._open_route(route)
+            return
+
+        tokens = shlex.split(text)
+        if not tokens:
+            return
+        cmd = tokens[0].lstrip("/:").lower()
+        args = tokens[1:]
+        command = self.command_registry.match(cmd)
+        if not command:
+            self._set_command_message("Unknown command. Type 'help' for available commands.")
+            return
+        message = command.handler(cmd, args)
+        if message:
+            self._set_command_message(message)
+
+    def on_key(self, event: events.Key) -> None:
+        focused = self.focused
+        if not isinstance(focused, Input) or focused.id != "command":
+            return
+        if event.key == "up":
+            self._history_prev(focused)
+            event.stop()
+        elif event.key == "down":
+            self._history_next(focused)
+            event.stop()
+        elif event.key == "tab":
+            self._autocomplete(focused)
+            event.stop()
+
+    def _record_history(self, text: str) -> None:
+        if not text:
+            return
+        if not self._command_history or self._command_history[-1] != text:
+            self._command_history.append(text)
+        self._history_index = len(self._command_history)
+
+    def _history_prev(self, input_widget: Input) -> None:
+        if not self._command_history:
+            return
+        self._history_index = max(self._history_index - 1, 0)
+        input_widget.value = self._command_history[self._history_index]
+
+    def _history_next(self, input_widget: Input) -> None:
+        if not self._command_history:
+            return
+        self._history_index = min(self._history_index + 1, len(self._command_history))
+        if self._history_index >= len(self._command_history):
+            input_widget.value = ""
+        else:
+            input_widget.value = self._command_history[self._history_index]
+
+    def _autocomplete(self, input_widget: Input) -> None:
+        text = input_widget.value.strip()
+        suggestion = self._autocomplete_for(text)
+        if suggestion:
+            input_widget.value = suggestion
+
+    def _autocomplete_for(self, text: str) -> Optional[str]:
+        command_names = sorted({cmd.name for cmd in self.command_registry._commands.values()})
+        profiles = [profile.name for profile in list_profiles()]
+        views = ["time", "heatmap", "table"]
+        route_candidates = ["home", "/", *[f"profile/{p}" for p in profiles], *[f"view/{v}" for v in views]]
+        if not text:
+            return "help"
+        if " " not in text:
+            prefix = text.lower()
+            for item in [*command_names, *route_candidates]:
+                if item.startswith(prefix):
+                    return item + (" " if item in command_names else "")
+            return None
+        parts = text.split()
+        if len(parts) == 1:
+            return text
+        if parts[0] in {"profile", "view"}:
+            choices = profiles if parts[0] == "profile" else views
+            prefix = parts[-1].lower()
+            for item in choices:
+                if item.startswith(prefix):
+                    return f"{parts[0]} {item}"
+        return None
+
+    def _set_command_message(self, message: str) -> None:
+        try:
+            self.screen.command_bar.set_message(message)
+        except Exception:
+            pass
+
+    def _register_commands(self) -> None:
+        self.command_registry.register("help", "Show commands for this screen.", self._cmd_help)
+        self.command_registry.register("home", "Return to the home screen.", self._cmd_home, aliases=["/"])
+        self.command_registry.register("profile", "Open a profile screen.", self._cmd_profile)
+        self.command_registry.register("view", "Open a data view screen.", self._cmd_view)
+        self.command_registry.register("diagnostics", "Run connectivity diagnostics.", self._cmd_diagnostics)
+        self.command_registry.register(
+            "select",
+            "Select symbol from Top Symbols list (symbol or #).",
+            self._cmd_select,
+            contexts=["liquidation"],
+            aliases=["symbol"],
+        )
+        self.command_registry.register(
+            "capture",
+            "Toggle liquidation capture on/off.",
+            self._cmd_capture,
+            contexts=["liquidation"],
+        )
+
+    def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
+        context = getattr(self.screen, "command_context", "home")
+        lines = self.command_registry.help_for(context)
+        if not lines:
+            return "No commands registered."
+        return "\n".join(lines)
+
+    def _cmd_home(self, _cmd: str, _args: List[str]) -> Optional[str]:
+        self._go_home()
+        return None
+
+    def _cmd_profile(self, _cmd: str, args: List[str]) -> str:
         if not args:
-            self.notify("Usage: /backtest run|sweep --strategy PATH --dataset NAME --timeframe TF", severity="warning")
-            return
-        sub = args[0]
-        rest = args[1:]
-        parsed = self._parse_args(rest)
-        strategy = parsed.get("strategy")
-        datasets = parsed.get("dataset", "").split(",") if parsed.get("dataset") else []
-        timeframes = parsed.get("timeframe", "").split(",") if parsed.get("timeframe") else []
-        seed = int(parsed["seed"]) if parsed.get("seed") else None
-        if not strategy:
-            self.notify("Missing --strategy PATH", severity="warning")
-            return
-        if sub == "run":
-            params = {k.replace("param_", ""): v for k, v in parsed.items() if k.startswith("param_")}
-            job = self.research_queue.add_job(
-                job_type=job_type,
-                strategy_path=strategy,
-                datasets=datasets,
-                timeframes=timeframes,
-                parameters=params,
-                seed=seed,
-            )
-            asyncio.create_task(asyncio.to_thread(self.research_queue.run_if_configured, job))
-            self.notify(f"Queued {job_type} job {job.job_id}")
-            return
-        if sub == "sweep":
-            grid: Dict[str, List[str]] = {}
-            for key, value in parsed.items():
-                if key.startswith("grid_"):
-                    grid[key.replace("grid_", "")] = [v.strip() for v in value.split(",") if v.strip()]
-            if not grid:
-                self.notify("Sweep requires --grid param=value1,value2", severity="warning")
-                return
-            jobs = self.research_queue.add_sweep(
-                job_type=job_type,
-                strategy_path=strategy,
-                datasets=datasets,
-                timeframes=timeframes,
-                parameter_grid=grid,
-                seed=seed,
-            )
-            for job in jobs:
-                asyncio.create_task(asyncio.to_thread(self.research_queue.run_if_configured, job))
-            self.notify(f"Queued {len(jobs)} sweep jobs")
-            return
-        self.notify("Unknown research subcommand", severity="warning")
+            return "Usage: profile <name>"
+        name = args[0]
+        self._open_profile(name)
+        return ""
 
-    @staticmethod
-    def _parse_args(args: List[str]) -> Dict[str, str]:
-        parsed: Dict[str, str] = {}
-        it = iter(args)
-        for token in it:
-            if token.startswith("--"):
-                key = token[2:]
-                try:
-                    value = next(it)
-                except StopIteration:
-                    value = ""
-                if key == "param":
-                    if "=" in value:
-                        param_key, param_value = value.split("=", 1)
-                        parsed[f"param_{param_key}"] = param_value
-                elif key == "grid":
-                    if "=" in value:
-                        grid_key, grid_value = value.split("=", 1)
-                        parsed[f"grid_{grid_key}"] = grid_value
-                else:
-                    parsed[key] = value
-        return parsed
+    def _cmd_view(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: view <time|heatmap|table>"
+        self._open_view(args[0])
+        return ""
+
+    def _cmd_diagnostics(self, _cmd: str, _args: List[str]) -> str:
+        report = self.provider.diagnostics()
+        http = report.get("http", "unknown")
+        ws = report.get("ws", "not configured")
+        return f"Diagnostics: http={http} | ws={ws}"
+
+    def _cmd_select(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: select <symbol|#>"
+        symbol = self._resolve_symbol(args[0])
+        if not symbol:
+            return "Symbol not found."
+        self.set_selected_symbol(symbol)
+        return f"Selected symbol: {symbol}"
+
+    def _cmd_capture(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: capture on|off"
+        value = args[0].lower()
+        if value not in {"on", "off"}:
+            return "Usage: capture on|off"
+        enabled = value == "on"
+        self.provider.set_capture_enabled(enabled)
+        return f"Capture {'enabled' if enabled else 'disabled'}."
+
+    def _open_route(self, route: Route) -> None:
+        if route.kind == "home":
+            self._go_home()
+            return
+        if route.kind == "profile":
+            self._open_profile(route.name or "")
+            return
+        if route.kind == "view":
+            self._open_view(route.name or "")
+            return
+        self._set_command_message("Unknown route.")
+
+    def _open_profile(self, name: str) -> None:
+        name = name.strip().lower()
+        if not name:
+            self._set_command_message("Profile name required.")
+            return
+        if name == "liquidation":
+            name = "liquidation_hunter"
+        if name == "liquidations":
+            name = "liquidation_hunter"
+        try:
+            profile = get_profile(name)
+        except KeyError:
+            self._set_command_message(f"Unknown profile: {name}")
+            return
+        self._cache["last_profile"] = profile.name
+        self.session_state.active_profile = profile.name
+        save_session_state(self.session_state)
+        self.theme_manager.set_active_profile(profile.name)
+        self.apply_palette(self.theme_manager.current())
+        self._push_or_replace(self._build_profile_screen(profile.name, profile.label))
+
+    def _open_view(self, name: str) -> None:
+        name = name.strip().lower()
+        view_map = {
+            "time": LiquidationTimeSeriesView,
+            "heatmap": LiquidationHeatmapView,
+            "heat": LiquidationHeatmapView,
+            "table": LiquidationTableView,
+        }
+        screen_cls = view_map.get(name)
+        if not screen_cls:
+            self._set_command_message("Unknown view. Use: time, heatmap, table.")
+            return
+        recent = self._cache.setdefault("recent_views", [])
+        view_label = f"liquidations/{name}"
+        if view_label in recent:
+            recent.remove(view_label)
+        recent.insert(0, view_label)
+        self._cache["recent_views"] = recent[:5]
+        save_cache(self._cache)
+        self._push_or_replace(screen_cls())
+
+    def _build_profile_screen(self, name: str, label: str):
+        if name == "liquidation_hunter":
+            return LiquidationHunterScreen()
+        return PlaceholderProfileScreen(name, label)
+
+    def _go_home(self) -> None:
+        while len(self._screen_stack) > 1:
+            try:
+                self.pop_screen()
+            except Exception:
+                break
+            self._screen_stack.pop()
+        if not self._screen_stack:
+            self._push_screen(HomeScreen())
+        self._apply_palette_to_screen(self.theme_manager.current())
+
+    def _push_screen(self, screen) -> None:
+        self.push_screen(screen)
+        self._screen_stack.append(screen.id or "")
+        self._apply_palette_to_screen(self.theme_manager.current())
+
+    def _push_or_replace(self, screen) -> None:
+        if len(self._screen_stack) > 1:
+            try:
+                self.pop_screen()
+            except Exception:
+                pass
+            if self._screen_stack:
+                self._screen_stack.pop()
+        self._push_screen(screen)
+
+    def _resolve_symbol(self, token: str) -> Optional[str]:
+        token = token.strip()
+        if not token:
+            return None
+        if token.isdigit():
+            idx = int(token) - 1
+            if 0 <= idx < len(self._top_symbols):
+                return self._top_symbols[idx].upper()
+        return token.upper()
+
+    def set_top_symbols(self, symbols: List[str]) -> None:
+        self._top_symbols = symbols
+
+    def set_selected_symbol(self, symbol: str) -> None:
+        symbol = symbol.upper()
+        self.selected_symbol = symbol
+        self._cache.setdefault("selected_symbol", {})["liquidation_hunter"] = symbol
+        profile_state = get_profile_state(self.session_state, "liquidation_hunter")
+        profile_state.selected_symbol = symbol
+        save_session_state(self.session_state)
+        save_cache(self._cache)
+
+    def cache_snapshot(self, profile: str, key: str, snapshot) -> None:
+        self._cache.setdefault("snapshots", {}).setdefault(profile, {})[key] = snapshot.to_dict()
+        save_cache(self._cache)
+
+    def _load_selected_symbol(self) -> str:
+        profile_state = get_profile_state(self.session_state, "liquidation_hunter")
+        if profile_state.selected_symbol:
+            return profile_state.selected_symbol.upper()
+        cached = self._cache.get("selected_symbol", {}).get("liquidation_hunter")
+        return str(cached or "BTC").upper()
+
+    def _load_cached_snapshots(self) -> None:
+        from tui.models.liquidations import LiquidationSnapshot
+
+        snapshots = self._cache.get("snapshots", {})
+        liq = snapshots.get("liquidation_hunter", {}).get("snapshot")
+        if isinstance(liq, dict):
+            try:
+                self.state_store.update_snapshot(
+                    "liquidation_hunter",
+                    "snapshot",
+                    LiquidationSnapshot.from_payload(liq),
+                )
+            except Exception:
+                pass
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:

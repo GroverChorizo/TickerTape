@@ -1,104 +1,40 @@
 Screen {
-    background: #0a0e1a;
-    color: #d6dde6;
+    background: transparent;
 }
 
-#title {
-    dock: top;
-    height: 3;
-    content-align: center middle;
-    background: #0d1117;
-    color: #79b4c4;
-    text-style: bold;
-}
-
-#body {
+#screen_root {
     height: 1fr;
 }
 
-#left {
-    width: 24;
-    padding: 1;
-    border: tall #243044;
-}
-
-#center {
-    width: 1fr;
-    padding: 1;
-    border: tall #243044;
-}
-
-#right {
-    width: 32;
-    padding: 1;
-    border: tall #243044;
-}
-
-.section {
+#screen_header {
+    dock: top;
+    height: 3;
+    content-align: center middle;
     text-style: bold;
-    padding-bottom: 1;
-    color: #d6dde6;
 }
 
-.help {
-    color: #7a8797;
+#status_strip {
+    dock: top;
+    height: 1;
+    padding: 0 2;
 }
 
-PanelBase {
-    border: tall #243044;
-    padding: 1;
-    margin-bottom: 1;
-    background: #0d1117;
+#screen_body {
+    height: 1fr;
+    padding: 1 2;
 }
 
-WalletPanel {
-    border: tall #243044;
-    padding: 1;
-    margin-bottom: 1;
-    background: #0d1117;
-}
-
-WalletDetailPanel {
-    border: tall #243044;
-    padding: 1;
-    margin-bottom: 1;
-    background: #0d1117;
-}
-
-.dim {
-    color: #7a8797;
-}
-
-#footer {
+CommandBar {
     dock: bottom;
-    height: 7;
-    border-top: tall #243044;
-    padding: 1;
+    height: 3;
+    padding: 0 2;
 }
 
 #command {
     width: 100%;
 }
 
-#status {
+#command_status {
     width: 100%;
-    padding-top: 1;
-    color: #7a8797;
     height: 1;
-}
-
-#shortcuts {
-    width: 100%;
-    padding-top: 1;
-    color: #7a8797;
-    height: 1;
-}
-
-#wizard {
-    padding: 1;
-    border: tall #243044;
-}
-
-#roadmap_body {
-    padding-top: 1;
 }
