@@ -50,12 +50,16 @@ from tui.ui.screens.home import HomeScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
 from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
 from tui.ui.screens.settings import SettingsScreen
+from tui.ui.screens.validation import ValidationScreen
 from tui.ui.screens.views import (
     LiquidationHeatmapView,
     LiquidationTableView,
     LiquidationTimeSeriesView,
 )
 from backend.storage import DatasetRegistry
+from backend.query_helpers import load_latest_snapshot
+from tui.state.datasets import latest_timeframe, load_datasets
+from tui.validation import extract_rows, run_validation
 
 
 class TickerTapeApp(App):
@@ -303,6 +307,9 @@ class TickerTapeApp(App):
             "Funding actions (refresh).",
             self._cmd_funding,
         )
+        self.command_registry.register(
+            "validate", "Validate a dataset snapshot.", self._cmd_validate
+        )
 
     def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
         context = getattr(self.screen, "command_context", "home")
@@ -398,6 +405,31 @@ class TickerTapeApp(App):
         self._cache["funding_refresh_requested"] = int(time.time() * 1000)
         save_cache(self._cache)
         return "Funding refresh requested."
+
+    def _cmd_validate(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: validate <dataset> [timeframe]"
+        dataset = args[0].strip()
+        registry = DatasetRegistry(path=self.config.data_root / "_registry.json")
+        datasets = load_datasets(registry)
+        dataset_key = dataset if dataset.startswith("feed=") else f"feed={dataset}"
+        if dataset_key not in datasets and dataset in datasets:
+            dataset_key = dataset
+        if dataset_key not in datasets:
+            available = ", ".join(sorted(datasets.keys())) or "none"
+            return f"Unknown dataset. Available: {available}"
+        timeframe = (
+            args[1] if len(args) > 1 else latest_timeframe(datasets, dataset_key)
+        )
+        if not timeframe:
+            return f"No timeframes for dataset {dataset_key}"
+        snapshot = load_latest_snapshot(registry, dataset_key, timeframe)
+        if snapshot is None:
+            return f"No snapshot found for {dataset_key} ({timeframe})"
+        rows = extract_rows(snapshot)
+        reports = run_validation(rows)
+        self._push_or_replace(ValidationScreen(dataset_key, timeframe, reports))
+        return ""
 
     def _open_route(self, route: Route) -> None:
         if route.kind == "home":
