@@ -81,6 +81,7 @@ class TickerTapeApp(App):
         self.command_registry = CommandRegistry()
         self.session_state = load_session_state()
         self.theme_manager = ThemeManager(self.session_state)
+        self.theme_tokens: dict[str, str] = {}
         self._cache = load_cache()
         self._cache.setdefault("preferences", {"refresh_interval_s": 1.0})
         self._tt_screen_stack: List[str] = []
@@ -116,9 +117,11 @@ class TickerTapeApp(App):
     def apply_palette(self, palette) -> None:
         self.styles.background = palette.bg.primary
         self.styles.color = palette.text.primary
+        self.theme_tokens = palette.to_tokens()
         self._apply_palette_to_screen(palette)
 
     def _apply_palette_to_screen(self, palette) -> None:
+        self._apply_theme_class(palette.theme_id)
         try:
             header = self.screen.query_one("#screen_header")
             header.styles.background = palette.bg.panel
@@ -145,6 +148,23 @@ class TickerTapeApp(App):
         try:
             cmd_status = self.screen.query_one("#command_status")
             cmd_status.styles.color = palette.text.muted
+        except Exception:
+            pass
+
+    def _apply_theme_class(self, theme_id: str) -> None:
+        try:
+            screen = self.screen
+        except Exception:
+            return
+        classes = list(getattr(screen, "classes", []))
+        for name in classes:
+            if name.startswith("theme-"):
+                try:
+                    screen.remove_class(name)
+                except Exception:
+                    pass
+        try:
+            screen.add_class(f"theme-{theme_id}")
         except Exception:
             pass
 
@@ -300,6 +320,7 @@ class TickerTapeApp(App):
         self.command_registry.register(
             "settings", "Open settings screen.", self._cmd_settings
         )
+        self.command_registry.register("theme", "Switch UI theme.", self._cmd_theme)
         self.command_registry.register(
             "exchange",
             "Manage funding exchanges (list/add/remove).",
@@ -361,6 +382,16 @@ class TickerTapeApp(App):
         http = report.get("http", "unknown")
         ws = report.get("ws", "not configured")
         return f"Diagnostics: http={http} | ws={ws}"
+
+    def _cmd_theme(self, _cmd: str, args: List[str]) -> str:
+        themes = self.theme_manager.available()
+        if not args:
+            return "Themes: " + ", ".join(themes)
+        theme = args[0].strip().lower()
+        if theme not in themes:
+            return f"Unknown theme: {theme}. Available: {', '.join(themes)}"
+        self.theme_manager.apply(self, theme)
+        return f"Theme set to {theme}."
 
     def _cmd_select(self, _cmd: str, args: List[str]) -> str:
         if not args:
