@@ -50,6 +50,7 @@ from tui.ui.screens.home import HomeScreen
 from tui.ui.screens.profile_day_trader import DayTraderScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
 from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
+from tui.ui.screens.profile_whale_watcher import WhaleWatcherScreen
 from tui.ui.screens.settings import SettingsScreen
 from tui.ui.screens.validation import ValidationScreen
 from tui.ui.screens.views import (
@@ -317,6 +318,18 @@ class TickerTapeApp(App):
             self._cmd_watchlist,
             contexts=["day_trader"],
         )
+        self.command_registry.register(
+            "whalefilter",
+            "Filter whales by side and notional.",
+            self._cmd_whalefilter,
+            contexts=["whale_watcher"],
+        )
+        self.command_registry.register(
+            "wallet",
+            "Open wallet detail (address or #).",
+            self._cmd_wallet,
+            contexts=["whale_watcher"],
+        )
 
     def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
         context = getattr(self.screen, "command_context", "home")
@@ -449,6 +462,49 @@ class TickerTapeApp(App):
         self.set_watchlist(symbols)
         return f"Watchlist set: {', '.join(symbols)}"
 
+    def _cmd_whalefilter(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: whalefilter side=<buy|sell|all> min=<notional>"
+        side = "all"
+        min_notional = None
+        for token in args:
+            if token.startswith("side="):
+                side = token.split("=", 1)[1].strip().lower() or "all"
+            elif token.startswith("min="):
+                try:
+                    min_notional = float(token.split("=", 1)[1])
+                except (TypeError, ValueError):
+                    min_notional = None
+        if min_notional is None:
+            return "Usage: whalefilter side=<buy|sell|all> min=<notional>"
+        try:
+            screen = self.screen
+        except Exception:
+            return "Whale screen not active."
+        if hasattr(screen, "update_filter"):
+            screen.update_filter(side, min_notional)
+            return f"Whale filter set: side={side} min={min_notional}"
+        return "Whale screen not active."
+
+    def _cmd_wallet(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: wallet <#|address>"
+        token = args[0].strip()
+        address = None
+        if token.isdigit():
+            idx = int(token) - 1
+            wallets = self.get_wallets()
+            if 0 <= idx < len(wallets):
+                address = wallets[idx]
+        else:
+            address = token
+        if not address:
+            return "Wallet not found."
+        from tui.ui.screens.wallet_detail import WalletDetailScreen
+
+        self._push_or_replace(WalletDetailScreen(address, source="whales"))
+        return ""
+
     def _open_route(self, route: Route) -> None:
         if route.kind == "home":
             self._go_home()
@@ -511,6 +567,8 @@ class TickerTapeApp(App):
             return DayTraderScreen()
         if name == "liquidation_hunter":
             return LiquidationHunterScreen()
+        if name == "whale_watcher":
+            return WhaleWatcherScreen()
         return PlaceholderProfileScreen(name, label)
 
     def _go_home(self) -> None:
@@ -592,6 +650,16 @@ class TickerTapeApp(App):
                 screen.update_watchlist(self._cache["watchlist"])
             except Exception:
                 pass
+
+    def get_wallets(self) -> List[str]:
+        wallets = self._cache.get("wallets")
+        if isinstance(wallets, list):
+            return [str(w) for w in wallets]
+        return []
+
+    def set_wallets(self, wallets: List[str]) -> None:
+        self._cache["wallets"] = [str(w) for w in wallets if w]
+        save_cache(self._cache)
 
     def _load_cached_snapshots(self) -> None:
         from tui.models.liquidations import LiquidationSnapshot
