@@ -72,6 +72,7 @@ class MarketDataFeed(BaseFeed):
     def fetch(self) -> Dict[str, Any]:
         now = time.monotonic()
         errors: List[str] = []
+        disconnect_flags: List[bool] = []
         updated_any = False
 
         if self._due(now, "prices"):
@@ -83,6 +84,7 @@ class MarketDataFeed(BaseFeed):
                     updated_any = True
             except Exception as exc:
                 errors.append(f"prices: {exc}")
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
                 logger.warning({"event": "market_data_prices_failed", "error": str(exc)})
             self._last_fetch["prices"] = now
 
@@ -95,6 +97,7 @@ class MarketDataFeed(BaseFeed):
                     updated_any = True
             except Exception as exc:
                 errors.append(f"quick: {exc}")
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
                 logger.warning({"event": "market_data_quick_failed", "error": str(exc)})
             self._last_fetch["quick"] = now
 
@@ -107,6 +110,7 @@ class MarketDataFeed(BaseFeed):
                     updated_any = True
             except Exception as exc:
                 errors.append(f"orderbook: {exc}")
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
                 logger.warning({"event": "market_data_orderbook_failed", "error": str(exc)})
             self._last_fetch["orderbook"] = now
 
@@ -123,6 +127,7 @@ class MarketDataFeed(BaseFeed):
                     updated_any = True
             except Exception as exc:
                 errors.append(f"candles_1h: {exc}")
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
                 logger.warning({"event": "market_data_candles_failed", "error": str(exc), "interval": "1h"})
 
             try:
@@ -137,11 +142,14 @@ class MarketDataFeed(BaseFeed):
                     updated_any = True
             except Exception as exc:
                 errors.append(f"candles_1m: {exc}")
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
                 logger.warning({"event": "market_data_candles_failed", "error": str(exc), "interval": "1m"})
             self._last_fetch["candles"] = now
 
         if errors and not updated_any:
-            raise ConnectionError("; ".join(errors))
+            if disconnect_flags and all(disconnect_flags):
+                raise ConnectionError("; ".join(errors))
+            raise RuntimeError("; ".join(errors))
 
         payload = {
             "ts_ms": int(time.time() * 1000),

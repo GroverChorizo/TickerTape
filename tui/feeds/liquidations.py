@@ -53,7 +53,8 @@ class LiquidationsRadarFeed(BaseFeed):
 
     def fetch(self) -> Dict[str, Any]:
         now_ms = int(time.time() * 1000)
-        errors: List[str] = []
+        error_messages: List[str] = []
+        disconnect_flags: List[bool] = []
         timeframe_stats: Dict[str, Dict[str, Any]] = {}
         raw_events: List[Dict[str, Any]] = []
 
@@ -61,7 +62,8 @@ class LiquidationsRadarFeed(BaseFeed):
             try:
                 raw = self.client.get_json("liquidations", timeframe=tf)
             except Exception as exc:
-                errors.append(str(exc))
+                error_messages.append(str(exc))
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
                 continue
             timeframe_stats[tf] = _normalize_timeframe_stats(raw)
             if tf == "1h":
@@ -71,7 +73,8 @@ class LiquidationsRadarFeed(BaseFeed):
         try:
             stats_payload = self.client.get_json("liquidations_stats")
         except Exception as exc:
-            errors.append(str(exc))
+            error_messages.append(str(exc))
+            disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
 
         if not raw_events:
             raw_events = _extract_largest_events(stats_payload)
@@ -93,11 +96,13 @@ class LiquidationsRadarFeed(BaseFeed):
             "series": series,
             "cascade": cascade,
             "top_symbols": top_symbols,
-            "errors": errors,
+            "errors": error_messages,
             "capture": capture,
         }
-        if not events and not timeframe_stats and not stats_payload and errors:
-            raise ConnectionError("; ".join(errors))
+        if not events and not timeframe_stats and not stats_payload and error_messages:
+            if disconnect_flags and all(disconnect_flags):
+                raise ConnectionError("; ".join(error_messages))
+            raise RuntimeError("; ".join(error_messages))
         return payload
 
     def _capture_if_enabled(self, events: List[LiquidationEvent], now_ms: int) -> Dict[str, Any]:
