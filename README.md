@@ -103,6 +103,11 @@ For commercial licensing inquiries, contact: elias@osgrovesolutions.com
 
 ## Secrets & Local Configuration (recommended) 🔐
 
+- Default secrets file (YAML, created on first run):
+  - `~/.ticker_tape/secrets.yaml`
+  - Override with `--secrets <path>` or `TICKER_TAPE_SECRETS_PATH`
+  - Use the in-app command `:secrets` to open the file in your editor
+
 - Recommended default (example only - do not treat as a real absolute path):
   - POSIX (Linux / macOS): `~/.tickertape/secrets/HLdontShare.env`
   - Windows (PowerShell / CMD): `%USERPROFILE%\.tickertape\secrets\HLdontShare.env`

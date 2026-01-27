@@ -1,4 +1,5 @@
 """Startup wizard for first-run setup."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -10,8 +11,15 @@ from textual.containers import Vertical
 from textual.screen import Screen
 from textual.widgets import Button, Input, Static
 
+from config.secrets import DEFAULT_SECRETS_PATH, ensure_secrets_file
 from .bootstrap import bootstrap_data
-from .config import TuiConfig, DEFAULT_DATA_ROOT, DEFAULT_PROFILE, ensure_data_root, save_config
+from .config import (
+    TuiConfig,
+    DEFAULT_DATA_ROOT,
+    DEFAULT_PROFILE,
+    ensure_data_root,
+    save_config,
+)
 from .themes.theme_manager import ThemeManager
 
 
@@ -70,7 +78,9 @@ class StartupWizard(Screen):
             if not self._themes:
                 lines.append("No themes available.")
             else:
-                self._theme_index = max(0, min(self._theme_index, len(self._themes) - 1))
+                self._theme_index = max(
+                    0, min(self._theme_index, len(self._themes) - 1)
+                )
                 for idx, theme_id in enumerate(self._themes):
                     marker = "▶" if idx == self._theme_index else " "
                     lines.append(f"{marker} {theme_id}")
@@ -79,13 +89,18 @@ class StartupWizard(Screen):
             title.update("Step 3/4: Paths & Secrets")
             body.update(
                 "Set BASE_PARQUET_ROOT (default: ./data/parquet).\n"
-                "Optional: enter secrets path (leave blank to skip)."
-                "\nFormat: <data_root> [| <secrets_path>]"
+                f"Secrets file default: {DEFAULT_SECRETS_PATH}\n"
+                "Optional: enter secrets path (leave blank to use default and create it).\n"
+                "Format: <data_root> [| <secrets_path>]"
             )
-            input_field.placeholder = f"{self.state.data_root} | {self.state.secrets_path or ''}".strip()
+            input_field.placeholder = (
+                f"{self.state.data_root} | {self.state.secrets_path or ''}".strip()
+            )
         elif self.step == 3:
             title.update("Step 4/4: Data Bootstrap")
-            body.update("Press Next to bootstrap data for the selected mode and launch the dashboard.")
+            body.update(
+                "Press Next to bootstrap data for the selected mode and launch the dashboard."
+            )
             input_field.display = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -108,7 +123,9 @@ class StartupWizard(Screen):
         elif self.step == 2:
             data_root, secrets = _parse_paths_input(value, self.state)
             self.state.data_root = data_root
-            self.state.secrets_path = secrets
+            if secrets is None:
+                secrets = DEFAULT_SECRETS_PATH
+            self.state.secrets_path = ensure_secrets_file(secrets)[0]
         elif self.step == 3:
             config = TuiConfig(
                 mode=self.state.mode,

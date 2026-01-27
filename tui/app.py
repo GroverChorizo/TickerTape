@@ -1,4 +1,5 @@
 """TickerTape multi-screen, command-driven TUI."""
+
 from __future__ import annotations
 
 import argparse
@@ -22,6 +23,12 @@ def ensure_src_on_path() -> Path:
 
 ROOT = ensure_src_on_path()
 
+from config.secrets import (
+    check_permissions,
+    ensure_secrets_file,
+    open_in_editor,
+    resolve_secrets_path,
+)
 from tui.core.cache import load_cache, save_cache
 from tui.core.commands import CommandRegistry
 from tui.core.router import Route, parse_route
@@ -29,7 +36,13 @@ from tui.core.state import StateStore
 from tui.providers.hyperliquid import HyperliquidProvider
 from tui.state.profiles import get_profile, list_profiles
 from tui.themes.theme_manager import ThemeManager
-from tui.config import TuiConfig, config_needs_setup, ensure_data_root, load_config, save_config
+from tui.config import (
+    TuiConfig,
+    config_needs_setup,
+    ensure_data_root,
+    load_config,
+    save_config,
+)
 from tui.state.session import load_session_state, save_session_state, get_profile_state
 from tui.ui.screens.home import HomeScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
@@ -44,11 +57,15 @@ from backend.storage import DatasetRegistry
 
 class TickerTapeApp(App):
     CSS_PATH = "tui.css"
-    BINDINGS = [("ctrl+p", "focus_command", "Focus command"), ("ctrl+h", "go_home", "Home")]
+    BINDINGS = [
+        ("ctrl+p", "focus_command", "Focus command"),
+        ("ctrl+h", "go_home", "Home"),
+    ]
 
     def __init__(self, config: TuiConfig) -> None:
         super().__init__()
         self.config = config
+        self.secrets_notice: Optional[str] = None
         self.state_store = StateStore()
         self.command_registry = CommandRegistry()
         self.session_state = load_session_state()
@@ -71,8 +88,12 @@ class TickerTapeApp(App):
     def on_mount(self) -> None:
         self.apply_palette(self.theme_manager.current())
         self._push_screen(HomeScreen())
+        if self.secrets_notice:
+            self.notify(self.secrets_notice, severity="information")
         if getattr(self, "_show_wizard", False):
-            self.notify("Setup required. Run with --setup to configure.", severity="warning")
+            self.notify(
+                "Setup required. Run with --setup to configure.", severity="warning"
+            )
 
     def on_shutdown(self) -> None:
         try:
@@ -143,7 +164,9 @@ class TickerTapeApp(App):
         args = tokens[1:]
         command = self.command_registry.match(cmd)
         if not command:
-            self._set_command_message("Unknown command. Type 'help' for available commands.")
+            self._set_command_message(
+                "Unknown command. Type 'help' for available commands."
+            )
             return
         message = command.handler(cmd, args)
         if message:
@@ -192,10 +215,17 @@ class TickerTapeApp(App):
             input_widget.value = suggestion
 
     def _autocomplete_for(self, text: str) -> Optional[str]:
-        command_names = sorted({cmd.name for cmd in self.command_registry._commands.values()})
+        command_names = sorted(
+            {cmd.name for cmd in self.command_registry._commands.values()}
+        )
         profiles = [profile.name for profile in list_profiles()]
         views = ["time", "heatmap", "table"]
-        route_candidates = ["home", "/", *[f"profile/{p}" for p in profiles], *[f"view/{v}" for v in views]]
+        route_candidates = [
+            "home",
+            "/",
+            *[f"profile/{p}" for p in profiles],
+            *[f"view/{v}" for v in views],
+        ]
         if not text:
             return "help"
         if " " not in text:
@@ -222,11 +252,21 @@ class TickerTapeApp(App):
             pass
 
     def _register_commands(self) -> None:
-        self.command_registry.register("help", "Show commands for this screen.", self._cmd_help)
-        self.command_registry.register("home", "Return to the home screen.", self._cmd_home, aliases=["/"])
-        self.command_registry.register("profile", "Open a profile screen.", self._cmd_profile)
-        self.command_registry.register("view", "Open a data view screen.", self._cmd_view)
-        self.command_registry.register("diagnostics", "Run connectivity diagnostics.", self._cmd_diagnostics)
+        self.command_registry.register(
+            "help", "Show commands for this screen.", self._cmd_help
+        )
+        self.command_registry.register(
+            "home", "Return to the home screen.", self._cmd_home, aliases=["/"]
+        )
+        self.command_registry.register(
+            "profile", "Open a profile screen.", self._cmd_profile
+        )
+        self.command_registry.register(
+            "view", "Open a data view screen.", self._cmd_view
+        )
+        self.command_registry.register(
+            "diagnostics", "Run connectivity diagnostics.", self._cmd_diagnostics
+        )
         self.command_registry.register(
             "select",
             "Select symbol from Top Symbols list (symbol or #).",
@@ -239,6 +279,9 @@ class TickerTapeApp(App):
             "Toggle liquidation capture on/off.",
             self._cmd_capture,
             contexts=["liquidation"],
+        )
+        self.command_registry.register(
+            "secrets", "Open secrets file.", self._cmd_secrets
         )
 
     def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
@@ -289,6 +332,23 @@ class TickerTapeApp(App):
         enabled = value == "on"
         self.provider.set_capture_enabled(enabled)
         return f"Capture {'enabled' if enabled else 'disabled'}."
+
+    def _cmd_secrets(self, _cmd: str, _args: List[str]) -> str:
+        resolved = resolve_secrets_path(self.config.secrets_path)
+        path, created = ensure_secrets_file(resolved)
+        self.config.secrets_path = path
+        save_config(self.config)
+        warning = check_permissions(path)
+        opened = open_in_editor(path)
+        notes = []
+        if created:
+            notes.append("created")
+        if warning:
+            notes.append(warning)
+        if not opened:
+            notes.append("failed to open editor")
+        suffix = f" ({'; '.join(notes)})" if notes else ""
+        return f"Secrets file: {path}{suffix}"
 
     def _open_route(self, route: Route) -> None:
         if route.kind == "home":
@@ -398,7 +458,9 @@ class TickerTapeApp(App):
         save_cache(self._cache)
 
     def cache_snapshot(self, profile: str, key: str, snapshot) -> None:
-        self._cache.setdefault("snapshots", {}).setdefault(profile, {})[key] = snapshot.to_dict()
+        self._cache.setdefault("snapshots", {}).setdefault(profile, {})[key] = (
+            snapshot.to_dict()
+        )
         save_cache(self._cache)
 
     def _load_selected_symbol(self) -> str:
@@ -429,6 +491,7 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--setup", action="store_true", help="Run setup wizard")
     parser.add_argument("--profile", help="Start in profile")
     parser.add_argument("--data-root", help="Override data root")
+    parser.add_argument("--secrets", help="Override secrets file path")
     parser.add_argument("--offline", action="store_true", help="Force offline mode")
     return parser.parse_args(argv)
 
@@ -440,10 +503,15 @@ def run() -> None:
         overrides["profile"] = args.profile
     if args.data_root:
         overrides["data_root"] = args.data_root
+    if args.secrets:
+        overrides["secrets_path"] = args.secrets
     if args.offline:
         overrides["mode"] = "offline_demo"
     config = load_config(overrides)
     ensure_data_root(config)
+    secrets_path = resolve_secrets_path(config.secrets_path)
+    secrets_path, created = ensure_secrets_file(secrets_path)
+    config.secrets_path = secrets_path
     if args.profile:
         config.profile = args.profile
         save_config(config)
@@ -457,6 +525,10 @@ def run() -> None:
     except Exception:
         pass
     app = TickerTapeApp(config)
+    if created:
+        notice = f"Secrets file created at {secrets_path}"
+        print(notice)
+        app.secrets_notice = notice
     app._show_wizard = args.setup or config_needs_setup(config)
     app.run()
 

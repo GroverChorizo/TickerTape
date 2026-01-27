@@ -1,4 +1,5 @@
 """Configuration management for the TUI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
@@ -51,10 +52,30 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
     payload: Dict[str, str] = {}
     if path.exists():
         payload = json.loads(path.read_text(encoding="utf-8"))
-    mode = overrides.get("mode") or os.environ.get("TICKERTAPE_MODE") or payload.get("mode") or "offline_demo"
-    data_root = Path(overrides.get("data_root") or os.environ.get("TICKERTAPE_DATA_ROOT") or payload.get("data_root") or DEFAULT_DATA_ROOT)
-    profile = overrides.get("profile") or os.environ.get("TICKERTAPE_PROFILE") or payload.get("profile") or DEFAULT_PROFILE
-    secrets_path = overrides.get("secrets_path") or os.environ.get("TICKERTAPE_SECRETS_PATH") or payload.get("secrets_path")
+    mode = (
+        overrides.get("mode")
+        or os.environ.get("TICKERTAPE_MODE")
+        or payload.get("mode")
+        or "offline_demo"
+    )
+    data_root = Path(
+        overrides.get("data_root")
+        or os.environ.get("TICKERTAPE_DATA_ROOT")
+        or payload.get("data_root")
+        or DEFAULT_DATA_ROOT
+    )
+    profile = (
+        overrides.get("profile")
+        or os.environ.get("TICKERTAPE_PROFILE")
+        or payload.get("profile")
+        or DEFAULT_PROFILE
+    )
+    secrets_path = (
+        overrides.get("secrets_path")
+        or os.environ.get("TICKER_TAPE_SECRETS_PATH")
+        or os.environ.get("TICKERTAPE_SECRETS_PATH")
+        or payload.get("secrets_path")
+    )
     return TuiConfig(
         mode=mode,
         data_root=data_root,
@@ -66,7 +87,9 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
 
 def save_config(config: TuiConfig) -> None:
     config.config_path.parent.mkdir(parents=True, exist_ok=True)
-    config.config_path.write_text(json.dumps(config.to_dict(), indent=2, sort_keys=True), encoding="utf-8")
+    config.config_path.write_text(
+        json.dumps(config.to_dict(), indent=2, sort_keys=True), encoding="utf-8"
+    )
 
 
 def ensure_data_root(config: TuiConfig) -> None:

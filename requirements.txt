@@ -5,6 +5,7 @@ backend
 requests
 rich>=13.7,<15.0
 python-dotenv
+PyYAML
 pandas
 textual>=0.60,<0.80
 
