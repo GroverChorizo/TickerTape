@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ def partition_and_write(
 
     Partition layout: data/parquet/feed={dataset}/timeframe={timeframe}/date=YYYY-MM-DD/part-<ts>.parquet
     """
-    ts_dt = datetime.utcfromtimestamp(window_start_ts / 1000)
+    ts_dt = datetime.fromtimestamp(window_start_ts / 1000, tz=timezone.utc)
     date_str = ts_dt.strftime("%Y-%m-%d")
     base = (
         BASE_PARQUET_ROOT
