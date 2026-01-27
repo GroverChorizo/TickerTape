@@ -47,6 +47,7 @@ from tui.config import (
 )
 from tui.state.session import load_session_state, save_session_state, get_profile_state
 from tui.ui.screens.home import HomeScreen
+from tui.ui.screens.profile_day_trader import DayTraderScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
 from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
 from tui.ui.screens.settings import SettingsScreen
@@ -310,6 +311,12 @@ class TickerTapeApp(App):
         self.command_registry.register(
             "validate", "Validate a dataset snapshot.", self._cmd_validate
         )
+        self.command_registry.register(
+            "watchlist",
+            "Update watchlist symbols (comma-separated).",
+            self._cmd_watchlist,
+            contexts=["day_trader"],
+        )
 
     def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
         context = getattr(self.screen, "command_context", "home")
@@ -431,6 +438,17 @@ class TickerTapeApp(App):
         self._push_or_replace(ValidationScreen(dataset_key, timeframe, reports))
         return ""
 
+    def _cmd_watchlist(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            current = ", ".join(self.get_watchlist()) or "none"
+            return f"Watchlist: {current}"
+        raw = " ".join(args)
+        symbols = [s.strip().upper() for s in raw.replace(" ", "").split(",") if s]
+        if not symbols:
+            return "Usage: watchlist BTC,ETH,SOL"
+        self.set_watchlist(symbols)
+        return f"Watchlist set: {', '.join(symbols)}"
+
     def _open_route(self, route: Route) -> None:
         if route.kind == "home":
             self._go_home()
@@ -489,6 +507,8 @@ class TickerTapeApp(App):
         self._push_or_replace(SettingsScreen())
 
     def _build_profile_screen(self, name: str, label: str):
+        if name == "day_trader":
+            return DayTraderScreen()
         if name == "liquidation_hunter":
             return LiquidationHunterScreen()
         return PlaceholderProfileScreen(name, label)
@@ -553,6 +573,25 @@ class TickerTapeApp(App):
             return profile_state.selected_symbol.upper()
         cached = self._cache.get("selected_symbol", {}).get("liquidation_hunter")
         return str(cached or "BTC").upper()
+
+    def get_watchlist(self) -> List[str]:
+        watchlist = self._cache.get("watchlist")
+        if isinstance(watchlist, list) and watchlist:
+            return [str(s).upper() for s in watchlist]
+        return ["BTC", "ETH", "SOL"]
+
+    def set_watchlist(self, symbols: List[str]) -> None:
+        self._cache["watchlist"] = [str(s).upper() for s in symbols if s]
+        save_cache(self._cache)
+        try:
+            screen = self.screen
+        except Exception:
+            return
+        if hasattr(screen, "update_watchlist"):
+            try:
+                screen.update_watchlist(self._cache["watchlist"])
+            except Exception:
+                pass
 
     def _load_cached_snapshots(self) -> None:
         from tui.models.liquidations import LiquidationSnapshot
