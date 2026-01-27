@@ -59,6 +59,12 @@ from tui.ui.screens.views import (
     LiquidationTableView,
     LiquidationTimeSeriesView,
 )
+from tui.ui.custom_dashboard import (
+    apply_custom_dashboard,
+    create_dashboard_from_state,
+    load_custom_dashboards,
+    save_custom_dashboard,
+)
 from backend.storage import DatasetRegistry
 from backend.query_helpers import load_latest_snapshot
 from tui.state.datasets import latest_timeframe, load_datasets
@@ -94,6 +100,13 @@ class TickerTapeApp(App):
             registry=DatasetRegistry(path=registry_path),
             offline=self.config.mode == "offline_demo",
         )
+        self._custom_dashboards = load_custom_dashboards()
+        if self.config.profile in self._custom_dashboards:
+            apply_custom_dashboard(
+                self.session_state,
+                self.config.profile,
+                self._custom_dashboards[self.config.profile],
+            )
         self._register_commands()
         self._load_cached_snapshots()
 
@@ -334,6 +347,9 @@ class TickerTapeApp(App):
         )
         self.command_registry.register("theme", "Switch UI theme.", self._cmd_theme)
         self.command_registry.register(
+            "dashboard", "Manage custom dashboards.", self._cmd_dashboard
+        )
+        self.command_registry.register(
             "exchange",
             "Manage funding exchanges (list/add/remove).",
             self._cmd_exchange,
@@ -404,6 +420,32 @@ class TickerTapeApp(App):
             return f"Unknown theme: {theme}. Available: {', '.join(themes)}"
         self.theme_manager.apply(self, theme)
         return f"Theme set to {theme}."
+
+    def _cmd_dashboard(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: dashboard list|save|load <name>"
+        action = args[0].lower()
+        if action == "list":
+            names = sorted(self._custom_dashboards.keys())
+            return (
+                "Dashboards: " + ", ".join(names) if names else "No dashboards saved."
+            )
+        if action not in {"save", "load"}:
+            return "Usage: dashboard list|save|load <name>"
+        if len(args) < 2:
+            return "Usage: dashboard list|save|load <name>"
+        name = args[1]
+        profile = self.config.profile
+        if action == "save":
+            layout = create_dashboard_from_state(self.session_state, profile, name=name)
+            save_custom_dashboard(layout)
+            self._custom_dashboards[name] = layout
+            return f"Dashboard saved: {name}"
+        layout = self._custom_dashboards.get(name)
+        if not layout:
+            return f"Dashboard not found: {name}"
+        apply_custom_dashboard(self.session_state, profile, layout)
+        return f"Dashboard loaded: {name}"
 
     def _cmd_select(self, _cmd: str, args: List[str]) -> str:
         if not args:

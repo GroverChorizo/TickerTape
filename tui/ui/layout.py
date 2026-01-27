@@ -36,6 +36,18 @@ def apply_layout(screen, width: int) -> str:
     return current
 
 
+def apply_panel_sizes(panels: Iterable, sizes: dict[str, dict[str, int]]) -> None:
+    for panel in panels:
+        panel_id = getattr(panel, "panel_id", "")
+        if not panel_id or panel_id not in sizes:
+            continue
+        size = sizes[panel_id]
+        width = size.get("width")
+        height = size.get("height")
+        if hasattr(panel, "resize_to") and width and height:
+            panel.resize_to(int(width), int(height))
+
+
 def _set_layout_class(screen, current: str) -> None:
     classes: Iterable[str] = getattr(screen, "classes", [])
     existing = [c for c in classes if c.startswith("layout-")]

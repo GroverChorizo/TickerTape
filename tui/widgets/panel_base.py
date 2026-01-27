@@ -77,3 +77,63 @@ class PanelBase(Static):
             self.styles.border = ("heavy", self.palette.border.focus)
         else:
             self.styles.border = ("tall", self.palette.border.panel)
+
+
+class ResizablePanel(PanelBase):
+    def __init__(
+        self,
+        panel_id: str,
+        title: str,
+        *,
+        min_width: int = 20,
+        min_height: int = 5,
+        **kwargs,
+    ) -> None:
+        super().__init__(panel_id=panel_id, title=title, **kwargs)
+        self._min_width = min_width
+        self._min_height = min_height
+        self._resizing = False
+        self._resize_origin: tuple[int, int] | None = None
+        self._size_origin: tuple[int, int] | None = None
+
+    def on_mouse_down(self, event) -> None:
+        self._resizing = True
+        self._resize_origin = (event.screen_x, event.screen_y)
+        self._size_origin = (self.size.width, self.size.height)
+
+    def on_mouse_up(self, _event) -> None:
+        self._resizing = False
+        self._resize_origin = None
+        self._size_origin = None
+
+    def on_mouse_move(self, event) -> None:
+        if not self._resizing or not self._resize_origin or not self._size_origin:
+            return
+        delta_x = event.screen_x - self._resize_origin[0]
+        delta_y = event.screen_y - self._resize_origin[1]
+        width = self._size_origin[0] + delta_x
+        height = self._size_origin[1] + delta_y
+        self.resize_to(width, height)
+
+    def resize_by(self, delta_w: int, delta_h: int) -> tuple[int, int]:
+        width = _scalar_to_int(self.styles.width, self.size.width) + delta_w
+        height = _scalar_to_int(self.styles.height, self.size.height) + delta_h
+        return self.resize_to(width, height)
+
+    def resize_to(self, width: int, height: int) -> tuple[int, int]:
+        width = max(self._min_width, width)
+        height = max(self._min_height, height)
+        self.styles.width = width
+        self.styles.height = height
+        return width, height
+
+
+def _scalar_to_int(value, fallback: int) -> int:
+    if value is None:
+        return int(fallback)
+    if isinstance(value, (int, float)):
+        return int(value)
+    scalar_value = getattr(value, "value", None)
+    if isinstance(scalar_value, (int, float)):
+        return int(scalar_value)
+    return int(fallback)

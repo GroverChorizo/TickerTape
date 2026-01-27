@@ -21,6 +21,7 @@ class ProfileState:
     selected_symbol: str | None = None
     fullscreen: bool = False
     density: str = "comfortable"
+    panel_sizes: Dict[str, Dict[str, int]] = field(default_factory=dict)
 
 
 @dataclass
@@ -39,6 +40,7 @@ class SessionState:
                     "selected_symbol": state.selected_symbol,
                     "fullscreen": state.fullscreen,
                     "density": state.density,
+                    "panel_sizes": state.panel_sizes,
                 }
                 for name, state in self.profiles.items()
             },
@@ -55,6 +57,7 @@ class SessionState:
                 selected_symbol=state.get("selected_symbol"),
                 fullscreen=bool(state.get("fullscreen", False)),
                 density=state.get("density", "comfortable"),
+                panel_sizes=dict(state.get("panel_sizes", {})),
             )
         active_profile = payload.get("active_profile", default_profile().name)
         return cls(active_profile=active_profile, profiles=profiles)
