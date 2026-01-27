@@ -19,6 +19,8 @@ class ProfileState:
     collapsed: Dict[str, bool] = field(default_factory=dict)
     theme: str = ""
     selected_symbol: str | None = None
+    fullscreen: bool = False
+    density: str = "comfortable"
 
 
 @dataclass
@@ -35,6 +37,8 @@ class SessionState:
                     "collapsed": state.collapsed,
                     "theme": state.theme,
                     "selected_symbol": state.selected_symbol,
+                    "fullscreen": state.fullscreen,
+                    "density": state.density,
                 }
                 for name, state in self.profiles.items()
             },
@@ -49,6 +53,8 @@ class SessionState:
                 collapsed=dict(state.get("collapsed", {})),
                 theme=state.get("theme", ""),
                 selected_symbol=state.get("selected_symbol"),
+                fullscreen=bool(state.get("fullscreen", False)),
+                density=state.get("density", "comfortable"),
             )
         active_profile = payload.get("active_profile", default_profile().name)
         return cls(active_profile=active_profile, profiles=profiles)

@@ -102,6 +102,16 @@ Screen.layout-compact {
     --tt-pad-y: 0;
 }
 
+Screen.density-compact {
+    --tt-pad-x: 1;
+    --tt-pad-y: 0;
+}
+
+Screen.density-comfortable {
+    --tt-pad-x: 2;
+    --tt-pad-y: 1;
+}
+
 #screen_root {
     height: 1fr;
 }
@@ -169,4 +179,12 @@ TabBar {
     padding: 0 var(--tt-pad-x);
     background: var(--tt-bg-panel);
     color: var(--tt-text-primary);
+}
+
+Screen.fullscreen #screen_header,
+Screen.fullscreen #status_strip,
+Screen.fullscreen Sidebar,
+Screen.fullscreen TabBar,
+Screen.fullscreen CommandBar {
+    display: none;
 }

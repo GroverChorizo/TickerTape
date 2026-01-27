@@ -12,10 +12,16 @@ from tui.ui.layout import apply_layout
 from tui.ui.sidebar import Sidebar, SidebarEntry
 from tui.ui.tabbar import TabBar, TabItem
 from tui.state.profiles import list_profiles
+from tui.ui.fullscreen import apply_fullscreen_state, toggle_fullscreen
+from tui.ui.density import apply_density_state, toggle_density
 
 
 class BaseScreen(Screen):
-    BINDINGS = [("ctrl+p", "focus_command", "Focus command")]
+    BINDINGS = [
+        ("ctrl+p", "focus_command", "Focus command"),
+        ("f", "toggle_fullscreen", "Fullscreen"),
+        ("d", "toggle_density", "Density"),
+    ]
 
     def __init__(self, *, screen_id: str, title: str, context: str) -> None:
         super().__init__(id=screen_id)
@@ -47,6 +53,7 @@ class BaseScreen(Screen):
     def on_show(self) -> None:
         layout = apply_layout(self, self.size.width)
         self._sync_navigation(layout)
+        self._apply_persisted_ui_state()
 
     def on_resize(self, event: events.Resize) -> None:
         layout = apply_layout(self, event.size.width)
@@ -66,6 +73,14 @@ class BaseScreen(Screen):
         handler = getattr(self.app, "dispatch_command", None)
         if handler:
             handler(command, context=self.command_context)
+
+    def action_toggle_fullscreen(self) -> None:
+        self._ensure_state()
+        toggle_fullscreen(self.app, self, self._profile_name())
+
+    def action_toggle_density(self) -> None:
+        self._ensure_state()
+        toggle_density(self.app, self, self._profile_name())
 
     def _sync_navigation(self, layout: str) -> None:
         entries = [SidebarEntry(key="home", label="Home", short="H")]
@@ -92,3 +107,19 @@ class BaseScreen(Screen):
         self.tabbar.set_tabs(tabs)
         self.tabbar.set_active(active_key)
         self.tabbar.display = compact
+
+    def _apply_persisted_ui_state(self) -> None:
+        self._ensure_state()
+        apply_fullscreen_state(self.app, self, self._profile_name())
+        apply_density_state(self.app, self, self._profile_name())
+
+    def _ensure_state(self) -> None:
+        if not hasattr(self, "app"):
+            return
+        if not getattr(self.app, "session_state", None):
+            return
+
+    def _profile_name(self) -> str:
+        if self.command_context in {"home", "views", "settings"}:
+            return self.app.session_state.active_profile
+        return self.command_context
