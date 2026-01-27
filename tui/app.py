@@ -140,9 +140,21 @@ class TickerTapeApp(App):
         except Exception:
             pass
         try:
+            sidebar = self.screen.query_one("#sidebar")
+            sidebar.styles.background = palette.bg.panel
+            sidebar.styles.color = palette.text.primary
+        except Exception:
+            pass
+        try:
             command = self.screen.query_one("#command")
             command.styles.background = palette.bg.panel
             command.styles.color = palette.text.primary
+        except Exception:
+            pass
+        try:
+            tabbar = self.screen.query_one("#tabbar")
+            tabbar.styles.background = palette.bg.panel
+            tabbar.styles.color = palette.text.primary
         except Exception:
             pass
         try:

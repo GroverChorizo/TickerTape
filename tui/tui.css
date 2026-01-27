@@ -130,7 +130,6 @@ Screen.layout-compact {
 }
 
 CommandBar {
-    dock: bottom;
     height: 3;
     padding: 0 var(--tt-pad-x);
     background: var(--tt-bg-panel);
@@ -147,4 +146,27 @@ CommandBar {
     width: 100%;
     height: 1;
     color: var(--tt-text-muted);
+}
+
+#content_row {
+    height: 1fr;
+}
+
+Sidebar {
+    width: 20;
+    padding: 1 1;
+    background: var(--tt-bg-panel);
+    color: var(--tt-text-primary);
+}
+
+Screen.layout-narrow Sidebar,
+Screen.layout-compact Sidebar {
+    width: 6;
+}
+
+TabBar {
+    height: 1;
+    padding: 0 var(--tt-pad-x);
+    background: var(--tt-bg-panel);
+    color: var(--tt-text-primary);
 }
