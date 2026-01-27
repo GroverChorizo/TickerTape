@@ -163,8 +163,13 @@ def ensure_secrets_home_exists() -> Path:
     return home
 
 
-def default_secrets_file_path() -> Path:
-    """Return the default secrets file path inside Secrets Home."""
+def default_secrets_file_path(path: Optional[Path] = None) -> Path:
+    """Return the default secrets file path inside Secrets Home.
+
+    Optional path argument is accepted for backward compatibility and tests.
+    """
+    if path is not None:
+        return Path(path).expanduser().resolve()
     home = ensure_secrets_home_exists()
     return (home / _DEFAULT_FILENAME).resolve()
 
