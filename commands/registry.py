@@ -40,3 +40,6 @@ class CommandRegistry:
 
     def match(self, name: str) -> Optional[Command]:
         return self._commands.get(name)
+
+    def names(self) -> list[str]:
+        return sorted({cmd.name for cmd in self._commands.values()})
