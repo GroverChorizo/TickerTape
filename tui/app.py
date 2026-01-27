@@ -76,7 +76,7 @@ class TickerTapeApp(App):
         self.theme_manager = ThemeManager(self.session_state)
         self._cache = load_cache()
         self._cache.setdefault("preferences", {"refresh_interval_s": 1.0})
-        self._screen_stack: List[str] = []
+        self._tt_screen_stack: List[str] = []
         self._command_history: List[str] = []
         self._history_index: int = 0
         self._top_symbols: List[str] = []
@@ -462,29 +462,29 @@ class TickerTapeApp(App):
         return PlaceholderProfileScreen(name, label)
 
     def _go_home(self) -> None:
-        while len(self._screen_stack) > 1:
+        while len(self._tt_screen_stack) > 1:
             try:
                 self.pop_screen()
             except Exception:
                 break
-            self._screen_stack.pop()
-        if not self._screen_stack:
+            self._tt_screen_stack.pop()
+        if not self._tt_screen_stack:
             self._push_screen(HomeScreen())
         self._apply_palette_to_screen(self.theme_manager.current())
 
     def _push_screen(self, screen) -> None:
         self.push_screen(screen)
-        self._screen_stack.append(screen.id or "")
+        self._tt_screen_stack.append(screen.id or "")
         self._apply_palette_to_screen(self.theme_manager.current())
 
     def _push_or_replace(self, screen) -> None:
-        if len(self._screen_stack) > 1:
+        if len(self._tt_screen_stack) > 1:
             try:
                 self.pop_screen()
             except Exception:
                 pass
-            if self._screen_stack:
-                self._screen_stack.pop()
+            if self._tt_screen_stack:
+                self._tt_screen_stack.pop()
         self._push_screen(screen)
 
     def _resolve_symbol(self, token: str) -> Optional[str]:
