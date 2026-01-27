@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import shlex
 import sys
+import time
 from pathlib import Path
 from typing import List, Optional
 
@@ -42,6 +43,7 @@ from tui.config import (
     ensure_data_root,
     load_config,
     save_config,
+    update_funding_exchanges,
 )
 from tui.state.session import load_session_state, save_session_state, get_profile_state
 from tui.ui.screens.home import HomeScreen
@@ -291,6 +293,16 @@ class TickerTapeApp(App):
         self.command_registry.register(
             "settings", "Open settings screen.", self._cmd_settings
         )
+        self.command_registry.register(
+            "exchange",
+            "Manage funding exchanges (list/add/remove).",
+            self._cmd_exchange,
+        )
+        self.command_registry.register(
+            "funding",
+            "Funding actions (refresh).",
+            self._cmd_funding,
+        )
 
     def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
         context = getattr(self.screen, "command_context", "home")
@@ -361,6 +373,31 @@ class TickerTapeApp(App):
     def _cmd_settings(self, _cmd: str, _args: List[str]) -> Optional[str]:
         self._open_settings()
         return None
+
+    def _cmd_exchange(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            return "Usage: exchange list | exchange add <name> | exchange remove <name>"
+        action = args[0].lower()
+        if action == "list":
+            exchanges = ", ".join(self.config.funding_exchanges) or "none"
+            return f"Funding exchanges: {exchanges}"
+        if action in {"add", "remove"}:
+            if len(args) < 2:
+                return f"Usage: exchange {action} <name>"
+            updated, message = update_funding_exchanges(
+                self.config.funding_exchanges, action, args[1]
+            )
+            self.config.funding_exchanges = updated
+            save_config(self.config)
+            return message
+        return "Usage: exchange list | exchange add <name> | exchange remove <name>"
+
+    def _cmd_funding(self, _cmd: str, args: List[str]) -> str:
+        if not args or args[0].lower() != "refresh":
+            return "Usage: funding refresh"
+        self._cache["funding_refresh_requested"] = int(time.time() * 1000)
+        save_cache(self._cache)
+        return "Funding refresh requested."
 
     def _open_route(self, route: Route) -> None:
         if route.kind == "home":

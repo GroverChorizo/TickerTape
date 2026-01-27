@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 import json
 import os
 
 
 DEFAULT_DATA_ROOT = Path("data/parquet")
 DEFAULT_PROFILE = "day_trader"
+DEFAULT_FUNDING_EXCHANGES = ["hyperliquid", "binance"]
 
 
 @dataclass
@@ -22,6 +23,9 @@ class TuiConfig:
     secrets_path: Optional[Path]
     alerts: Dict[str, bool] = field(default_factory=dict)
     panel_overrides: Dict[str, list[str]] = field(default_factory=dict)
+    funding_exchanges: List[str] = field(
+        default_factory=lambda: list(DEFAULT_FUNDING_EXCHANGES)
+    )
 
     def to_dict(self) -> Dict:
         payload = asdict(self)
@@ -80,10 +84,13 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
     )
     alerts = payload.get("alerts") or {}
     panel_overrides = payload.get("panel_overrides") or {}
+    funding_exchanges = payload.get("funding_exchanges") or DEFAULT_FUNDING_EXCHANGES
     if not isinstance(alerts, dict):
         alerts = {}
     if not isinstance(panel_overrides, dict):
         panel_overrides = {}
+    if not isinstance(funding_exchanges, list):
+        funding_exchanges = list(DEFAULT_FUNDING_EXCHANGES)
     return TuiConfig(
         mode=mode,
         data_root=data_root,
@@ -95,6 +102,7 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
             for k, v in panel_overrides.items()
             if isinstance(v, list)
         },
+        funding_exchanges=[str(x) for x in funding_exchanges],
         config_path=path,
     )
 
@@ -116,3 +124,25 @@ def config_needs_setup(config: TuiConfig) -> bool:
     if not config.data_root:
         return True
     return False
+
+
+def update_funding_exchanges(
+    current: List[str], action: str, exchange: str
+) -> tuple[List[str], str]:
+    normalized = []
+    for value in current:
+        name = str(value).strip().lower()
+        if name and name not in normalized:
+            normalized.append(name)
+    target = str(exchange).strip().lower()
+    if not target:
+        return normalized, "Exchange name required."
+    if action == "add":
+        if target in normalized:
+            return normalized, f"{target} already enabled."
+        return [*normalized, target], f"Added {target}."
+    if action == "remove":
+        if target not in normalized:
+            return normalized, f"{target} not in list."
+        return [x for x in normalized if x != target], f"Removed {target}."
+    return normalized, "Usage: exchange add|remove <name> or exchange list"

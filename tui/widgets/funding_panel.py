@@ -1,4 +1,5 @@
 """Funding rates panel with explicit missing-data messaging."""
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -7,7 +8,15 @@ from typing import Any, Dict, List
 from rich.text import Text
 
 from ..feeds.base import FeedResult
-from tui.render.palette import build_text, format_last_good, heading_line, last_updated_line, muted_line, panel_header, status_style
+from tui.render.palette import (
+    build_text,
+    format_last_good,
+    heading_line,
+    last_updated_line,
+    muted_line,
+    panel_header,
+    status_style,
+)
 from .panel_base import PanelBase
 
 
@@ -95,10 +104,17 @@ class FundingPanel(PanelBase):
             last_updated_line(updated_ts_ms, self.palette),
         ]
         if status == "disconnected" or is_lkg:
-            styled_lines.append(muted_line(f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}", self.palette))
+            styled_lines.append(
+                muted_line(
+                    f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}",
+                    self.palette,
+                )
+            )
         errors = payload.get("errors") if isinstance(payload, dict) else None
         if isinstance(errors, list) and errors:
-            styled_lines.append(muted_line("Partial errors: " + "; ".join(errors[:3]), self.palette))
+            styled_lines.append(
+                muted_line("Partial errors: " + "; ".join(errors[:3]), self.palette)
+            )
         styled_lines.extend(self._render_table(rows))
         self.update_text(build_text(styled_lines))
 
@@ -121,7 +137,12 @@ class FundingPanel(PanelBase):
             grouped.setdefault(symbol, []).append(row)
 
         lines: List[Any] = []
-        lines.append(heading_line("Exchange | Symbol | Rate | Annualized | Updated | Status", self.palette))
+        lines.append(
+            heading_line(
+                "Exchange | Symbol | Rate | Annualized | Spread | Updated | Arb | Status",
+                self.palette,
+            )
+        )
         for symbol, group in grouped.items():
             lines.append(muted_line(f"{symbol}", self.palette))
             for row in group:
@@ -138,11 +159,18 @@ class FundingPanel(PanelBase):
         status = str(row.get("status") or "STALE").upper()
         rate_str = self._fmt_rate(rate, interval)
         ann_str = self._fmt_percent(annualized)
+        spread_str = self._fmt_percent(row.get("spread_pct"))
         ts_str = self._fmt_short_ts(timestamp)
+        arb = bool(row.get("arbitrage"))
+        arb_label = "ARB" if arb else "-"
         row_text = Text()
         row_text.append(
-            f"{exchange:<12} | {symbol:<6} | {rate_str:<10} | {ann_str:<10} | {ts_str:<8} | ",
+            f"{exchange:<12} | {symbol:<6} | {rate_str:<10} | {ann_str:<10} | {spread_str:<8} | {ts_str:<8} | ",
             style=self.palette.text.primary,
+        )
+        row_text.append(
+            f"{arb_label:<3} | ",
+            style=f"bold {status_style('ok' if arb else 'empty', self.palette)}",
         )
         row_text.append(
             status,
@@ -156,7 +184,9 @@ class FundingPanel(PanelBase):
             value = float(rate)
         except (TypeError, ValueError):
             return "n/a"
-        suffix = f"/{interval_hours}h" if isinstance(interval_hours, (int, float)) else ""
+        suffix = (
+            f"/{interval_hours}h" if isinstance(interval_hours, (int, float)) else ""
+        )
         return f"{value:+.6f}{suffix}"
 
     @staticmethod

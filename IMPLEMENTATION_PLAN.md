@@ -102,7 +102,7 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-080 | Multi-exchange panel | 1. Implement panel that displays funding rates across exchanges with computed spread and arbitrage flag. 2. Implement arbitrage detection logic using thresholds. 3. Provide commands to add/remove exchanges and refresh data. | Panel renders correctly with sample data; detection logic flags opportunities; tests verify. | `tui/feeds/funding.py`, `tui/widgets/funding_panel.py`, `commands/exchange.py`, `tests/panels/test_multi_exchange.py` | M | Partial - feed + panel exist; arbitrage detection + commands missing. |
+| TT-080 | Multi-exchange panel | 1. Implement panel that displays funding rates across exchanges with computed spread and arbitrage flag. 2. Implement arbitrage detection logic using thresholds. 3. Provide commands to add/remove exchanges and refresh data. | Panel renders correctly with sample data; detection logic flags opportunities; tests verify. | `tui/feeds/funding.py`, `tui/widgets/funding_panel.py`, `tui/app.py`, `tests/panels/test_multi_exchange.py` | M | Done - arbitrage detection + spread column added; exchange commands + refresh added; tests updated. |
 
 ### Epic 10 - Alerts and Notifications
 
