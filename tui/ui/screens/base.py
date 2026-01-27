@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from textual import events
 from textual.screen import Screen
 from textual.widgets import Static, Input
 from textual.containers import Vertical
 
 from tui.ui.widgets.command_bar import CommandBar
+from tui.ui.layout import apply_layout
 
 
 class BaseScreen(Screen):
@@ -33,6 +35,12 @@ class BaseScreen(Screen):
 
     def set_status(self, text: str) -> None:
         self.status.update(text)
+
+    def on_show(self) -> None:
+        apply_layout(self, self.size.width)
+
+    def on_resize(self, event: events.Resize) -> None:
+        apply_layout(self, event.size.width)
 
     def action_focus_command(self) -> None:
         try:

@@ -24,6 +24,22 @@ Screen {
     padding: 1 2;
 }
 
+Screen.layout-ultra #screen_body {
+    padding: 1 4;
+}
+
+Screen.layout-wide #screen_body {
+    padding: 1 3;
+}
+
+Screen.layout-narrow #screen_body {
+    padding: 1 1;
+}
+
+Screen.layout-compact #screen_body {
+    padding: 0 1;
+}
+
 CommandBar {
     dock: bottom;
     height: 3;
