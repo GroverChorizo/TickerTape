@@ -47,6 +47,7 @@ from tui.config import (
 )
 from tui.state.session import load_session_state, save_session_state, get_profile_state
 from tui.ui.screens.home import HomeScreen
+from tui.ui.screens.command_palette import CommandPaletteScreen
 from tui.ui.screens.profile_day_trader import DayTraderScreen
 from tui.ui.screens.profile_funding_arbitrage import FundingArbitrageScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
@@ -77,6 +78,8 @@ class TickerTapeApp(App):
         ("ctrl+p", "focus_command", "Focus command"),
         ("ctrl+h", "go_home", "Home"),
         ("ctrl+comma", "open_settings", "Settings"),
+        ("ctrl+k", "open_palette", "Command palette"),
+        ("/", "open_palette", "Command palette"),
     ]
 
     def __init__(self, config: TuiConfig) -> None:
@@ -179,6 +182,17 @@ class TickerTapeApp(App):
         except Exception:
             pass
         try:
+            palette_input = self.screen.query_one("#palette_input")
+            palette_input.styles.background = palette.bg.panel
+            palette_input.styles.color = palette.text.primary
+        except Exception:
+            pass
+        try:
+            palette_suggestions = self.screen.query_one("#palette_suggestions")
+            palette_suggestions.styles.color = palette.text.primary
+        except Exception:
+            pass
+        try:
             tabbar = self.screen.query_one("#tabbar")
             tabbar.styles.background = palette.bg.panel
             tabbar.styles.color = palette.text.primary
@@ -218,6 +232,10 @@ class TickerTapeApp(App):
 
     def action_open_settings(self) -> None:
         self._open_settings()
+
+    def action_open_palette(self) -> None:
+        context = getattr(self.screen, "command_context", "home")
+        self.push_screen(CommandPaletteScreen(context=context))
 
     def dispatch_command(self, raw: str, *, context: str) -> None:
         text = raw.strip()
@@ -401,6 +419,27 @@ class TickerTapeApp(App):
         if not lines:
             return "No commands registered."
         return "\n".join(lines)
+
+    def palette_suggestions(self, query: str) -> List[str]:
+        query = query.strip().lower()
+        history = list(reversed(self._command_history))
+        command_map = {c.name: c for c in self.command_registry._commands.values()}
+        commands = [
+            f"{name} - {command_map[name].description}"
+            for name in sorted(command_map.keys())
+        ]
+        profiles = [profile.name for profile in list_profiles()]
+        views = ["time", "heatmap", "table"]
+        routes = [
+            "home",
+            "settings",
+            *[f"profile/{p}" for p in profiles],
+            *[f"view/{v}" for v in views],
+        ]
+        items = history + commands + routes
+        if not query:
+            return items[:15]
+        return [item for item in items if query in item.lower()][:15]
 
     def _cmd_home(self, _cmd: str, _args: List[str]) -> Optional[str]:
         self._go_home()

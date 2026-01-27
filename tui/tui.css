@@ -32,6 +32,18 @@ TabCarousel {
     padding: 0 2;
 }
 
+#palette_root {
+    align: center middle;
+    height: 1fr;
+}
+
+CommandPalette {
+    width: 80%;
+    height: 8;
+    padding: 1 2;
+    border: tall;
+}
+
 #content_row {
     height: 1fr;
 }
