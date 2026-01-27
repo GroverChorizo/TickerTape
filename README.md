@@ -48,6 +48,11 @@ Quick commands:
 
     python -m tui.app
 
+  Or after installation:
+
+    TickerTape
+    TTape
+
   The TUI reads local datasets from `data/parquet/`, listens for alerts on `127.0.0.1:8765`,
   and streams live market data for liquidations, funding rates, whale trades, and event stream panels.
   Run ingestion first to populate liquidation snapshots (used by non-live panels) and start the alert

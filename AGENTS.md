@@ -20,10 +20,11 @@ pip install -r requirements.txt
 
 ```bash
 # Launch the TUI application
-python -m ticker_tape
+python -m tui.app
 
 # or, if packaged as a CLI entry point
-ticker-tape
+TickerTape
+TTape
 ```
 
 ## Running Tests
@@ -63,23 +64,23 @@ mypy --config-file mypy.ini .
 
 ```bash
 # Run a minimal backtest from the CLI to verify core functionality
-python -m ticker_tape backtest --data sample.csv --strategy simple
+python -m tui.app backtest --data sample.csv --strategy simple
 
 # Verify Monte Carlo runs
-python -m ticker_tape mc --data sample.csv --strategy simple --runs 100
+python -m tui.app mc --data sample.csv --strategy simple --runs 100
 ```
 
 ## Other Utilities
 
 ```bash
 # Export logs from the current session
-python -m ticker_tape export --logs
+python -m tui.app export --logs
 
 # Diagnose provider connectivity
-python -m ticker_tape diagnose provider
+python -m tui.app diagnose provider
 
 # Validate a dataset snapshot
-python -m ticker_tape validate ticks.csv
+python -m tui.app validate ticks.csv
 ```
 
 Ensure to run these commands after each task implementation to validate correctness.  If any command fails, fix the underlying issue before proceeding to the next task.
