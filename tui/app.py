@@ -47,6 +47,7 @@ from tui.state.session import load_session_state, save_session_state, get_profil
 from tui.ui.screens.home import HomeScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
 from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
+from tui.ui.screens.settings import SettingsScreen
 from tui.ui.screens.views import (
     LiquidationHeatmapView,
     LiquidationTableView,
@@ -60,6 +61,7 @@ class TickerTapeApp(App):
     BINDINGS = [
         ("ctrl+p", "focus_command", "Focus command"),
         ("ctrl+h", "go_home", "Home"),
+        ("ctrl+comma", "open_settings", "Settings"),
     ]
 
     def __init__(self, config: TuiConfig) -> None:
@@ -145,6 +147,9 @@ class TickerTapeApp(App):
 
     def action_go_home(self) -> None:
         self._go_home()
+
+    def action_open_settings(self) -> None:
+        self._open_settings()
 
     def dispatch_command(self, raw: str, *, context: str) -> None:
         text = raw.strip()
@@ -283,6 +288,9 @@ class TickerTapeApp(App):
         self.command_registry.register(
             "secrets", "Open secrets file.", self._cmd_secrets
         )
+        self.command_registry.register(
+            "settings", "Open settings screen.", self._cmd_settings
+        )
 
     def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
         context = getattr(self.screen, "command_context", "home")
@@ -350,6 +358,10 @@ class TickerTapeApp(App):
         suffix = f" ({'; '.join(notes)})" if notes else ""
         return f"Secrets file: {path}{suffix}"
 
+    def _cmd_settings(self, _cmd: str, _args: List[str]) -> Optional[str]:
+        self._open_settings()
+        return None
+
     def _open_route(self, route: Route) -> None:
         if route.kind == "home":
             self._go_home()
@@ -403,6 +415,9 @@ class TickerTapeApp(App):
         self._cache["recent_views"] = recent[:5]
         save_cache(self._cache)
         self._push_or_replace(screen_cls())
+
+    def _open_settings(self) -> None:
+        self._push_or_replace(SettingsScreen())
 
     def _build_profile_screen(self, name: str, label: str):
         if name == "liquidation_hunter":
