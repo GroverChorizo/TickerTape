@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 import time
 
 from tui.ui.screens.base import BaseScreen
@@ -11,6 +11,8 @@ from tui.models.liquidations import LiquidationSnapshot
 from tui.models.market import MarketContext
 from tui.feeds.base import FeedResult
 from tui.render.sparkline import sparkline, heat_bar
+from backend.query_helpers import load_latest_snapshot
+from backend.storage import DatasetRegistry
 
 
 class LiquidationHunterScreen(BaseScreen):
@@ -22,8 +24,10 @@ class LiquidationHunterScreen(BaseScreen):
         )
         self._next_liq_fetch = 0.0
         self._next_market_fetch = 0.0
+        self._next_positions_fetch = 0.0
         self._liq_result: Optional[FeedResult] = None
         self._market_result: Optional[FeedResult] = None
+        self._positions_snapshot: Optional[Dict[str, Any]] = None
 
     def on_mount(self) -> None:
         self.set_header("Liquidation Hunter | LIVE")
@@ -60,6 +64,10 @@ class LiquidationHunterScreen(BaseScreen):
             self._market_result = result
             self._next_market_fetch = now + provider.market_next_delay(result.status)
 
+        if now >= self._next_positions_fetch:
+            self._positions_snapshot = _load_positions_snapshot(self.app)
+            self._next_positions_fetch = now + 10.0
+
         self._render()
 
     def _render(self) -> None:
@@ -91,45 +99,17 @@ class LiquidationHunterScreen(BaseScreen):
             return
 
         if snapshot:
-            lines.append("Rolling totals (1m/5m/15m)")
-            for key in ("1m", "5m", "15m"):
-                roll = snapshot.rollups.get(key)
-                if not roll:
-                    continue
-                lines.append(
-                    f"{key}: {roll.count} liqs | ${roll.notional:,.0f} | L/S {roll.long_count}/{roll.short_count}"
+            lines.extend(
+                _build_liquidation_lines(
+                    snapshot,
+                    self._market_result,
+                    getattr(self.app, "selected_symbol", "BTC"),
+                    self._positions_snapshot,
                 )
-            spark = sparkline(snapshot.series_notional, width=30)
-            if spark:
-                lines.append(f"Notional sparkline: {spark}")
-            lines.append(
-                f"Cascade risk: {snapshot.cascade.level} ({snapshot.cascade.reason})"
             )
-            if result and result.error and result.is_lkg:
-                lines.append(f"Last error: {result.error}")
-                lines.append("Showing last known good data.")
-            lines.append("")
-            lines.append("Recent liquidations")
-            for event in snapshot.events[:8]:
-                lines.append(
-                    f"{_fmt_ts(event.ts_ms)} {event.symbol:<6} {event.side:<9} ${event.notional_usd or 0:,.0f}"
-                )
-            lines.append("")
-            lines_top, symbols = _render_top_symbols(
-                snapshot, getattr(self.app, "selected_symbol", "BTC")
-            )
-            lines.extend(lines_top)
             updater = getattr(self.app, "set_top_symbols", None)
             if updater:
-                updater(symbols)
-            lines.append("")
-            lines.extend(_render_market_context(self._market_result))
-            lines.append("")
-            lines.extend(_render_capture_status(snapshot))
-            lines.append("")
-            lines.append(
-                "Commands: view time | view heatmap | view table | select <symbol|#> | capture on|off"
-            )
+                updater(_collect_symbols(snapshot))
         else:
             lines.append("Waiting for liquidation data...")
         self.body.update("\n".join(lines))
@@ -176,6 +156,106 @@ def _render_market_context(result: Optional[FeedResult]) -> List[str]:
     return lines
 
 
+def _render_heatmap(snapshot: LiquidationSnapshot) -> List[str]:
+    lines: List[str] = ["Liquidation Heatmap (Top 15m)"]
+    top = snapshot.top_symbols.get("15m") or []
+    max_val = max([float(row.get("notional") or 0.0) for row in top], default=1.0)
+    if not top:
+        lines.append("No heatmap data yet.")
+        return lines
+    for row in top[:8]:
+        symbol = str(row.get("symbol") or "?")
+        bar = heat_bar(float(row.get("notional") or 0.0), max_val, width=18)
+        lines.append(f"{symbol:<6} {bar}")
+    return lines
+
+
+def _render_liquidation_distance(positions: List[Dict[str, Any]]) -> List[str]:
+    lines: List[str] = ["Liquidation Distance"]
+    if not positions:
+        lines.append("Positions feed not available yet.")
+        return lines
+    rows = []
+    for pos in positions:
+        symbol = _coerce_str(pos.get("symbol") or pos.get("coin") or pos.get("asset"))
+        liq_price = _coerce_float(
+            pos.get("liquidation_price")
+            or pos.get("liq_price")
+            or pos.get("liquidationPrice")
+        )
+        mark_price = _coerce_float(
+            pos.get("mark_price") or pos.get("price") or pos.get("mark")
+        )
+        side = _coerce_str(pos.get("side") or pos.get("direction") or "")
+        if not symbol or liq_price is None or mark_price is None or mark_price == 0:
+            continue
+        distance_pct = abs(liq_price - mark_price) / mark_price * 100.0
+        rows.append((symbol, side or "?", distance_pct))
+    if not rows:
+        lines.append("No liquidation distance data available.")
+        return lines
+    max_val = max([row[2] for row in rows], default=1.0)
+    for symbol, side, distance_pct in rows[:8]:
+        bar = heat_bar(distance_pct, max_val, width=12)
+        lines.append(f"{symbol:<6} {side:<5} {bar} {distance_pct:.2f}%")
+    return lines
+
+
+def _render_cascade_monitor(snapshot: LiquidationSnapshot) -> List[str]:
+    cascade = snapshot.cascade
+    lines = [
+        "Cascade Monitor",
+        f"Level: {cascade.level} | Score: {cascade.score:.2f}",
+        f"Reason: {cascade.reason}",
+    ]
+    return lines
+
+
+def _build_liquidation_lines(
+    snapshot: LiquidationSnapshot,
+    market_result: Optional[FeedResult],
+    selected_symbol: str,
+    positions_snapshot: Optional[Dict[str, Any]],
+) -> List[str]:
+    lines: List[str] = []
+    lines.append("Rolling totals (1m/5m/15m)")
+    for key in ("1m", "5m", "15m"):
+        roll = snapshot.rollups.get(key)
+        if not roll:
+            continue
+        lines.append(
+            f"{key}: {roll.count} liqs | ${roll.notional:,.0f} | L/S {roll.long_count}/{roll.short_count}"
+        )
+    spark = sparkline(snapshot.series_notional, width=30)
+    if spark:
+        lines.append(f"Notional sparkline: {spark}")
+    lines.append("")
+    lines.extend(_render_cascade_monitor(snapshot))
+    lines.append("")
+    lines.append("Recent liquidations")
+    for event in snapshot.events[:8]:
+        lines.append(
+            f"{_fmt_ts(event.ts_ms)} {event.symbol:<6} {event.side:<9} ${event.notional_usd or 0:,.0f}"
+        )
+    lines.append("")
+    lines_top, _ = _render_top_symbols(snapshot, selected_symbol)
+    lines.extend(lines_top)
+    lines.append("")
+    lines.extend(_render_heatmap(snapshot))
+    lines.append("")
+    positions = _extract_positions(positions_snapshot)
+    lines.extend(_render_liquidation_distance(positions))
+    lines.append("")
+    lines.extend(_render_market_context(market_result))
+    lines.append("")
+    lines.extend(_render_capture_status(snapshot))
+    lines.append("")
+    lines.append(
+        "Commands: view time | view heatmap | view table | select <symbol|#> | capture on|off"
+    )
+    return lines
+
+
 def _render_capture_status(snapshot: LiquidationSnapshot) -> List[str]:
     capture = snapshot.capture
     status = "ON" if capture.enabled else "OFF"
@@ -189,6 +269,35 @@ def _render_capture_status(snapshot: LiquidationSnapshot) -> List[str]:
         lines.append(f"path={capture.base_path}")
     lines.append("Backtests use local data only.")
     return lines
+
+
+def _collect_symbols(snapshot: LiquidationSnapshot) -> List[str]:
+    top = snapshot.top_symbols.get("15m") or snapshot.top_symbols.get("5m") or []
+    return [str(row.get("symbol") or "?") for row in top]
+
+
+def _load_positions_snapshot(app) -> Optional[Dict[str, Any]]:
+    try:
+        registry = DatasetRegistry(path=app.config.data_root / "_registry.json")
+    except Exception:
+        return None
+    return load_latest_snapshot(registry, "feed=positions", "live")
+
+
+def _extract_positions(snapshot: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    if not isinstance(snapshot, dict):
+        return []
+    for key in ("positions", "data", "rows", "items"):
+        value = snapshot.get(key)
+        if isinstance(value, list):
+            return [row for row in value if isinstance(row, dict)]
+    if isinstance(snapshot.get("snapshot"), dict):
+        inner = snapshot["snapshot"]
+        for key in ("positions", "data", "rows", "items"):
+            value = inner.get(key)
+            if isinstance(value, list):
+                return [row for row in value if isinstance(row, dict)]
+    return []
 
 
 def _status_label(result: Optional[FeedResult]) -> str:
@@ -235,3 +344,20 @@ def _fmt_num(value: Optional[float]) -> str:
     if abs(value) >= 1000:
         return f"{value:,.2f}"
     return f"{value:.4f}"
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _coerce_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        text = str(value).strip()
+    except Exception:
+        return None
+    return text or None

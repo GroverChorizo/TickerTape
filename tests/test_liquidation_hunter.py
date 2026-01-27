@@ -13,6 +13,11 @@ from tui.feeds.liquidations import (
     _normalize_timeframe_stats,
 )
 from tui.widgets.liquidations_radar import LiquidationsRadarPanel
+from tui.ui.screens.profile_liquidation import (
+    _build_liquidation_lines,
+    _render_liquidation_distance,
+)
+from tui.models.liquidations import LiquidationSnapshot
 from tui.state.profiles import get_profile
 
 
@@ -101,3 +106,53 @@ def test_liquidations_feed_failure_does_not_raise(tmp_path):
     feed = LiquidationsRadarFeed(DummyClient(), registry=registry)
     result = feed.fetch_result()
     assert result.status in {"error", "disconnected"}
+
+
+def test_liquidation_distance_section():
+    positions = [
+        {
+            "symbol": "BTC",
+            "liquidation_price": 9000,
+            "mark_price": 10000,
+            "side": "long",
+        }
+    ]
+    lines = _render_liquidation_distance(positions)
+    assert lines[0] == "Liquidation Distance"
+    assert any("BTC" in line for line in lines[1:])
+
+
+def test_liquidation_hunter_build_lines_sections():
+    payload = {
+        "events": [
+            {
+                "ts_ms": 1,
+                "symbol": "BTC",
+                "side": "long_liq",
+                "notional_usd": 1000,
+                "price": 100,
+                "size": 10,
+                "source": "moondev",
+                "liquidated_wallet": None,
+            }
+        ],
+        "rollups": {
+            "1m": {"count": 1, "notional": 1000, "long_count": 1, "short_count": 0}
+        },
+        "series": {"notional": [1000.0], "count": [1.0]},
+        "cascade": {"level": "LOW", "score": 0.0, "reason": "ok"},
+        "top_symbols": {"15m": [{"symbol": "BTC", "notional": 1000}]},
+        "errors": [],
+        "capture": {
+            "enabled": False,
+            "dataset": "",
+            "timeframe": "",
+            "file_count": 0,
+            "total_bytes": 0,
+        },
+    }
+    snapshot = LiquidationSnapshot.from_payload(payload)
+    lines = _build_liquidation_lines(snapshot, None, "BTC", None)
+    text = "\n".join(lines)
+    assert "Liquidation Heatmap" in text
+    assert "Liquidation Distance" in text
