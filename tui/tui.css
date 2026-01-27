@@ -2,16 +2,6 @@ Screen {
     background: transparent;
 }
 
-Screen.density-compact {
-    --tt-pad-x: 1;
-    --tt-pad-y: 0;
-}
-
-Screen.density-comfortable {
-    --tt-pad-x: 2;
-    --tt-pad-y: 1;
-}
-
 #screen_root {
     height: 1fr;
 }
