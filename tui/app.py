@@ -48,6 +48,7 @@ from tui.config import (
 from tui.state.session import load_session_state, save_session_state, get_profile_state
 from tui.ui.screens.home import HomeScreen
 from tui.ui.screens.profile_day_trader import DayTraderScreen
+from tui.ui.screens.profile_funding_arbitrage import FundingArbitrageScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
 from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
 from tui.ui.screens.profile_whale_watcher import WhaleWatcherScreen
@@ -569,6 +570,8 @@ class TickerTapeApp(App):
             return LiquidationHunterScreen()
         if name == "whale_watcher":
             return WhaleWatcherScreen()
+        if name == "funding_arbitrage":
+            return FundingArbitrageScreen()
         return PlaceholderProfileScreen(name, label)
 
     def _go_home(self) -> None:
