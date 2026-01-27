@@ -1,6 +1,7 @@
 """Provider package scaffolding."""
 
 from .base import Provider
+from .hyperliquid import HyperliquidProvider
 from .models import (
     FundingRate,
     LiquidationEvent,
@@ -13,6 +14,7 @@ from .models import (
 
 __all__ = [
     "FundingRate",
+    "HyperliquidProvider",
     "LiquidationEvent",
     "OrderBookLevel",
     "OrderBookSnapshot",
