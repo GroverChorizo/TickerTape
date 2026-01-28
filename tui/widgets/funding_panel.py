@@ -7,7 +7,7 @@ from typing import Any, Dict, List
 
 from rich.text import Text
 
-from ..feeds.base import FeedResult
+from ..feeds.base import FeedResult, FeedStatus, _as_status
 from tui.render.palette import (
     build_text,
     format_last_good,
@@ -30,18 +30,18 @@ class FundingPanel(PanelBase):
         self.refresh_panel()
 
     def refresh_panel(self) -> None:
-        status = self.feed_result.status
-        if status == "loading":
+        status = _as_status(self.feed_result.status)
+        if status == FeedStatus.LOADING:
             self.render_loading()
             return
-        if status in {"error", "disconnected"} and not self.feed_result.data:
+        if status in {FeedStatus.ERROR, FeedStatus.DISCONNECTED} and not self.feed_result.data:
             self.render_error(
                 self.feed_result.error or "Unknown error",
                 hint="Check API base URL or endpoint availability.",
                 updated_ts_ms=self.feed_result.updated_ts_ms,
             )
             return
-        if status == "empty" and not self.feed_result.data:
+        if status == FeedStatus.EMPTY and not self.feed_result.data:
             self.render_empty("No data yet.")
             return
         self.render_data(
@@ -52,27 +52,27 @@ class FundingPanel(PanelBase):
         )
 
     def render_loading(self) -> None:
-        self.set_status_class("loading")
+        self.set_status_class(FeedStatus.LOADING.value)
         lines = [
-            panel_header(self.title, "loading", self.palette),
+            panel_header(self.title, FeedStatus.LOADING.value, self.palette),
             last_updated_line(self.feed_result.updated_ts_ms, self.palette),
             muted_line("Loading funding rates...", self.palette),
         ]
         self.update_text(build_text(lines))
 
     def render_empty(self, reason: str) -> None:
-        self.set_status_class("empty")
+        self.set_status_class(FeedStatus.EMPTY.value)
         lines = [
-            panel_header(self.title, "empty", self.palette),
+            panel_header(self.title, FeedStatus.EMPTY.value, self.palette),
             last_updated_line(self.feed_result.updated_ts_ms, self.palette),
             muted_line(f"No data. {reason}", self.palette),
         ]
         self.update_text(build_text(lines))
 
     def render_error(self, error: str, hint: str, updated_ts_ms: int | None) -> None:
-        self.set_status_class("error")
+        self.set_status_class(FeedStatus.ERROR.value)
         lines = [
-            panel_header(self.title, "error", self.palette),
+            panel_header(self.title, FeedStatus.ERROR.value, self.palette),
             last_updated_line(updated_ts_ms, self.palette),
             (error, self.palette.text.primary),
             (f"Hint: {hint}", self.palette.text.muted),
@@ -97,13 +97,13 @@ class FundingPanel(PanelBase):
             self.update_text(build_text(lines))
             return
         lines: List[tuple[str, str] | Any] = []
-        self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        status_value = "disconnected" if status == "disconnected" else "ok"
+        self.set_status_class(FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value)
+        status_value = FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         styled_lines = [
             panel_header(self.title, status_value, self.palette),
             last_updated_line(updated_ts_ms, self.palette),
         ]
-        if status == "disconnected" or is_lkg:
+        if status == FeedStatus.DISCONNECTED or is_lkg:
             styled_lines.append(
                 muted_line(
                     f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}",

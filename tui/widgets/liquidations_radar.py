@@ -14,7 +14,7 @@ from tui.render.palette import (
     panel_header,
 )
 from tui.render.sparkline import sparkline
-from tui.feeds.base import FeedResult
+from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from .panel_base import PanelBase
 
 
@@ -33,18 +33,18 @@ class LiquidationsRadarPanel(PanelBase):
         self.refresh_panel()
 
     def refresh_panel(self) -> None:
-        status = self.feed_result.status
-        if status == "loading":
+        status = _as_status(self.feed_result.status)
+        if status == FeedStatus.LOADING:
             self._render_loading()
             return
-        if status in {"error", "disconnected"} and not self.feed_result.data:
+        if status in {FeedStatus.ERROR, FeedStatus.DISCONNECTED} and not self.feed_result.data:
             self._render_error(
                 self.feed_result.error or "Unknown error",
                 hint="Check API key or endpoint availability.",
                 updated_ts_ms=self.feed_result.updated_ts_ms,
             )
             return
-        if status == "empty" and not self.feed_result.data:
+        if status == FeedStatus.EMPTY and not self.feed_result.data:
             self._render_empty("No data yet.")
             return
         self._render_data(self.feed_result)
@@ -87,14 +87,15 @@ class LiquidationsRadarPanel(PanelBase):
         events = payload.get("events", []) if isinstance(payload, dict) else []
         errors = payload.get("errors", []) if isinstance(payload, dict) else []
 
+        status = _as_status(result.status)
         self.set_status_class(
-            "disconnected" if result.status == "disconnected" else "ok"
+            FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         )
-        status_value = "disconnected" if result.status == "disconnected" else "ok"
+        status_value = FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         lines: List[tuple[str, str]] = []
         lines.append(panel_header(self.title, status_value, self.palette))
         lines.append(last_updated_line(result.updated_ts_ms, self.palette))
-        if result.status == "disconnected" or result.is_lkg:
+        if status == FeedStatus.DISCONNECTED or result.is_lkg:
             stale = _fmt_stale(result.updated_ts_ms)
             lines.append(
                 muted_line(f"Showing last known data. Stale {stale}", self.palette)

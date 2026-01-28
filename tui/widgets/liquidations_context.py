@@ -12,7 +12,7 @@ from tui.render.palette import (
     muted_line,
     panel_header,
 )
-from tui.feeds.base import FeedResult
+from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from .panel_base import PanelBase
 
 
@@ -41,28 +41,28 @@ class LiquidationsContextPanel(PanelBase):
         self.refresh_panel()
 
     def refresh_panel(self) -> None:
-        status = self._liq_result.status
-        if status == "loading":
+        status = _as_status(self._liq_result.status)
+        if status == FeedStatus.LOADING:
             self._render_loading()
             return
-        if status in {"error", "disconnected"} and not self._liq_result.data:
+        if status in {FeedStatus.ERROR, FeedStatus.DISCONNECTED} and not self._liq_result.data:
             self._render_error(self._liq_result.error or "Unknown error")
             return
         self._render_data()
 
     def _render_loading(self) -> None:
-        self.set_status_class("loading")
+        self.set_status_class(FeedStatus.LOADING.value)
         lines = [
-            panel_header(self.title, "loading", self.palette),
+            panel_header(self.title, FeedStatus.LOADING.value, self.palette),
             last_updated_line(self._liq_result.updated_ts_ms, self.palette),
             muted_line("Loading microstructure context...", self.palette),
         ]
         self.update_text(build_text(lines))
 
     def _render_error(self, error: str) -> None:
-        self.set_status_class("error")
+        self.set_status_class(FeedStatus.ERROR.value)
         lines = [
-            panel_header(self.title, "error", self.palette),
+            panel_header(self.title, FeedStatus.ERROR.value, self.palette),
             last_updated_line(self._liq_result.updated_ts_ms, self.palette),
             (error, self.palette.text.primary),
             ("Hint: Check API key or endpoint availability.", self.palette.text.muted),
@@ -70,16 +70,17 @@ class LiquidationsContextPanel(PanelBase):
         self.update_text(build_text(lines))
 
     def _render_data(self) -> None:
+        status = _as_status(self._liq_result.status)
         self.set_status_class(
-            "disconnected" if self._liq_result.status == "disconnected" else "ok"
+            FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         )
         status_value = (
-            "disconnected" if self._liq_result.status == "disconnected" else "ok"
+            FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         )
         lines: List[tuple[str, str]] = []
         lines.append(panel_header(self.title, status_value, self.palette))
         lines.append(last_updated_line(self._liq_result.updated_ts_ms, self.palette))
-        if self._liq_result.status == "disconnected" or self._liq_result.is_lkg:
+        if status == FeedStatus.DISCONNECTED or self._liq_result.is_lkg:
             lines.append(
                 muted_line(
                     f"Showing last known data. Stale {_fmt_stale(self._liq_result.updated_ts_ms)}",

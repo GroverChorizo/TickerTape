@@ -9,7 +9,7 @@ import time
 from tui.ui.screens.base import BaseScreen
 from tui.models.liquidations import LiquidationSnapshot
 from tui.models.market import MarketContext
-from tui.feeds.base import FeedResult
+from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from tui.render.sparkline import sparkline, heat_bar
 from backend.query_helpers import load_latest_snapshot
 from backend.storage import DatasetRegistry
@@ -44,7 +44,8 @@ class LiquidationHunterScreen(BaseScreen):
         if now >= self._next_liq_fetch:
             result = provider.get_liquidations()
             self._liq_result = result
-            self._next_liq_fetch = now + provider.liquidation_next_delay(result.status)
+            status = _as_status(result.status)
+            self._next_liq_fetch = now + provider.liquidation_next_delay(status.value)
             if isinstance(result.data, LiquidationSnapshot):
                 store.update_snapshot(
                     "liquidation_hunter",
@@ -62,7 +63,8 @@ class LiquidationHunterScreen(BaseScreen):
             symbol = getattr(self.app, "selected_symbol", "BTC") or "BTC"
             result = provider.get_market_context(symbol)
             self._market_result = result
-            self._next_market_fetch = now + provider.market_next_delay(result.status)
+            status = _as_status(result.status)
+            self._next_market_fetch = now + provider.market_next_delay(status.value)
 
         if now >= self._next_positions_fetch:
             self._positions_snapshot = _load_positions_snapshot(self.app)
@@ -88,7 +90,7 @@ class LiquidationHunterScreen(BaseScreen):
         if (
             result
             and result.error
-            and result.status in {"error", "disconnected"}
+            and _as_status(result.status) in {FeedStatus.ERROR, FeedStatus.DISCONNECTED}
             and not snapshot
         ):
             lines.append(f"ERROR: {result.error}")
@@ -148,7 +150,7 @@ def _render_market_context(result: Optional[FeedResult]) -> List[str]:
                 f"funding={_fmt_num(context.funding_rate)} oi={_fmt_num(context.open_interest)}"
             )
         return lines
-    if result and result.error and result.status in {"error", "disconnected"}:
+    if result and result.error and _as_status(result.status) in {FeedStatus.ERROR, FeedStatus.DISCONNECTED}:
         lines.append(f"ERROR: {result.error}")
         lines.append("Hint: market context uses price/orderbook endpoints.")
     else:
@@ -303,13 +305,14 @@ def _extract_positions(snapshot: Optional[Dict[str, Any]]) -> List[Dict[str, Any
 def _status_label(result: Optional[FeedResult]) -> str:
     if result is None:
         return "LOADING"
-    if result.status == "ok":
+    status = _as_status(result.status)
+    if status == FeedStatus.OK:
         return "LIVE"
-    if result.status == "empty":
+    if status == FeedStatus.EMPTY:
         return "NO DATA"
-    if result.status in {"error", "disconnected"} and result.is_lkg:
+    if status in {FeedStatus.ERROR, FeedStatus.DISCONNECTED} and result.is_lkg:
         return "STALE"
-    if result.status == "disconnected":
+    if status == FeedStatus.DISCONNECTED:
         return "DISCONNECTED"
     return "ERROR"
 
@@ -328,7 +331,8 @@ def _status_line(result: Optional[FeedResult], now_ms: int) -> str:
     if result.is_lkg and updated:
         stale_s = int((now_ms - updated) / 1000)
         stale = f" | STALE +{stale_s}s"
-    return f"Status: {result.status} | Last update: {updated_str}{stale}"
+    status = _as_status(result.status)
+    return f"Status: {status.value} | Last update: {updated_str}{stale}"
 
 
 def _fmt_ts(ts_ms: Optional[int]) -> str:

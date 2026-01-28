@@ -13,7 +13,7 @@ from tui.render.palette import (
     panel_header,
 )
 from tui.render.sparkline import heat_bar
-from tui.feeds.base import FeedResult
+from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from .panel_base import PanelBase
 
 
@@ -43,14 +43,14 @@ class LiquidationsTopPanel(PanelBase):
         return token.upper()
 
     def refresh_panel(self) -> None:
-        status = self.feed_result.status
-        if status == "loading":
+        status = _as_status(self.feed_result.status)
+        if status == FeedStatus.LOADING:
             self._render_loading()
             return
-        if status in {"error", "disconnected"} and not self.feed_result.data:
+        if status in {FeedStatus.ERROR, FeedStatus.DISCONNECTED} and not self.feed_result.data:
             self._render_error(self.feed_result.error or "Unknown error")
             return
-        if status == "empty" and not self.feed_result.data:
+        if status == FeedStatus.EMPTY and not self.feed_result.data:
             self._render_empty("No data yet.")
             return
         self._render_data()
@@ -89,16 +89,17 @@ class LiquidationsTopPanel(PanelBase):
         top_15m = top.get("15m", []) if isinstance(top, dict) else []
         top_5m = top.get("5m", []) if isinstance(top, dict) else []
 
+        status = _as_status(self.feed_result.status)
         self.set_status_class(
-            "disconnected" if self.feed_result.status == "disconnected" else "ok"
+            FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         )
         status_value = (
-            "disconnected" if self.feed_result.status == "disconnected" else "ok"
+            FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         )
         lines: List[tuple[str, str]] = []
         lines.append(panel_header(self.title, status_value, self.palette))
         lines.append(last_updated_line(self.feed_result.updated_ts_ms, self.palette))
-        if self.feed_result.status == "disconnected" or self.feed_result.is_lkg:
+        if status == FeedStatus.DISCONNECTED or self.feed_result.is_lkg:
             lines.append(
                 muted_line(
                     f"Showing last known data. Stale {_fmt_stale(self.feed_result.updated_ts_ms)}",

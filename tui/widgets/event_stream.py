@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import List
 
-from ..feeds.base import FeedResult
+from ..feeds.base import FeedResult, FeedStatus, _as_status
 from tui.render.palette import (
     build_text,
     format_last_good,
@@ -27,18 +27,18 @@ class EventStream(PanelBase):
         self.refresh_panel()
 
     def refresh_panel(self) -> None:
-        status = self.feed_result.status
-        if status == "loading":
+        status = _as_status(self.feed_result.status)
+        if status == FeedStatus.LOADING:
             self.render_loading()
             return
-        if status in {"error", "disconnected"} and not self.feed_result.data:
+        if status in {FeedStatus.ERROR, FeedStatus.DISCONNECTED} and not self.feed_result.data:
             self.render_error(
                 self.feed_result.error or "Unknown error",
                 hint="Check API base URL or endpoint availability.",
                 updated_ts_ms=self.feed_result.updated_ts_ms,
             )
             return
-        if status == "empty" and not self.feed_result.data:
+        if status == FeedStatus.EMPTY and not self.feed_result.data:
             self.render_empty("No data yet.")
             return
         self.render_data(
@@ -97,11 +97,11 @@ class EventStream(PanelBase):
             self.update_text(build_text(lines))
             return
         styled_lines: List[tuple[str, str]] = []
-        self.set_status_class("disconnected" if status == "disconnected" else "ok")
-        status_value = "disconnected" if status == "disconnected" else "ok"
+        self.set_status_class(FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value)
+        status_value = FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else FeedStatus.OK.value
         styled_lines.append(panel_header(self.title, status_value, self.palette))
         styled_lines.append(last_updated_line(updated_ts_ms, self.palette))
-        if status == "disconnected" or is_lkg:
+        if status == FeedStatus.DISCONNECTED or is_lkg:
             styled_lines.append(
                 muted_line(
                     f"Showing last known data. Last good: {format_last_good(updated_ts_ms)}",

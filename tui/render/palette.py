@@ -8,6 +8,7 @@ from typing import Iterable, List, Tuple, Union
 from rich.text import Text
 
 from tui.themes.palettes import Palette
+from tui.feeds.base import FeedStatus
 
 
 RenderableLine = Union[Tuple[str, str | None], Text]
@@ -29,7 +30,8 @@ def build_text(lines: Iterable[RenderableLine]) -> Text:
     return text
 
 
-def format_status_label(status: str) -> str:
+def format_status_label(status: str | FeedStatus) -> str:
+    s = status.value if isinstance(status, FeedStatus) else status
     labels = {
         "ok": "LIVE",
         "loading": "LOADING",
@@ -37,23 +39,24 @@ def format_status_label(status: str) -> str:
         "error": "ERROR",
         "disconnected": "DISCONNECTED",
     }
-    return labels.get(status, status.upper())
+    return labels.get(s, s.upper())
 
 
-def status_style(status: str, palette: Palette) -> str:
-    if status == "ok":
+def status_style(status: str | FeedStatus, palette: Palette) -> str:
+    s = status.value if isinstance(status, FeedStatus) else status
+    if s == "ok":
         return palette.accent.green
-    if status == "live":
+    if s == "live":
         return palette.accent.green
-    if status == "loading":
+    if s == "loading":
         return palette.accent.purple
-    if status == "disconnected":
+    if s == "disconnected":
         return palette.accent.orange
-    if status == "stale":
+    if s == "stale":
         return palette.accent.orange
-    if status == "error":
+    if s == "error":
         return palette.accent.orange
-    if status == "empty":
+    if s == "empty":
         return palette.text.muted
     return palette.text.primary
 

@@ -7,7 +7,7 @@ import time
 from typing import Optional
 
 from tui.render.palette import build_text, last_updated_line, muted_line, panel_header
-from tui.feeds.base import FeedResult
+from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from .panel_base import PanelBase
 
 
@@ -21,11 +21,11 @@ class CaptureStatusPanel(PanelBase):
         self.refresh_panel()
 
     def refresh_panel(self) -> None:
-        status = self.feed_result.status
-        if status == "loading":
+        status = _as_status(self.feed_result.status)
+        if status == FeedStatus.LOADING:
             self._render_loading()
             return
-        if status in {"error", "disconnected"} and not self.feed_result.data:
+        if status in {FeedStatus.ERROR, FeedStatus.DISCONNECTED} and not self.feed_result.data:
             self._render_error(self.feed_result.error or "Unknown error")
             return
         self._render_data()
@@ -40,9 +40,9 @@ class CaptureStatusPanel(PanelBase):
         self.update_text(build_text(lines))
 
     def _render_error(self, error: str) -> None:
-        self.set_status_class("error")
+        self.set_status_class(FeedStatus.ERROR.value)
         lines = [
-            panel_header(self.title, "error", self.palette),
+            panel_header(self.title, FeedStatus.ERROR.value, self.palette),
             last_updated_line(self.feed_result.updated_ts_ms, self.palette),
             (error, self.palette.text.primary),
             ("Hint: Check capture command and storage path.", self.palette.text.muted),
@@ -50,21 +50,20 @@ class CaptureStatusPanel(PanelBase):
         self.update_text(build_text(lines))
 
     def _render_data(self) -> None:
+        status = _as_status(self.feed_result.status)
         payload = self.feed_result.data or {}
         capture = payload.get("capture") if isinstance(payload, dict) else None
         enabled = capture.get("enabled") if isinstance(capture, dict) else False
-        status_value = "ok" if enabled else "empty"
+        status_value = FeedStatus.OK.value if enabled else FeedStatus.EMPTY.value
         self.set_status_class(
-            "disconnected"
-            if self.feed_result.status == "disconnected"
-            else status_value
+            FeedStatus.DISCONNECTED.value if status == FeedStatus.DISCONNECTED else status_value
         )
-        header_status = "ok" if enabled else "empty"
+        header_status = status_value
         lines = [
             panel_header(self.title, header_status, self.palette),
             last_updated_line(self.feed_result.updated_ts_ms, self.palette),
         ]
-        if self.feed_result.status == "disconnected" or self.feed_result.is_lkg:
+        if status == FeedStatus.DISCONNECTED or self.feed_result.is_lkg:
             lines.append(
                 muted_line(
                     f"Showing last known data. Stale {_fmt_stale(self.feed_result.updated_ts_ms)}",
