@@ -10,11 +10,15 @@ class DummyFeed(BaseFeed):
         self._payloads = list(payloads)
 
     def fetch(self):
+        # Follow the explicit contract: return None when no new data is available
         if not self._payloads:
-            return {}
+            return None
         value = self._payloads.pop(0)
         if isinstance(value, Exception):
             raise value
+        # Treat an empty mapping as no-new-data for test fixtures
+        if value == {}:
+            return None
         return value
 
 
