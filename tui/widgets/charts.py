@@ -56,16 +56,53 @@ class BarChartWidget(Static):
 
 
 class TableWidget(Static):
-    """Minimal table renderer."""
+    """Minimal table renderer with numeric formatting and heat indicators.
+
+    update_table supports:
+    - headers: list of column headers
+    - rows: list of rows where each row is a sequence of values
+    - numeric_cols: optional sequence of column indices that should be formatted as numbers
+    - heat_cols: optional mapping of column index -> max_value for rendering heat bars
+    - width: width for heat bars
+    """
 
     def update_table(
-        self, headers: Sequence[str], rows: Sequence[Sequence[str]]
+        self,
+        headers: Sequence[str],
+        rows: Sequence[Sequence],
+        *,
+        numeric_cols: Sequence[int] | None = None,
+        heat_cols: dict[int, float] | None = None,
+        heat_width: int = 6,
     ) -> None:
         lines: List[str] = []
         if headers:
             lines.append(" | ".join(headers))
+        numeric_cols = list(numeric_cols or [])
+        heat_cols = dict(heat_cols or {})
         for row in rows:
-            lines.append(" | ".join(str(cell) for cell in row))
+            formatted_cells: List[str] = []
+            for i, cell in enumerate(row):
+                if i in numeric_cols:
+                    # format numeric with sign for floats
+                    try:
+                        v = float(cell)
+                        cell_str = f"{v:+.4f}" if abs(v) >= 1 else f"{v:+.6f}"
+                    except Exception:
+                        cell_str = str(cell)
+                else:
+                    cell_str = str(cell)
+                # append heat bar if requested
+                if i in heat_cols:
+                    try:
+                        val = abs(float(row[i]))
+                    except Exception:
+                        val = 0.0
+                    max_val = float(heat_cols.get(i) or 1.0)
+                    bar = heat_bar(val, max_val, width=heat_width)
+                    cell_str = f"{cell_str} {bar}"
+                formatted_cells.append(cell_str)
+            lines.append(" | ".join(formatted_cells))
         if not lines:
             lines.append("No data.")
         self.update(Text("\n".join(lines)))
