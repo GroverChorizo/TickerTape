@@ -16,6 +16,15 @@ class FeedStatus(str, Enum):
     ERROR = "error"
     DISCONNECTED = "disconnected"
 
+
+def _as_status(status: Union[FeedStatus, str]) -> FeedStatus:
+    if isinstance(status, FeedStatus):
+        return status
+    try:
+        return FeedStatus(status)
+    except Exception:
+        return FeedStatus.ERROR
+
 logger = logging.getLogger(__name__)
 
 
@@ -158,3 +167,17 @@ class BaseFeed:
         else:
             logger.warning(payload)
         return result
+
+    def push(self, payload: Any) -> FeedResult:
+        """Accept a pushed payload (e.g., from a stream) and record it as OK.
+
+        This method is safe to call from streaming supervisors and will update
+        internal last-known-good data and timestamps.
+        """
+        now_ms = int(time.time() * 1000)
+        self._lkg = payload
+        self._last_update_ts = now_ms
+        self._backoff = 1.0
+        return self._record_result(
+            FeedResult(status=FeedStatus.OK, data=payload, updated_ts_ms=now_ms)
+        )
