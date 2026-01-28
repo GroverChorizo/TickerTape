@@ -165,6 +165,7 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 | TT-100 | Table styling & heat rows (Funding panel) | 1. Add numeric sign colorization (green/red) for rate, spread and annualized columns. 2. Add a compact heat indicator for `annualized_pct` showing relative magnitude. 3. Unit test verifying styled output for positive and negative values. | Funding panel table shows colored numbers and a heat indicator; unit test verifies presence of formatted values and ARB label. | `tui/widgets/funding_panel.py`, `tui/render/palette.py`, `tests/widgets/test_funding_table_style.py` | S | Done - initial styling and heat indicator added; more panels to follow. |
 
 | TT-101 | Shared TableWidget & apply to other panels | 1. Enhance `TableWidget` to support numeric formatting and heat indicators. 2. Add unit tests for `TableWidget`. 3. Plan follow-up to replace per-panel formatting with shared widget. | `TableWidget` supports numeric_cols and heat_cols; tests verify numeric formatting and presence of heat bars. | `tui/widgets/charts.py`, `tests/widgets/test_table_widget.py` | S | Done - shared TableWidget enhanced and tests added; follow-ups planned. |
+| TT-102 | Jobs CLI & UI | 1. Add `:jobs list` and `:jobs show <id>` commands; 2. Add a minimal Jobs screen. | `:jobs list` runs and `:jobs show <id>` shows run metadata; unit tests included. | `commands/jobs.py`, `tui/ui/screens/jobs.py`, `tests/commands/test_jobs.py` | S | Done - CLI commands and tests added (UI screen stub added). |
 
 ## Definition of Done (unchanged)
 
