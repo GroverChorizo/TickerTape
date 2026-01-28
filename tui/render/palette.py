@@ -94,3 +94,23 @@ def panel_header(title: str, status: str, palette: Palette) -> Text:
 def last_updated_line(updated_ts_ms: int | None, palette: Palette) -> Tuple[str, str]:
     label = "never" if not updated_ts_ms else format_last_good(updated_ts_ms)
     return (f"Last updated: {label}", palette.text.muted)
+
+
+def numeric_style_for(value: float | None, palette: Palette) -> str:
+    """Return a style string for numeric sign coloring."""
+    try:
+        v = float(value) if value is not None else 0.0
+    except (TypeError, ValueError):
+        return palette.text.primary
+    if v > 0:
+        return f"bold {palette.accent.green}"
+    if v < 0:
+        return f"bold {palette.accent.red}"
+    return palette.text.primary
+
+
+def format_signed_percent(value: float | None) -> str:
+    try:
+        return f"{float(value):+.2f}%"
+    except (TypeError, ValueError):
+        return "n/a"

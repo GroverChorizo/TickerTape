@@ -126,6 +126,18 @@ class FundingPanel(PanelBase):
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
 
     def _render_table(self, rows: List[Dict[str, Any]]) -> List[Any]:
+        # compute scaling for annualized heat indicator
+        max_ann = 0.0
+        for r in rows:
+            try:
+                v = abs(float(r.get("annualized_pct") or 0.0))
+            except Exception:
+                v = 0.0
+            if v > max_ann:
+                max_ann = v
+        if max_ann <= 0:
+            max_ann = 1.0
+
         sorted_rows = sorted(
             rows,
             key=lambda row: abs(row.get("annualized_pct") or 0.0),
@@ -146,10 +158,10 @@ class FundingPanel(PanelBase):
         for symbol, group in grouped.items():
             lines.append(muted_line(f"{symbol}", self.palette))
             for row in group:
-                lines.append(self._format_row(row))
+                lines.append(self._format_row(row, max_ann))
         return lines
 
-    def _format_row(self, row: Dict[str, Any]):
+    def _format_row(self, row: Dict[str, Any], max_ann: float):
         exchange = str(row.get("exchange") or "?")
         symbol = str(row.get("symbol") or "?")
         rate = row.get("rate")
@@ -163,11 +175,36 @@ class FundingPanel(PanelBase):
         ts_str = self._fmt_short_ts(timestamp)
         arb = bool(row.get("arbitrage"))
         arb_label = "ARB" if arb else "-"
+
+        # styles for numeric columns
+        from tui.render.palette import numeric_style_for
+        from tui.render.sparkline import heat_bar
+
+        rate_style = numeric_style_for(rate, self.palette)
+        spread_style = numeric_style_for(row.get("spread_pct"), self.palette)
+        ann_style = numeric_style_for(annualized, self.palette)
+
+        ann_val = 0.0
+        try:
+            ann_val = float(annualized or 0.0)
+        except Exception:
+            ann_val = 0.0
+        ann_bar = heat_bar(abs(ann_val), max_ann, width=6)
+
         row_text = Text()
         row_text.append(
-            f"{exchange:<12} | {symbol:<6} | {rate_str:<10} | {ann_str:<10} | {spread_str:<8} | {ts_str:<8} | ",
+            f"{exchange:<12} | {symbol:<6} | ",
             style=self.palette.text.primary,
         )
+        row_text.append(f"{rate_str:<10}", style=rate_style)
+        row_text.append(" | ", style=self.palette.text.primary)
+        row_text.append(f"{ann_str:<8}", style=ann_style)
+        row_text.append(" ")
+        row_text.append(ann_bar, style=f"{self.palette.accent.purple}")
+        row_text.append(" | ", style=self.palette.text.primary)
+        row_text.append(f"{spread_str:<8}", style=spread_style)
+        row_text.append(" | ", style=self.palette.text.primary)
+        row_text.append(f"{ts_str:<8} | ", style=self.palette.text.primary)
         row_text.append(
             f"{arb_label:<3} | ",
             style=f"bold {status_style('ok' if arb else 'empty', self.palette)}",

@@ -156,6 +156,14 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 |----|-------|-------|--------------------|---------------|------------|--------|
 | TT-099 | Minimal backtest runner & TUI command | 1. Implement a lightweight backtest runner capable of executing a simple strategy script against historical snapshots (`backtesting/runner.py`). 2. Add a `:backtest run <file>` command that executes the runner, stores provenance (TT‑095) and writes a `BacktestResult`. 3. Add a simple result panel to display equity curve and summary metrics. | Running `:backtest run example_strategy.py` completes within 10s for fixture data, writes provenance and result files, and opens a result panel. | `backtesting/runner.py`, `commands/backtest.py`, `ui/panels/backtest.py`, `tests/backtesting/test_runner.py` | L | Done - Minimal runner, command and panel added; tests included. |
 
+---
+
+### Epic 16 - Tables & Data Visualization (Phase 1) 🧾
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-100 | Table styling & heat rows (Funding panel) | 1. Add numeric sign colorization (green/red) for rate, spread and annualized columns. 2. Add a compact heat indicator for `annualized_pct` showing relative magnitude. 3. Unit test verifying styled output for positive and negative values. | Funding panel table shows colored numbers and a heat indicator; unit test verifies presence of formatted values and ARB label. | `tui/widgets/funding_panel.py`, `tui/render/palette.py`, `tests/widgets/test_funding_table_style.py` | S | Done - initial styling and heat indicator added; more panels to follow. |
+
 ## Definition of Done (unchanged)
 
 - All tasks in the MVP epics (1-10) are complete and marked as done.
