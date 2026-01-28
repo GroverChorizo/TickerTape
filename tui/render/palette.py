@@ -46,7 +46,7 @@ def status_style(status: str, palette: Palette) -> str:
     if status == "live":
         return palette.accent.green
     if status == "loading":
-        return palette.accent.cyan
+        return palette.accent.purple
     if status == "disconnected":
         return palette.accent.orange
     if status == "stale":
@@ -66,7 +66,7 @@ def status_line(status: str, palette: Palette) -> Tuple[str, str]:
 
 
 def heading_line(label: str, palette: Palette) -> Tuple[str, str]:
-    return (label, f"bold {palette.accent.cyan}")
+    return (label, f"bold {palette.accent.purple}")
 
 
 def muted_line(label: str, palette: Palette) -> Tuple[str, str]:

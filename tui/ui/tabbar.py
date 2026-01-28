@@ -69,7 +69,7 @@ class TabBar(Static):
                 text.append(" | ", style=self._palette.text.muted)
             label = tab.short
             style = (
-                f"bold {self._palette.accent.cyan}"
+                f"bold {self._palette.accent.purple}"
                 if idx == self._active_index
                 else self._palette.text.muted
             )

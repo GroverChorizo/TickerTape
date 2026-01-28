@@ -132,7 +132,7 @@ class MarketDataPanel(PanelBase):
         if not isinstance(top_coins, list) or not top_coins:
             lines.append(muted_line("No top coin data.", self.palette))
             return
-        lines.append(("Symbol | Last | Mid | Funding | OI", self.palette.accent.cyan))
+        lines.append(("Symbol | Last | Mid | Funding | OI", self.palette.accent.purple))
         for entry in top_coins[:10]:
             if not isinstance(entry, dict):
                 continue
@@ -183,7 +183,10 @@ class MarketDataPanel(PanelBase):
             lines.append(muted_line("No orderbook levels.", self.palette))
             return
         lines.append(
-            ("Bid Size | Bid Price | Ask Price | Ask Size", self.palette.accent.cyan)
+            (
+                "Bid Size | Bid Price | Ask Price | Ask Size",
+                self.palette.accent.purple,
+            )
         )
         depth = max(len(bids), len(asks))
         for i in range(min(depth, 10)):
@@ -209,7 +212,7 @@ class MarketDataPanel(PanelBase):
             lines.append(muted_line("No candle data.", self.palette))
             return
         lines.append(
-            ("Time | Open | High | Low | Close | Vol", self.palette.accent.cyan)
+            ("Time | Open | High | Low | Close | Vol", self.palette.accent.purple)
         )
         for entry in list(reversed(candles))[:10]:
             if not isinstance(entry, dict):

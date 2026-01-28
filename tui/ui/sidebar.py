@@ -51,7 +51,7 @@ class Sidebar(Static):
             label = entry.short if self._compact else entry.label
             marker = ">" if entry.key == self._active_key else " "
             style = (
-                f"bold {self._palette.accent.cyan}"
+                f"bold {self._palette.accent.purple}"
                 if entry.key == self._active_key
                 else self._palette.text.muted
             )

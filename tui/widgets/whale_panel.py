@@ -132,7 +132,7 @@ class WhalePanel(PanelBase):
             styled_lines.append(
                 (
                     f"- {symbol} {side} size={size} price={price}{wallet_hint}",
-                    self.palette.accent.cyan,
+                    self.palette.accent.purple,
                 )
             )
         self.update_text(build_text(styled_lines))

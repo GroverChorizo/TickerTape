@@ -147,7 +147,7 @@ class TickerTapeApp(App):
         try:
             header = self.screen.query_one("#screen_header")
             header.styles.background = palette.bg.panel
-            header.styles.color = palette.accent.cyan
+            header.styles.color = palette.accent.purple
         except Exception:
             pass
         try:
