@@ -15,15 +15,18 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 ## Gap Analysis Summary (by spec)
 
-- Command System: No command palette overlay, fuzzy search, or global command set per spec.
-- UI Layout: No responsive breakpoints, sidebar/tab bar, fullscreen/density toggles, or detached panels.
-- Profiles: Only Liquidation Hunter screen is implemented; Day Trader, Whale Watcher, Funding Arbitrageur remain placeholders.
-- Liquidation Hunter spec gaps: heatmap panel, liquidation distance, cascade monitor, alerts.
-- Data Ingestion: Provider interface + typed models are partial; no WS streaming or reconnect logic.
-- Data Validation: Only minimal anti-lookahead guard exists; full validators missing.
-- Backtesting: Engine, MC, and walk-forward are unimplemented.
-- Secrets: YAML file, CLI command, and wizard integration not implemented.
-- Navigation carousel + custom dashboards not implemented.
+- Command System: **Done.** Palette, parser, history and built-in commands are implemented and tested.
+- UI Layout: **Done.** Responsive breakpoints, sidebar/tabbar, theming, and panel resizing are implemented.
+- Profiles: **Mostly Done.** Day Trader, Liquidation Hunter, Whale Watcher and Funding Arbitrageur profiles exist and have panel scaffolding; minor panel feature wiring remains.
+- Liquidation Hunter: **Partial.** Heatmap, distance and cascade monitor are present; **cascade alert wiring into the global alert service and UI is pending.**
+- Data Ingestion: **Partial.** Provider interfaces and typed models exist; **Hyperliquid currently provides HTTP snapshots only.** WebSocket streaming, reconnect/backoff, and additional endpoints (orderbook/funding streams) are not implemented.
+- Data Validation: **Done.** Validator framework and core validators are implemented with tests.
+- Backtesting & Simulation: **Not started / not integrated.** The `backtesting/` package is a placeholder; Monte Carlo and walk‑forward capabilities exist in other repos but are not integrated into the app.
+- Secrets: **Done.** YAML secrets handling, CLI integration and wizard support are implemented.
+- Alerts & Notifications: **Partial.** Backend `AlertManager` and socket notifier exist and TUI alert stream can receive messages; per‑panel trigger integration and mute/clear UX remain to be implemented.
+- Architecture & Quality: **Not started.** Linting/typing hardening, spec ↔ code path alignment, and provider streaming tests are outstanding.
+
+**New priorities:** Add explicit, small tasks for (1) Research job provenance and deterministic job store, (2) Alert UI integration and panel triggers, (3) Hyperliquid WebSocket streaming + test harness, and (4) Minimal backtest runner + deterministic CI tests. These are added below as TT‑095 → TT‑099.
 
 ## Epics and Stories
 
@@ -118,6 +121,40 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 | TT-092 | Align spec paths with code structure | 1. Decide whether to migrate to top-level `profiles/`, `providers/`, `ui/`, `commands/` packages or keep the `tui/`-centric layout. 2. Update specs and import paths accordingly. | Specs and code paths agree; new contributors can follow a single structure without guesswork. | `IMPLEMENTATION_PLAN.md`, `specs/*`, potential refactors in `tui/` | S | Not started |
 | TT-093 | Linting & typing hardening | 1. Revisit `ruff.toml` and `mypy.ini` to reduce global ignores. 2. Fix outstanding lint/type errors incrementally and align with repo style. | Ruff and mypy run with minimal ignores; remaining suppressions are localized with comments or per-module config. | `ruff.toml`, `mypy.ini`, offending modules | M | Not started |
 | TT-094 | Provider streaming & additional endpoints | 1. Add WebSocket streaming support to the Hyperliquid provider with reconnect/backoff. 2. Implement at least one additional endpoint (orderbook or funding) returning typed models. 3. Add tests for WS reconnect and new endpoint parsing. | WS reconnect behavior validated in tests; new endpoint returns typed models; provider remains deterministic. | `providers/hyperliquid.py`, `tests/test_provider_hyperliquid.py` | M | Not started |
+
+---
+
+### Epic 12 - Research Jobs & Provenance 🔧
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-095 | Provenance & job store | 1. Define a `BacktestJob` metadata model capturing: strategy name/version, dataset(s), timeframe(s), parameters, random seed(s), start/end timestamps and result path. 2. Implement a local job store under `~/.ticker_tape/jobs/<run_id>/` that writes metadata and serialized `BacktestResult` in JSON/Parquet. 3. Add CLI commands `:jobs list` and `:jobs show <id>`. | Running a backtest writes a run folder with metadata and result files; `:jobs list` shows recent runs and `:jobs show` prints detailed metadata. Unit tests cover metadata serialization and file layout. | `backtesting/job.py`, `backtesting/store.py`, `commands/jobs.py`, `tests/backtesting/test_jobs.py` | M | Not started |
+
+| TT-096 | Provenance tests & CI | 1. Add unit tests that assert deterministic `BacktestResult` given fixed seed and dataset fixture. 2. Include a lightweight end‑to‑end CI job that runs a sample backtest and compares output checksums to stored golden results. | Tests fail if backtest outputs change; CI job runs in <2 minutes and fails on non‑deterministic output. | `tests/backtesting/test_provenance.py`, `.github/workflows/backtest.yml` | M | Not started |
+
+---
+
+### Epic 13 - Alerts Completion 🔔
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-097 | Alert UI integration & per‑panel triggers | 1. Add alert configuration for panels (enabled events, thresholds, severity). 2. Wire `src/backend/AlertManager` events to panel-level triggers (cascade, whale, funding). 3. Implement mute/clear UX and a `:alerts` command to list recent alerts. | Simulated events generate UI pop-ups and entries in the alert panel; user can mute/clear alerts and `:alerts` lists recent items. Unit and UI tests exercise the flow. | `src/backend/alerts.py`, `tui/state/alerts.py`, `tui/widgets/alert_panel.py`, `tests/alerts/test_integration.py` | L | Not started |
+
+---
+
+### Epic 14 - Provider Streaming & Test Harness 🛰️
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-098 | Hyperliquid WS streaming & harness | 1. Add an asyncio WebSocket client to `providers/hyperliquid.py` with automatic reconnect/backoff and jitter. 2. Implement streaming handlers for at least orderbook and funding endpoints and ensure typed model emission. 3. Add a local test harness that replays recorded WS frames for deterministic testing. | WS reconnect/backoff behavior validated in unit tests; harness can replay recorded frames to verify parsing and backpressure handling. | `providers/hyperliquid.py`, `tests/test_provider_hyperliquid_ws.py`, `tests/fixtures/hyperliquid/` | M | Not started |
+
+---
+
+### Epic 15 - Backtesting Minimal Runner & UI Integration 🎲
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-099 | Minimal backtest runner & TUI command | 1. Implement a lightweight backtest runner capable of executing a simple strategy script against historical snapshots (`backtesting/runner.py`). 2. Add a `:backtest run <file>` command that executes the runner, stores provenance (TT‑095) and writes a `BacktestResult`. 3. Add a simple result panel to display equity curve and summary metrics. | Running `:backtest run example_strategy.py` completes within 10s for fixture data, writes provenance and result files, and opens a result panel. | `backtesting/runner.py`, `commands/backtest.py`, `ui/panels/backtest.py`, `tests/backtesting/test_runner.py` | L | Done - Minimal runner, command and panel added; tests included. |
 
 ## Definition of Done (unchanged)
 
