@@ -5,7 +5,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 from tui.state import session as session_state
 from tui.state.session import load_session_state
-from tui.ui.fullscreen import apply_fullscreen_state, toggle_fullscreen
+from tui.ui.fullscreen import toggle_fullscreen
 from tui.ui.density import apply_density_state, toggle_density
 
 

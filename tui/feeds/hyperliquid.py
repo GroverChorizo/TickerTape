@@ -9,7 +9,6 @@ import time
 
 from backend.storage import DatasetRegistry, partition_and_write
 from .base import BaseFeed
-from .url_builder import EndpointUrlBuilder
 from .moondev_client import MoonDevClient
 
 logger = logging.getLogger(__name__)
@@ -105,19 +104,25 @@ class FundingRatesFeed(BaseFeed):
 
     def fetch(self) -> Dict[str, Any]:
         end_ms = int(time.time() * 1000)
-        start_ms = end_ms - 60 * 60 * 1000
         payloads: Dict[str, Dict[str, Any]] = {}
-        for coin in self.coins:
-            history = self.client.post(
-                "info",
-                {"type": "fundingHistory", "coin": coin, "startTime": start_ms},
-            )
-            points = _parse_funding_history(history)
-            latest = points[-1] if points else None
-            payloads[coin] = {
-                "history": [p.__dict__ for p in points[-12:]],
-                "latest": latest.__dict__ if latest else None,
-            }
+        if hasattr(self.client, "post"):
+            start_ms = end_ms - 60 * 60 * 1000
+            for coin in self.coins:
+                history = self.client.post(
+                    "info",
+                    {"type": "fundingHistory", "coin": coin, "startTime": start_ms},
+                )
+                points = _parse_funding_history(history)
+                latest = points[-1] if points else None
+                payloads[coin] = {
+                    "history": [p.__dict__ for p in points[-12:]],
+                    "latest": latest.__dict__ if latest else None,
+                }
+        elif hasattr(self.client, "get_json"):
+            raw = self.client.get_json("binance_funding")
+            payloads = _normalize_funding_snapshot(raw, self.coins)
+        else:
+            raise RuntimeError("FundingRatesFeed client lacks post/get_json")
         payload = {"funding": payloads, "received_ts_ms": end_ms}
         self._persist_snapshot(payload, end_ms)
         return payload
@@ -280,3 +285,21 @@ def _normalize_events(raw: Any) -> List[Dict[str, Any]]:
             }
         )
     return events
+
+
+def _normalize_funding_snapshot(
+    raw: Any, coins: Optional[List[str]] = None
+) -> Dict[str, Dict[str, Any]]:
+    payloads: Dict[str, Dict[str, Any]] = {}
+    if not isinstance(raw, dict):
+        return payloads
+    allowed = {c.upper() for c in coins} if coins else None
+    for symbol, info in raw.items():
+        sym = str(symbol).upper()
+        if allowed and sym not in allowed:
+            continue
+        if isinstance(info, dict):
+            payloads[sym] = info
+        else:
+            payloads[sym] = {"latest": {"rate": info}}
+    return payloads

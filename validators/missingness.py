@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, List
+from typing import Any, Iterable
 
 from .base import Validator
 from .report import ValidationReport

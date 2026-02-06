@@ -244,7 +244,7 @@ def test_orderbook_replay_parses_and_pushes():
 
     async def run():
         streamer = HyperliquidStreamer(provider)
-        await _run_streamer(streamer, duration=0.06, poll_interval=0.01, market_agg_ms=50)
+        await _run_streamer(streamer, duration=0.12, poll_interval=0.01, market_agg_ms=50)
 
     asyncio.run(run())
 

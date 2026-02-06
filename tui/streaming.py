@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Dict, Optional
+from typing import Dict
 
 from backend.feeds.base import BaseFeed
 from tui.feeds.base import BaseFeed as TuiFeedBase, FeedStatus, _as_status

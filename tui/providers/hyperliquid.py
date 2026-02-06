@@ -284,7 +284,6 @@ class HyperliquidStreamer:
             await asyncio.gather(*pending, return_exceptions=True)
         # wait (blocking) for any cross-loop futures to complete (short timeout)
         import concurrent.futures
-        import time as _time
 
         for fut in other_loop_futs:
             try:

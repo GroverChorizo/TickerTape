@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import List
 
 from ..feeds.base import FeedResult, FeedStatus, _as_status
 from tui.render.palette import (

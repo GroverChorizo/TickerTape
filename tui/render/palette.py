@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Iterable, List, Tuple, Union
+from typing import Iterable, Tuple, Union
 
 from rich.text import Text
 

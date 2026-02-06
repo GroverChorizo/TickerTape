@@ -1,5 +1,3 @@
-import os
-
 import pytest
 
 from tui.feeds.moondev_client import MoonDevAuthError, MoonDevClient

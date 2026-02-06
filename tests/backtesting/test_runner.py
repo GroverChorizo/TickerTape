@@ -1,9 +1,7 @@
 import os
-import tempfile
-import json
 
 from backtesting.runner import run_from_file
-from backtesting.job import write_metadata, write_result, new_run_dir, read_metadata, read_result
+from backtesting.job import read_metadata, read_result
 
 
 def test_run_from_file_writes_results(tmp_path, monkeypatch):
@@ -15,7 +13,13 @@ def test_run_from_file_writes_results(tmp_path, monkeypatch):
     # use a temporary job root so we don't pollute user dir
     job_root = str(tmp_path / "jobs")
 
-    result = run_from_file(str(strat), prices=[100.0, 101.0, 102.0], seed=42, job_root=job_root)
+    result = run_from_file(
+        str(strat),
+        prices=[100.0, 101.0, 102.0],
+        seed=42,
+        job_root=job_root,
+        confirm_exec=True,
+    )
 
     assert result is not None
     assert isinstance(result.equity_curve, list)

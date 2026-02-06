@@ -1,6 +1,6 @@
 [lint]
 select = ["E", "F"]
-ignore = ["E402", "E501", "E702", "F401"]
+ignore = ["E402", "E501"]
 
 [format]
 line-ending = "auto"

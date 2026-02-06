@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, Mapping, Tuple
+from typing import Any, Iterable, Mapping, Tuple
 
 from .base import Validator
 from .report import ValidationReport

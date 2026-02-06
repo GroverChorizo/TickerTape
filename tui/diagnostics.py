@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict
 from importlib import metadata
 from pathlib import Path
 from typing import Dict, Any

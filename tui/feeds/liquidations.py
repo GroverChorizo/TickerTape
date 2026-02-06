@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 import time
 
 from backend.storage import BASE_PARQUET_ROOT, DatasetRegistry, partition_and_write

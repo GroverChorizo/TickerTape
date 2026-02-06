@@ -1,7 +1,5 @@
 import asyncio
 
-import pytest
-
 from tui.feeds.moondev_client import MoonDevClient
 
 
