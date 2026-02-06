@@ -22,6 +22,6 @@ The Whale Watcher profile is tailored to users who track large orders and walle
 
 ## Implementation Notes
 
-* Define this profile in `profiles/whale_watcher.py`.
+* Profile metadata is registered in `tui/state/profiles.py`; the screen implementation lives in `tui/ui/screens/profile_whale_watcher.py` (exported via the `profiles` facade).
 * Provide commands to filter trades by symbol, size or side (`/search btc >1M sell`)【438442747367044†L1719-L1727】.
 * The wallet inspection feature should reuse components from the global wallet panel to avoid duplication.

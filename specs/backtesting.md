@@ -21,6 +21,7 @@ Provide a robust research engine for running historical backtests, Monte Carlo s
 
 ## Implementation Notes
 
+* Canonical models live in `src/tickertape/core/backtesting.py` and are re-exported via `backtesting/models.py`.
 * Implement the backtest engine under `backtesting/engine.py` and Monte Carlo under `backtesting/monte_carlo.py`.
 * Use typed models for signals, trades and metrics; ensure consistent units (e.g., basis points, percentages).
 * Provide fixtures in `tests/backtesting` with simple strategies to verify engine correctness.

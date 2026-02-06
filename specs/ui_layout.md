@@ -31,4 +31,4 @@ Define the principles and requirements for the terminal user interface (TUI).  T
 * Implement layout logic using Textual’s grid and container primitives.  Use CSS for borders, rounded corners and animations.
 * Provide a `Panel` base class with focus and alert states; derive specific panels (e.g., Whale Feed) from it.
 * Manage responsive behaviour via a breakpoints module that listens to terminal width changes and recomputes panel layouts.
-* Keep the layout definitions in `ui/layout.py` and theme styles in `ui/themes/`.
+* Keep the layout definitions in `tui/ui/layout.py` and theme styles in `tui/themes/`.

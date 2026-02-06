@@ -1,30 +1,31 @@
 # Implementation Plan
 
-Last updated: 2026-01-27
+Last updated: 2026-02-05
 
 This plan enumerates the work required to realize the MVP of the TickerTape terminal application. It is derived from the PRD and the specifications in the `specs/` directory, then reconciled with the current codebase. Tasks are organized by Epic -> Story -> Task. Each task includes acceptance criteria, estimated complexity, likely files, and a status.
 
 ## Current State Snapshot
 
-- Multi-screen shell exists: `tui/app.py` with Home screen, Liquidation Hunter screen, and view screens (time/heatmap/table).
-- Command system exists in a minimal form: `tui/core/commands.py`, `tui/core/router.py`, and a command bar widget (no palette overlay).
-- Hyperliquid provider exists in `tui/providers/hyperliquid.py` using MoonDev API via feed wrappers with polling + backoff; no WS yet.
-- Liquidation Hunter data pipeline exists (feed + models + screen + capture status), but missing heatmap/distance/cascade-alert features from the spec.
-- Multi-exchange funding feed + panel exist, but arbitrage detection/alerts and profile screen wiring are incomplete.
-- Secrets handling is implemented via env file in `src/backend/secrets.py`, not the YAML spec in `specs/config_secrets.md`.
+- Multi-screen shell exists with Home, profile screens, and view screens (`tui/app.py`).
+- Command system unified: `commands/registry.py` is canonical and TUI uses it via shim.
+- Shared core models live under `src/tickertape/core/` with provider/backtest/validation shims.
+- Hyperliquid provider supports direct HTTP with optional MoonDev fallback; streaming adapters exist with deterministic backoff.
+- Backtesting engine, resampling, walk-forward, and subprocess strategy runner are implemented with determinism tests.
+- Playbooks added under `playbooks/`; PRD moved to root `PRD.md` and doc hygiene allowlisted.
+- Alerts have a local store, pop-up notifications, per-profile triggers, and `:alerts` command; backend alert service uses core types.
 
 ## Gap Analysis Summary (by spec)
 
 - Command System: **Done.** Palette, parser, history and built-in commands are implemented and tested.
 - UI Layout: **Done.** Responsive breakpoints, sidebar/tabbar, theming, and panel resizing are implemented.
-- Profiles: **Mostly Done.** Day Trader, Liquidation Hunter, Whale Watcher and Funding Arbitrageur profiles exist and have panel scaffolding; minor panel feature wiring remains.
-- Liquidation Hunter: **Partial.** Heatmap, distance and cascade monitor are present; **cascade alert wiring into the global alert service and UI is pending.**
-- Data Ingestion: **Partial.** Provider interfaces and typed models exist; **Hyperliquid currently provides HTTP snapshots only.** WebSocket streaming, reconnect/backoff, and additional endpoints (orderbook/funding streams) are not implemented.
+- Profiles: **Mostly Done.** Day Trader, Liquidation Hunter, Whale Watcher and Funding Arbitrageur profiles exist; alerts now wired; remaining polish is layout integration for alert panel.
+- Liquidation Hunter: **Mostly Done.** Heatmap, distance and cascade monitor present; cascade alert triggers wired; UI alert panel integration remains.
+- Data Ingestion: **Partial.** Provider interfaces and typed models exist; direct HTTP + optional streaming implemented, but full WS harness and live endpoint coverage remain.
 - Data Validation: **Done.** Validator framework and core validators are implemented with tests.
-- Backtesting & Simulation: **Not started / not integrated.** The `backtesting/` package is a placeholder; Monte Carlo and walk‑forward capabilities exist in other repos but are not integrated into the app.
+- Backtesting & Resampling: **Done (core).** Engine, resampling, walk-forward and subprocess strategy runner implemented; UI panel integration pending.
 - Secrets: **Done.** YAML secrets handling, CLI integration and wizard support are implemented.
-- Alerts & Notifications: **Partial.** Backend `AlertManager` and socket notifier exist and TUI alert stream can receive messages; per‑panel trigger integration and mute/clear UX remain to be implemented.
-- Architecture & Quality: **Not started.** Linting/typing hardening, spec ↔ code path alignment, and provider streaming tests are outstanding.
+- Alerts & Notifications: **Partial.** Alert store, popups, and per-panel triggers exist; alert panel wiring and UX refinements remain.
+- Architecture & Quality: **Partial.** Core models + shims added; linting/typing hardening and spec alignment updates are pending.
 
 **New priorities:** Add explicit, small tasks for (1) Research job provenance and deterministic job store, (2) Alert UI integration and panel triggers, (3) Hyperliquid WebSocket streaming + test harness, and (4) Minimal backtest runner + deterministic CI tests. These are added below as TT‑095 → TT‑099.
 
@@ -38,6 +39,8 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 | TT-002 | Build test harness | 1. Configure pytest with a `tests/` directory. 2. Add example test for a dummy validator. 3. Ensure `pytest` runs successfully. | `pytest` collects and runs dummy tests without failure. | `tests/conftest.py`, `tests/test_dummy.py` | S | Done - pytest configured, multiple tests present. |
 | TT-003 | Secrets file management | 1. Define a configuration specification for a secrets file. By default, look for `~/.ticker_tape/secrets.yaml` (or `.secrets`) but allow the path to be overridden via env var or CLI arg. 2. Modify startup sequence and wizard to create this file if it does not exist and inform the user. 3. Provide a CLI command `:secrets` to print the secrets file path and open it in an editor. | Running the app without specifying a secrets path creates the default secrets file and logs its path. The command `:secrets` prints the path and opens the file. Unit tests verify creation and reading. | `src/config/secrets.py`, `tui/wizard.py`, `tui/app.py`, `tests/config/test_secrets.py` | M | Done - YAML secrets module, CLI command, wizard integration, and tests added. |
 | TT-004 | CLI entry points | 1. Configure build system to expose console scripts named `TickerTape` and `TTape` that run the application’s main entry point. 2. Update docs to document new commands. | After installation, running `TickerTape` or `TTape` launches the application. A test running these commands via subprocess succeeds. | `setup.py`, `README.md`, `AGENTS.md`, `tests/test_cli_entrypoints.py` | S | Done - setup.py entry points added with tests and docs updates. |
+| TT-005 | Playbooks | 1. Add missing playbooks for backend, frontend, research review, and privacy/security. 2. Reference playbooks in `AGENTS.md` and `README.md`. | `playbooks/` exists with four required playbooks; references updated. | `playbooks/*.md`, `AGENTS.md`, `README.md` | S | Done - playbooks added and referenced. |
+| TT-006 | PRD alignment | 1. Move PRD to root `PRD.md` as canonical source. 2. Remove duplicate doc copy and align data integrity allowlist. | `PRD.md` is canonical; references align; integrity gate allowlist updated. | `PRD.md`, `.data_integrity_gate.json` | S | Done - PRD relocated and allowlist updated. |
 
 ### Epic 2 - Data Provider Layer
 
@@ -68,10 +71,10 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-040 | Backtest engine | 1. Implement core engine that runs strategies over historical data with no lookahead bias. 2. Compute equity curve, trades, P&L and risk metrics. 3. Return a `BacktestResult` object. | Engine processes a sample strategy and produces correct metrics; tests compare with expected values. | `backtesting/engine.py`, `backtesting/models.py`, `tests/backtesting/test_engine.py` | L | Not started |
-| TT-041 | Monte Carlo simulation | 1. Implement Monte Carlo runner that bootstraps returns and produces a set of equity trajectories. 2. Output fan chart data and summary stats. | Running Monte Carlo on a fixture dataset produces expected percentiles; tests verify reproducibility. | `backtesting/monte_carlo.py`, `tests/backtesting/test_monte_carlo.py` | M | Not started |
-| TT-042 | Walk-forward testing | 1. Implement walk-forward module that splits data into train/test windows and executes strategies. 2. Compute average train/test metrics and degradation. | Module returns a report summarizing OOS Sharpe and degradation; tests validate outputs on fixture data. | `backtesting/walk_forward.py`, `tests/backtesting/test_walk_forward.py` | M | Not started |
-| TT-043 | Strategy integration | 1. Add ability for users to load custom strategy modules from a file path. 2. Validate that strategies implement the required interface. | Loading an example strategy file triggers correct backtest results; tests cover invalid strategies. | `commands/backtest.py`, `backtesting/loader.py`, `tests/backtesting/test_loader.py` | M | Not started |
+| TT-040 | Backtest engine | 1. Implement core engine that runs strategies over historical data with no lookahead bias. 2. Compute equity curve, trades, P&L and risk metrics. 3. Return a `BacktestResult` object. | Engine processes a sample strategy and produces correct metrics; tests compare with expected values. | `backtesting/engine.py`, `backtesting/models.py`, `tests/backtesting/test_engine.py` | L | Done - deterministic engine with metrics + tests added. |
+| TT-041 | Monte Carlo simulation | 1. Implement Monte Carlo runner that bootstraps returns and produces a set of equity trajectories. 2. Output fan chart data and summary stats. | Running Monte Carlo on a fixture dataset produces expected percentiles; tests verify reproducibility. | `backtesting/monte_carlo.py`, `tests/backtesting/test_monte_carlo.py` | M | Done - deterministic resampling engine + tests added. |
+| TT-042 | Walk-forward testing | 1. Implement walk-forward module that splits data into train/test windows and executes strategies. 2. Compute average train/test metrics and degradation. | Module returns a report summarizing OOS Sharpe and degradation; tests validate outputs on fixture data. | `backtesting/walk_forward.py`, `tests/backtesting/test_walk_forward.py` | M | Done - walk-forward report implemented with tests. |
+| TT-043 | Strategy integration | 1. Add ability for users to load custom strategy modules from a file path. 2. Validate that strategies implement the required interface. | Loading an example strategy file triggers correct backtest results; tests cover invalid strategies. | `commands/backtest.py`, `backtesting/loader.py`, `tests/backtesting/test_loader.py` | M | Done - subprocess runner with explicit confirmation + tests. |
 | TT-044 | Backtest UI | 1. Implement a backtest panel that displays equity curves and drawdowns using sparklines or area charts. 2. Integrate with command system (`:backtest`). | Running a backtest via command opens a panel with results; tests include UI assertions. | `ui/panels/backtest.py`, `commands/backtest.py`, `tests/ui/test_backtest_panel.py` | L | Not started |
 
 ### Epic 6 - User Interface and Layout
@@ -111,17 +114,17 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-090 | Alert framework | 1. Implement global alert service that can queue and dispatch alerts with severity levels. 2. Define alert configuration (enabled events, thresholds) and persistence. | Alerts triggered by other modules display pop-ups with correct color coding; user can mute or clear alerts. | `src/backend/alerts.py`, `tui/widgets/alert_panel.py`, `tests/alerts/test_service.py` | M | Partial - backend alert server + panel exist, no unified service or new UI integration. |
-| TT-091 | Panel integration | Integrate alert triggers in panels: cascade alerts, whale trade alerts, funding extreme alerts and anomaly alerts. | When events exceed thresholds, the corresponding alert appears; tests simulate events. | `tui/widgets/*`, `tests/alerts/test_integration.py` | L | Not started |
+| TT-090 | Alert framework | 1. Implement global alert service that can queue and dispatch alerts with severity levels. 2. Define alert configuration (enabled events, thresholds) and persistence. | Alerts triggered by other modules display pop-ups with correct color coding; user can mute or clear alerts. | `src/backend/alerts.py`, `tui/state/alerts.py`, `tui/widgets/alert_panel.py` | M | Partial - alert store + popups + mute/clear exist; alert panel wiring pending. |
+| TT-091 | Panel integration | Integrate alert triggers in panels: cascade alerts, whale trade alerts, funding extreme alerts and anomaly alerts. | When events exceed thresholds, the corresponding alert appears; tests simulate events. | `tui/ui/screens/*`, `tests/alerts/test_integration.py` | L | Partial - triggers wired in profile screens; missing tests + alert panel integration. |
 
 ### Epic 11 - Architecture Alignment
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-092 | Align spec paths with code structure | 1. Decide whether to migrate to top-level `profiles/`, `providers/`, `ui/`, `commands/` packages or keep the `tui/`-centric layout. 2. Update specs and import paths accordingly. | Specs and code paths agree; new contributors can follow a single structure without guesswork. | `IMPLEMENTATION_PLAN.md`, `specs/*`, potential refactors in `tui/` | S | Not started |
+| TT-092 | Align spec paths with code structure | 1. Decide whether to migrate to top-level `profiles/`, `providers/`, `ui/`, `commands/` packages or keep the `tui/`-centric layout. 2. Update specs and import paths accordingly. | Specs and code paths agree; new contributors can follow a single structure without guesswork. | `IMPLEMENTATION_PLAN.md`, `specs/*`, `providers/*`, `commands/*` | S | Done - keep `tui/` as runtime core with top-level facades; specs updated to match. |
 | TT-093 | Linting & typing hardening | 1. Revisit `ruff.toml` and `mypy.ini` to reduce global ignores. 2. Fix outstanding lint/type errors incrementally and align with repo style. | Ruff and mypy run with minimal ignores; remaining suppressions are localized with comments or per-module config. | `ruff.toml`, `mypy.ini`, offending modules | M | Not started |
 | TT-103 | Feed API: typed status & contract | 1. Introduce `FeedStatus` enum and use in `FeedResult` (frozen). 2. Make `fetch()` return `None` when no new data and document the contract. 3. Return immutable copies from `latest()` and add compatibility shim for string statuses. 4. Use status-aware logging (DEBUG for OK, WARNING otherwise) and update tests. | FeedResult is immutable with typed status; fetch contract documented and enforced; tests updated to use None for no-new-data fixtures; logging reflects status. | `tui/feeds/base.py`, `tests/test_tui_feeds.py`, `tests/test_tui_panel_states.py` | S | Done - FeedStatus + frozen FeedResult; fetch contract enforced; tests updated. |
-| TT-094 | Provider streaming & additional endpoints | 1. Add WebSocket streaming support to the Hyperliquid provider with reconnect/backoff. 2. Implement at least one additional endpoint (orderbook or funding) returning typed models. 3. Add tests for WS reconnect and new endpoint parsing. | WS reconnect behavior validated in tests; new endpoint returns typed models; provider remains deterministic. | `providers/hyperliquid.py`, `tests/test_provider_hyperliquid.py` | M | Not started |
+| TT-094 | Provider streaming & additional endpoints | 1. Add WebSocket streaming support to the Hyperliquid provider with reconnect/backoff. 2. Implement at least one additional endpoint (orderbook or funding) returning typed models. 3. Add tests for WS reconnect and new endpoint parsing. | WS reconnect behavior validated in tests; new endpoint returns typed models; provider remains deterministic. | `providers/hyperliquid.py`, `providers/ws.py`, `tests/test_provider_hyperliquid.py` | M | Partial - streaming methods + orderbook parsing added; WS harness tests pending. |
 
 ---
 
@@ -129,7 +132,7 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-095 | Provenance & job store | 1. Define a `BacktestJob` metadata model capturing: strategy name/version, dataset(s), timeframe(s), parameters, random seed(s), start/end timestamps and result path. 2. Implement a local job store under `~/.ticker_tape/jobs/<run_id>/` that writes metadata and serialized `BacktestResult` in JSON/Parquet. 3. Add CLI commands `:jobs list` and `:jobs show <id>`. | Running a backtest writes a run folder with metadata and result files; `:jobs list` shows recent runs and `:jobs show` prints detailed metadata. Unit tests cover metadata serialization and file layout. | `backtesting/job.py`, `backtesting/store.py`, `commands/jobs.py`, `tests/backtesting/test_jobs.py` | M | Not started |
+| TT-095 | Provenance & job store | 1. Define a `BacktestJob` metadata model capturing: strategy name/version, dataset(s), timeframe(s), parameters, random seed(s), start/end timestamps and result path. 2. Implement a local job store under `~/.ticker_tape/jobs/<run_id>/` that writes metadata and serialized `BacktestResult` in JSON/Parquet. 3. Add CLI commands `:jobs list` and `:jobs show <id>`. | Running a backtest writes a run folder with metadata and result files; `:jobs list` shows recent runs and `:jobs show` prints detailed metadata. Unit tests cover metadata serialization and file layout. | `backtesting/job.py`, `commands/jobs.py`, `tests/backtesting/test_jobs.py` | M | Done - job store + CLI commands implemented. |
 
 | TT-096 | Provenance tests & CI | 1. Add unit tests that assert deterministic `BacktestResult` given fixed seed and dataset fixture. 2. Include a lightweight end‑to‑end CI job that runs a sample backtest and compares output checksums to stored golden results. | Tests fail if backtest outputs change; CI job runs in <2 minutes and fails on non‑deterministic output. | `tests/backtesting/test_provenance.py`, `.github/workflows/backtest.yml` | M | Not started |
 
@@ -139,7 +142,7 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-097 | Alert UI integration & per‑panel triggers | 1. Add alert configuration for panels (enabled events, thresholds, severity). 2. Wire `src/backend/AlertManager` events to panel-level triggers (cascade, whale, funding). 3. Implement mute/clear UX and a `:alerts` command to list recent alerts. | Simulated events generate UI pop-ups and entries in the alert panel; user can mute/clear alerts and `:alerts` lists recent items. Unit and UI tests exercise the flow. | `src/backend/alerts.py`, `tui/state/alerts.py`, `tui/widgets/alert_panel.py`, `tests/alerts/test_integration.py` | L | Not started |
+| TT-097 | Alert UI integration & per‑panel triggers | 1. Add alert configuration for panels (enabled events, thresholds, severity). 2. Wire `src/backend/AlertManager` events to panel-level triggers (cascade, whale, funding). 3. Implement mute/clear UX and a `:alerts` command to list recent alerts. | Simulated events generate UI pop-ups and entries in the alert panel; user can mute/clear alerts and `:alerts` lists recent items. Unit and UI tests exercise the flow. | `src/backend/alerts.py`, `tui/state/alerts.py`, `tui/ui/screens/*`, `tui/widgets/alert_panel.py` | L | Partial - alert store + mute/clear + triggers wired; alert panel and tests pending. |
 
 ---
 
@@ -147,7 +150,7 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 
 | ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
 |----|-------|-------|--------------------|---------------|------------|--------|
-| TT-098 | Hyperliquid WS streaming & harness | 1. Add an asyncio WebSocket client to `providers/hyperliquid.py` with automatic reconnect/backoff and jitter. 2. Implement streaming handlers for at least orderbook and funding endpoints and ensure typed model emission. 3. Add a local test harness that replays recorded WS frames for deterministic testing. | WS reconnect/backoff behavior validated in unit tests; harness can replay recorded frames to verify parsing and backpressure handling. | `providers/hyperliquid.py`, `tests/test_provider_hyperliquid_ws.py`, `tests/fixtures/hyperliquid/` | M | Not started |
+| TT-098 | Hyperliquid WS streaming & harness | 1. Add an asyncio WebSocket client to `providers/hyperliquid.py` with automatic reconnect/backoff and jitter. 2. Implement streaming handlers for at least orderbook and funding endpoints and ensure typed model emission. 3. Add a local test harness that replays recorded WS frames for deterministic testing. | WS reconnect/backoff behavior validated in unit tests; harness can replay recorded frames to verify parsing and backpressure handling. | `providers/hyperliquid.py`, `providers/ws.py`, `tests/test_provider_hyperliquid_ws.py` | M | Partial - streaming generators exist; harness/tests pending. |
 
 ---
 

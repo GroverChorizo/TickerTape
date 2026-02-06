@@ -21,7 +21,7 @@ Provide an intuitive mechanism for users to manage and navigate between multiple
 
 ## Implementation Notes
 
-* Implement the carousel as a dedicated component (`ui/tab_carousel.py`) that can be shown or hidden.  Use Textual’s widget system to render the list and highlight the active item.
-* Use a central `NavigationManager` to track open screens, handle keyboard shortcuts and manage persistence.
-* Store the carousel state in the config directory (e.g., `~/.ticker_tape/state/carousel.yaml`) on shutdown and reload it on startup.
+* Implement the carousel as a dedicated component in `tui/ui/tab_carousel.py` and surface breadcrumb/status text via `tui/ui/status_bar.py`.
+* Track open screens and keyboard navigation inside `tui/app.py` (no separate NavigationManager).
+* Persist the open-screen order in the UI cache (`data/ui_cache.json`) and reload it on startup.
 * Unit tests should cover cycling operations, persistence and error handling (e.g., closing a screen when only one remains).

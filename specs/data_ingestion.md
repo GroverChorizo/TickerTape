@@ -28,4 +28,5 @@ Define the interfaces and responsibilities for ingesting real‑time and histori
 
 * Implement the provider in `providers/hyperliquid.py` with a configurable base URL and environment (e.g., testnet, mainnet).
 * Future providers (e.g., Binance) should follow the same interface; implement discovery via `providers/__init__.py`.
+* The TUI consumes provider data via feed adapters in `tui/providers/` and `tui/feeds/` for UI‑specific streaming/polling behavior.
 * Provide diagnostic commands (e.g., `:diagnose provider`) that test HTTP and WebSocket connectivity and return a short report.

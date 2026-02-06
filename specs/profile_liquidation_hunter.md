@@ -22,6 +22,6 @@ The Liquidation Hunter profile is designed for traders focused on detecting and
 
 ## Implementation Notes
 
-* The profile is defined in `profiles/liquidation_hunter.py`.  Use typed models for positions and liquidation events.
+* Profile metadata is registered in `tui/state/profiles.py`; the screen implementation lives in `tui/ui/screens/profile_liquidation.py` (exported via the `profiles` facade).  Use typed models for positions and liquidation events.
 * Implement a `detect_cascade(volume_history: List[float], threshold: float) -> bool` helper with tests.
 * Alerts should be routed to the global alert system with severity levels (warning, critical).  Use the alert threshold table provided in theVision【438442747367044†L842-L849】.

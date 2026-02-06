@@ -23,6 +23,6 @@ Define the design and behaviour of the command‑driven interface that powers na
 
 ## Implementation Notes
 
-* Implement command parsing in `commands/parser.py` and registration in `commands/registry.py`.
-* Provide a `CommandPalette` widget in `ui/command_palette.py` that implements fuzzy search and displays suggestions, history and syntax hints.
+* Implement command parsing in `commands/parser.py` and registration in `commands/registry.py` (stable facade). The TUI uses the shim in `tui/core/commands.py`.
+* Provide a `CommandPalette` widget in `tui/ui/widgets/command_palette.py` and a modal screen in `tui/ui/screens/command_palette.py` (exposed via the `ui` facade).
 * Use Python’s `argparse` or a custom parser to handle arguments and options for commands; ensure clear error messages on invalid usage.

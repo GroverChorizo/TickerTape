@@ -21,7 +21,7 @@ The Funding Arbitrageur profile helps users monitor and exploit funding rate di
 
 ## Implementation Notes
 
-* Create this profile in `profiles/funding_arbitrageur.py`.
+* Profile metadata is registered in `tui/state/profiles.py`; the screen implementation lives in `tui/ui/screens/profile_funding_arbitrage.py` (exported via the `profiles` facade).
 * Use typed models for `FundingRate` and `ArbitrageOpportunity` to ensure schema consistency.
 * Provide commands to add or remove exchanges (e.g., `:exchange add binance`).
 * Keep the multi‑exchange comparison panel optional for users who only trade on Hyperliquid.

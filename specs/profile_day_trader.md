@@ -23,7 +23,7 @@ The Day Trader profile targets intraday traders who rely on price action and mo
 
 ## Implementation Notes
 
-* The profile is registered under `profiles/day_trader.py` and returns a list of default panels and available commands.
+* Profile metadata is registered in `tui/state/profiles.py`; the screen implementation lives in `tui/ui/screens/profile_day_trader.py` (exported via the `profiles` facade).
 * Use Pydantic or dataclasses to define tick and trade models.
 * Use the command palette (`/`) to open panels, refresh data, and run searches.
 * When the user presses `F`, the active panel should enter fullscreen mode to show extended data (e.g., 50 levels of order book)【438442747367044†L551-L659】.

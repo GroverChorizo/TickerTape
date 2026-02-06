@@ -22,6 +22,6 @@ Provide a first‑time onboarding flow that guides users through selecting their
 
 ## Implementation Notes
 
-* Implement the wizard as a multi‑step form in `ui/wizard.py` using Textual’s `Screen` class.  Each step is a separate `Container` with navigation buttons.
+* Implement the wizard as a multi‑step form in `tui/wizard.py` using Textual’s `Screen` class.  Each step is a separate `Container` with navigation buttons.
 * Use a state machine to manage progress between steps and store selections.
-* On completion, write settings to `~/.ticker_tape/config.yaml` (or similar).  Provide functions to load these preferences at startup.
+* On completion, write settings to `~/.tickertape/config.json` (or the resolved config path).  Provide functions to load these preferences at startup.
