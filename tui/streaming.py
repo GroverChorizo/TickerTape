@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Optional
 
 from backend.feeds.base import BaseFeed
-from tui.feeds.base import BaseFeed as TuiFeedBase
+from tui.feeds.base import BaseFeed as TuiFeedBase, FeedStatus, _as_status
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,8 @@ class StreamSupervisor:
             try:
                 if isinstance(feed, TuiFeedBase):
                     result = feed.fetch_result()
-                    backoff = 1.0 if result.status == "ok" else backoff
+                    status = _as_status(result.status)
+                    backoff = 1.0 if status == FeedStatus.OK else backoff
                     delay = feed.next_delay(result.status)
                 else:
                     payload = feed.fetch()

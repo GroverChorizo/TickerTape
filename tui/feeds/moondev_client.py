@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, Tuple
 import logging
-import random
 import time
 
 from backend.secrets import moondev_config_help, resolve_moondev_api_key
@@ -59,6 +58,57 @@ class MoonDevClient:
     ) -> Any:
         url = self._url_builder.build(endpoint_key, **kwargs)
         return self._request("POST", url, json=payload)
+
+    async def ws_connect(self, endpoint_key: str, **kwargs: Any):
+        """Return an async context manager yielding an async iterator of messages.
+
+        - Uses the same endpoint mapping as the HTTP client.
+        - Auth is sent via `X-API-Key` header, with a query-param fallback on 401.
+        - Requires the optional `websockets` dependency; if missing this method
+          raises NotImplementedError so tests can monkeypatch it.
+        """
+        # Lazy import to keep runtime dependency optional
+        try:
+            import websockets
+        except Exception as exc:  # pragma: no cover - environment dependent
+            raise NotImplementedError(
+                "websocket support requires the 'websockets' package"
+            ) from exc
+
+        url = self._url_builder.build(endpoint_key, **kwargs)
+        # convert https/http -> wss/ws for websocket handshake
+        if url.startswith("https://"):
+            ws_url = "wss://" + url[len("https://") :]
+        elif url.startswith("http://"):
+            ws_url = "ws://" + url[len("http://") :]
+        else:
+            ws_url = url
+
+        auth = self._resolve_auth()
+        headers = {"X-API-Key": auth.api_key}
+
+        # websockets.connect may be a sync factory (real lib) or an async factory
+        # (test fakes). Handle both by awaiting only when necessary and retrying
+        # with a query-param fallback on handshake errors.
+        import asyncio
+
+        try:
+            maybe_cm = websockets.connect(ws_url, extra_headers=headers)
+            if asyncio.iscoroutine(maybe_cm):
+                return await maybe_cm
+            return maybe_cm
+        except Exception:
+            # Try with api_key query param
+            if "?" in ws_url:
+                sep = "&"
+            else:
+                sep = "?"
+            tried = f"{ws_url}{sep}api_key={auth.api_key}"
+            maybe_cm = websockets.connect(tried)
+            if asyncio.iscoroutine(maybe_cm):
+                return await maybe_cm
+            return maybe_cm
+
 
     def _request(self, method: str, url: str, **kwargs: Any) -> Any:
         auth = self._resolve_auth()
@@ -152,7 +202,7 @@ class MoonDevClient:
 
     @staticmethod
     def _backoff(attempt: int) -> float:
-        return 0.5 * (2 ** (attempt - 1)) + random.uniform(0, 0.25)
+        return 0.5 * (2 ** (attempt - 1))
 
 
 def _sanitize_url(url: str, params: Optional[Dict[str, Any]], used_query: bool) -> str:
