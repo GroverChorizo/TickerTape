@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Callable, Dict, Optional
+import json
 import asyncio
 import time
 
@@ -84,6 +85,9 @@ class HyperliquidProvider(Provider):
         direct_client: Optional[DirectHyperliquidClient] = None,
         moondev_client: Optional[MoonDevClient] = None,
         cache_ttl_s: float = 5.0,
+        stream_min_backoff: float = 0.5,
+        stream_max_backoff: float = 30.0,
+        stream_poll_interval: float = 2.0,
         now_fn: Optional[Callable[[], float]] = None,
         use_moondev: bool = False,
     ) -> None:
@@ -98,6 +102,9 @@ class HyperliquidProvider(Provider):
         self._cache_ttl_s = cache_ttl_s
         self._now = now_fn or time.monotonic
         self._liquidations_cache: Optional[CacheEntry] = None
+        self._stream_min_backoff = stream_min_backoff
+        self._stream_max_backoff = stream_max_backoff
+        self._stream_poll_interval = stream_poll_interval
 
     def get_liquidations(self) -> list[LiquidationEvent]:
         now = self._now()
@@ -159,16 +166,21 @@ class HyperliquidProvider(Provider):
 
     def get_funding_rates(self) -> list[FundingRate]:
         raw = self._client.get_json("funding")
-        entries = _ensure_list(raw)
+        entries = _normalize_funding_entries(raw)
         rates: list[FundingRate] = []
         for entry in entries:
             if not isinstance(entry, dict):
                 continue
+            rate = entry.get("fundingRate") or entry.get("rate")
+            if rate is None:
+                latest = entry.get("latest")
+                if isinstance(latest, dict):
+                    rate = latest.get("rate") or latest.get("fundingRate")
             rates.append(
                 FundingRate(
                     ts_ms=int(entry.get("timestamp_ms") or entry.get("time") or time.time() * 1000),
                     symbol=str(entry.get("symbol") or entry.get("coin") or "?").upper(),
-                    rate=float(entry.get("fundingRate") or entry.get("rate") or 0.0),
+                    rate=float(rate or 0.0),
                     interval_hours=_coerce_float(entry.get("interval_hours") or entry.get("interval")),
                     exchange=str(entry.get("exchange") or "hyperliquid"),
                     annualized_pct=_coerce_float(entry.get("annualized_pct")),
@@ -233,13 +245,18 @@ class HyperliquidProvider(Provider):
 
     async def stream_funding_rates(self) -> AsyncIterator[FundingRate]:
         async for message in self._stream_endpoint("funding"):
-            for entry in _ensure_list(message):
+            for entry in _normalize_funding_entries(message):
                 if not isinstance(entry, dict):
                     continue
+                rate = entry.get("fundingRate") or entry.get("rate")
+                if rate is None:
+                    latest = entry.get("latest")
+                    if isinstance(latest, dict):
+                        rate = latest.get("rate") or latest.get("fundingRate")
                 yield FundingRate(
                     ts_ms=int(entry.get("timestamp_ms") or entry.get("time") or time.time() * 1000),
                     symbol=str(entry.get("symbol") or entry.get("coin") or "?").upper(),
-                    rate=float(entry.get("fundingRate") or entry.get("rate") or 0.0),
+                    rate=float(rate or 0.0),
                     interval_hours=_coerce_float(entry.get("interval_hours") or entry.get("interval")),
                     exchange=str(entry.get("exchange") or "hyperliquid"),
                     annualized_pct=_coerce_float(entry.get("annualized_pct")),
@@ -283,16 +300,33 @@ class HyperliquidProvider(Provider):
         return trades
 
     async def _stream_endpoint(
-        self, endpoint_key: str, *, params: Optional[Dict[str, Any]] = None, poll_interval: float = 2.0
+        self, endpoint_key: str, *, params: Optional[Dict[str, Any]] = None, poll_interval: float | None = None
     ) -> AsyncIterator[Any]:
         params = params or {}
         ws_factory = getattr(self._client, "ws_connect", None)
+        poll_interval = self._stream_poll_interval if poll_interval is None else poll_interval
         if callable(ws_factory):
-            cm = await ws_factory(endpoint_key, **params)
-            async with cm as ws_iter:
-                async for message in ws_iter:
-                    yield message
-            return
+            backoff = max(0.0, float(self._stream_min_backoff))
+            max_backoff = max(backoff, float(self._stream_max_backoff))
+            while True:
+                try:
+                    maybe_cm = ws_factory(endpoint_key, **params)
+                    if asyncio.iscoroutine(maybe_cm):
+                        cm = await maybe_cm
+                    else:
+                        cm = maybe_cm
+                    async with cm as ws_iter:
+                        backoff = max(0.0, float(self._stream_min_backoff))
+                        async for message in ws_iter:
+                            yield _decode_message(message)
+                    # avoid a tight reconnect loop after graceful close
+                    await asyncio.sleep(backoff)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:
+                    jitter = min(backoff * 0.1, 0.25)
+                    await asyncio.sleep(min(backoff, max_backoff) + jitter)
+                    backoff = min(backoff * 2, max_backoff)
         while True:
             payload = await asyncio.to_thread(self._client.get_json, endpoint_key, **params)
             yield payload
@@ -366,6 +400,43 @@ def _parse_levels(raw: Any) -> list[OrderBookLevel]:
         except (TypeError, ValueError):
             continue
     return levels
+
+
+def _decode_message(message: Any) -> Any:
+    if isinstance(message, (dict, list)):
+        return message
+    if isinstance(message, bytes):
+        try:
+            message = message.decode("utf-8")
+        except Exception:
+            return message
+    if isinstance(message, str):
+        try:
+            return json.loads(message)
+        except Exception:
+            return message
+    return message
+
+
+def _normalize_funding_entries(raw: Any) -> list[dict[str, Any]]:
+    if isinstance(raw, dict):
+        if "funding" in raw:
+            raw = raw.get("funding")
+        if isinstance(raw, list):
+            return [entry for entry in raw if isinstance(entry, dict)]
+        if isinstance(raw, dict):
+            entries: list[dict[str, Any]] = []
+            for symbol, entry in raw.items():
+                if not isinstance(symbol, str):
+                    continue
+                if isinstance(entry, dict):
+                    item = dict(entry)
+                    item.setdefault("symbol", symbol)
+                    entries.append(item)
+                else:
+                    entries.append({"symbol": symbol, "rate": entry})
+            return entries
+    return [entry for entry in _ensure_list(raw) if isinstance(entry, dict)]
 
 
 def _ensure_list(raw: Any) -> list[Any]:
