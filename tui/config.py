@@ -7,6 +7,16 @@ from pathlib import Path
 from typing import Dict, List, Optional
 import json
 import os
+import sys
+
+from pathlib import Path as _Path
+
+_SRC = _Path(__file__).resolve().parents[1] / "src"
+if str(_SRC) not in sys.path:
+    sys.path.insert(0, str(_SRC))
+
+from tickertape.core.paths import resolve_config_path as _resolve_config_path
+from tickertape.core.paths import resolve_secrets_path as _resolve_secrets_path
 
 
 DEFAULT_DATA_ROOT = Path("data/parquet")
@@ -35,21 +45,8 @@ class TuiConfig:
         return payload
 
 
-def _env_path(name: str) -> Optional[Path]:
-    value = os.environ.get(name)
-    if value:
-        return Path(value)
-    return None
-
-
 def default_config_path() -> Path:
-    env_path = _env_path("TICKERTAPE_CONFIG")
-    if env_path:
-        return env_path
-    repo_default = Path(".tickertape") / "config.json"
-    if repo_default.exists():
-        return repo_default
-    return Path.home() / ".tickertape" / "config.json"
+    return _resolve_config_path()
 
 
 def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
@@ -76,12 +73,13 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
         or payload.get("profile")
         or DEFAULT_PROFILE
     )
-    secrets_path = (
+    secrets_override = (
         overrides.get("secrets_path")
         or os.environ.get("TICKER_TAPE_SECRETS_PATH")
         or os.environ.get("TICKERTAPE_SECRETS_PATH")
         or payload.get("secrets_path")
     )
+    secrets_path = _resolve_secrets_path(secrets_override) if secrets_override else None
     alerts = payload.get("alerts") or {}
     panel_overrides = payload.get("panel_overrides") or {}
     funding_exchanges = payload.get("funding_exchanges") or DEFAULT_FUNDING_EXCHANGES

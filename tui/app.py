@@ -31,6 +31,7 @@ from config.secrets import (
     open_in_editor,
     resolve_secrets_path,
 )
+from tui.core import cache as cache_store
 from tui.core.cache import load_cache, save_cache
 from tui.core.commands import CommandRegistry
 from tui.core.router import Route, parse_route
@@ -47,6 +48,8 @@ from tui.config import (
     update_funding_exchanges,
 )
 from tui.state.session import load_session_state, save_session_state, get_profile_state
+from tui.state.alerts import AlertStore, AlertStream
+from tickertape.core.alerts import AlertEvent, AlertSeverity
 from tui.ui.screens.home import HomeScreen
 from tui.ui.screens.command_palette import CommandPaletteScreen
 from tui.ui.screens.profile_day_trader import DayTraderScreen
@@ -71,6 +74,11 @@ from backend.storage import DatasetRegistry
 from backend.query_helpers import load_latest_snapshot
 from tui.state.datasets import latest_timeframe, load_datasets
 from tui.validation import extract_rows, run_validation
+from commands.backtest import backtest_run_command
+from commands.diagnose import diagnose_command
+from commands.jobs import jobs_command
+from backtesting.monte_carlo import resample_paths
+from backtesting.job import DEFAULT_ROOT as JOB_ROOT, read_result
 
 
 class TickerTapeApp(App):
@@ -92,6 +100,8 @@ class TickerTapeApp(App):
         self.session_state = load_session_state()
         self.theme_manager = ThemeManager(self.session_state)
         self.theme_tokens: dict[str, str] = {}
+        if cache_store.CACHE_PATH == cache_store.DEFAULT_CACHE_PATH:
+            cache_store.CACHE_PATH = self.config.data_root / "ui_cache.json"
         self._cache = load_cache()
         self._cache.setdefault("preferences", {"refresh_interval_s": 1.0})
         self._errors: List[str] = []
@@ -103,6 +113,12 @@ class TickerTapeApp(App):
         self._history_index: int = 0
         self._top_symbols: List[str] = []
         self.selected_symbol = self._load_selected_symbol()
+        self.alert_store = AlertStore()
+        self._alert_last_ts: dict[str, int] = {}
+        self.alert_stream = AlertStream(
+            store=self.alert_store,
+            on_alert=self._on_stream_alert,
+        )
         registry_path = self.config.data_root / "_registry.json"
         self.provider = HyperliquidProvider(
             registry=DatasetRegistry(path=registry_path),
@@ -122,6 +138,7 @@ class TickerTapeApp(App):
     def on_mount(self) -> None:
         self.apply_palette(self.theme_manager.current())
         self._push_screen(HomeScreen(), route="home")
+        self.alert_stream.start()
         if self.secrets_notice:
             self.notify(self.secrets_notice, severity="information")
         if getattr(self, "_show_wizard", False):
@@ -135,6 +152,60 @@ class TickerTapeApp(App):
         except Exception:
             pass
         save_cache(self._cache)
+
+    def is_alert_enabled(self, alert_type: str) -> bool:
+        try:
+            return bool(self.config.alerts.get(alert_type, False))
+        except Exception:
+            return False
+
+    def emit_alert(
+        self,
+        *,
+        alert_type: str,
+        severity: AlertSeverity,
+        source_feed: str,
+        payload: dict,
+        key: str | None = None,
+        min_interval_ms: int = 30000,
+    ) -> bool:
+        now_ms = int(time.time() * 1000)
+        throttle_key = f"{alert_type}:{key or source_feed}"
+        last = self._alert_last_ts.get(throttle_key)
+        if last is not None and (now_ms - last) < min_interval_ms:
+            return False
+        event = AlertEvent(
+            alert_type=alert_type,
+            severity=severity,
+            source_feed=source_feed,
+            timestamp_ms=now_ms,
+            payload=payload or {},
+        )
+        self.alert_store.add(event)
+        if not self.alert_store.muted:
+            self._notify_alert(event)
+        self._alert_last_ts[throttle_key] = now_ms
+        return True
+
+    def _notify_alert(self, alert: AlertEvent) -> None:
+        if alert.severity == AlertSeverity.CRITICAL:
+            level = "error"
+        elif alert.severity == AlertSeverity.WARNING:
+            level = "warning"
+        else:
+            level = "information"
+        try:
+            self.notify(
+                f"{alert.alert_type}: {alert.payload.get('message', '')}".strip(),
+                severity=level,
+            )
+        except Exception:
+            pass
+
+    def _on_stream_alert(self, alert: AlertEvent) -> None:
+        if self.alert_store.muted:
+            return
+        self._notify_alert(alert)
 
     def apply_palette(self, palette) -> None:
         self.styles.background = palette.bg.primary
@@ -380,6 +451,9 @@ class TickerTapeApp(App):
             "fullscreen", "Toggle fullscreen mode.", self._cmd_fullscreen
         )
         self.command_registry.register(
+            "alerts", "List or manage alerts.", self._cmd_alerts
+        )
+        self.command_registry.register(
             "tab", "Switch to a tab by name or index.", self._cmd_tab
         )
         self.command_registry.register(
@@ -387,6 +461,9 @@ class TickerTapeApp(App):
         )
         self.command_registry.register(
             "diagnostics", "Run connectivity diagnostics.", self._cmd_diagnostics
+        )
+        self.command_registry.register(
+            "jobs", "List or inspect backtest jobs.", self._cmd_jobs
         )
         self.command_registry.register(
             "select",
@@ -602,10 +679,14 @@ class TickerTapeApp(App):
         return "Grid layout not available."
 
     def _cmd_diagnostics(self, _cmd: str, _args: List[str]) -> str:
-        report = self.provider.diagnostics()
-        http = report.get("http", "unknown")
-        ws = report.get("ws", "not configured")
-        return f"Diagnostics: http={http} | ws={ws}"
+        try:
+            return diagnose_command(self.provider)
+        except Exception as exc:
+            return f"Diagnostics failed: {exc}"
+
+    def _cmd_jobs(self, _cmd: str, args: List[str]) -> str:
+        result = jobs_command("jobs", args)
+        return result or ""
 
     def _cmd_theme(self, _cmd: str, args: List[str]) -> str:
         themes = self.theme_manager.available()
@@ -762,10 +843,60 @@ class TickerTapeApp(App):
         return "Anomalies: " + ", ".join(result)
 
     def _cmd_backtest(self, _cmd: str, _args: List[str]) -> str:
-        return "Backtest engine not available yet."
+        return backtest_run_command(_args)
 
     def _cmd_mc(self, _cmd: str, _args: List[str]) -> str:
-        return "Monte Carlo engine not available yet."
+        if not _args:
+            return "Usage: mc --run-id <id> [--root PATH] [--runs N] [--seed N]"
+        run_id = None
+        root = JOB_ROOT
+        runs = 100
+        seed = 0
+        if "--run-id" in _args:
+            try:
+                i = _args.index("--run-id")
+                run_id = _args[i + 1]
+            except Exception:
+                return "Error: invalid --run-id usage"
+        if "--root" in _args:
+            try:
+                i = _args.index("--root")
+                root = _args[i + 1]
+            except Exception:
+                return "Error: invalid --root usage"
+        if "--runs" in _args:
+            try:
+                i = _args.index("--runs")
+                runs = int(_args[i + 1])
+            except Exception:
+                return "Error: invalid --runs usage"
+        if "--seed" in _args:
+            try:
+                i = _args.index("--seed")
+                seed = int(_args[i + 1])
+            except Exception:
+                return "Error: invalid --seed usage"
+        if not run_id:
+            return "Usage: mc --run-id <id> [--root PATH] [--runs N] [--seed N]"
+        run_dir = Path(root) / run_id
+        if not run_dir.exists():
+            return f"Run not found: {run_id}"
+        try:
+            res = read_result(str(run_dir))
+        except Exception as exc:
+            return f"Error reading run: {exc}"
+        curve = res.get("equity_curve") or []
+        if len(curve) < 2:
+            return "Run has insufficient equity data."
+        returns = []
+        for i in range(1, len(curve)):
+            prev = curve[i - 1]
+            if prev:
+                returns.append((curve[i] - prev) / prev)
+            else:
+                returns.append(0.0)
+        mc = resample_paths(returns, runs=runs, seed=seed, starting_value=float(curve[0]))
+        return f"MC complete: runs={runs} p50_end={mc.percentiles['p50'][-1]:.2f}"
 
     def _cmd_bt_export(self, _cmd: str, _args: List[str]) -> str:
         return "Backtest export not available yet."
@@ -800,6 +931,28 @@ class TickerTapeApp(App):
     def _cmd_metrics(self, _cmd: str, args: List[str]) -> str:
         target = args[0] if args else "current"
         return f"No metrics available for {target}."
+
+    def _cmd_alerts(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            if not self.alert_store.alerts:
+                return "No alerts."
+            lines = []
+            for alert in self.alert_store.alerts[-10:]:
+                lines.append(
+                    f"{alert.severity.value.upper()} {alert.alert_type} ({alert.source_feed})"
+                )
+            return "\n".join(lines)
+        action = args[0].lower()
+        if action == "clear":
+            self.alert_store.clear()
+            return "Alerts cleared."
+        if action == "mute":
+            self.alert_store.set_muted(True)
+            return "Alerts muted."
+        if action == "unmute":
+            self.alert_store.set_muted(False)
+            return "Alerts unmuted."
+        return "Usage: alerts [clear|mute|unmute]"
 
     def _cmd_errors(self, _cmd: str, _args: List[str]) -> str:
         if not self._errors:

@@ -13,6 +13,10 @@ from tui.feeds.funding import MultiExchangeFundingFeed
 from tui.feeds.hyperliquid import HyperliquidClient
 from tui.render.sparkline import heat_bar
 from tui.ui.screens.base import BaseScreen
+from tickertape.core.alerts import AlertSeverity
+
+
+FUNDING_EXTREME_RATE = 0.0001
 
 
 class FundingArbitrageScreen(BaseScreen):
@@ -52,12 +56,69 @@ class FundingArbitrageScreen(BaseScreen):
             self._next_fetch = now + self._feed.next_delay(
                 self._result.status if self._result else "error"
             )
+            self._check_alerts()
         self._render()
 
     def _render(self) -> None:
         self.set_status(_status_line(self._result))
         lines = _build_lines(self._result)
         self.body.update("\n".join(lines))
+
+    def _check_alerts(self) -> None:
+        if not hasattr(self, "app"):
+            return
+        if not self.app.is_alert_enabled("funding_extremes"):
+            return
+        payload = self._result.data if self._result and isinstance(self._result.data, dict) else {}
+        rows = payload.get("rows") if isinstance(payload, dict) else None
+        if isinstance(rows, list):
+            for row in rows[:10]:
+                rate = row.get("rate")
+                symbol = str(row.get("symbol") or "?")
+                exchange = str(row.get("exchange") or "?")
+                try:
+                    rate_val = float(rate)
+                except (TypeError, ValueError):
+                    continue
+                if abs(rate_val) < FUNDING_EXTREME_RATE:
+                    continue
+                self.app.emit_alert(
+                    alert_type="funding_extremes",
+                    severity=AlertSeverity.WARNING,
+                    source_feed="funding",
+                    payload={
+                        "message": f"{exchange} {symbol} rate {rate_val:+.5f}",
+                        "symbol": symbol,
+                        "exchange": exchange,
+                        "rate": rate_val,
+                    },
+                    key=f"{exchange}:{symbol}",
+                    min_interval_ms=60000,
+                )
+        arbitrage = payload.get("arbitrage") if isinstance(payload, dict) else None
+        if isinstance(arbitrage, list) and arbitrage:
+            row = arbitrage[0]
+            symbol = row.get("symbol") or "?"
+            spread = row.get("spread_pct")
+            try:
+                spread_val = float(spread)
+            except (TypeError, ValueError):
+                spread_val = None
+            if spread_val is not None:
+                self.app.emit_alert(
+                    alert_type="funding_extremes",
+                    severity=AlertSeverity.WARNING,
+                    source_feed="funding",
+                    payload={
+                        "message": f"{symbol} spread {spread_val:.2f}%",
+                        "symbol": symbol,
+                        "spread_pct": spread_val,
+                        "max_exchange": row.get("max_exchange"),
+                        "min_exchange": row.get("min_exchange"),
+                    },
+                    key=f"arb:{symbol}",
+                    min_interval_ms=60000,
+                )
 
 
 def _build_lines(result: Optional[FeedResult]) -> List[str]:

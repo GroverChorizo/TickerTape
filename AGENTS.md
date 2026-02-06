@@ -2,6 +2,15 @@
 
 This document lists the commands that automated agents should use to interact with the TickerTape repository.  Keep it concise (~60 lines).  All commands operate in the repository root.
 
+## Playbooks
+
+Use the institutional playbooks for implementation and review:
+
+- `playbooks/backend_quant_engineer.md`
+- `playbooks/frontend_tui_architect.md`
+- `playbooks/research_reviewer.md`
+- `playbooks/privacy_security_auditor.md`
+
 ## Installation
 
 ```bash

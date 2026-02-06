@@ -46,5 +46,5 @@ Quantitative researchers require a local-first, institutional-grade environment 
 
 ---
 
-For implementation details, see BtheVision_v1_5_5.txt, FtheVision_v1_5_5.txt, AGENTS.md, and playbooks.
-For implementation details, see BtheVision_v1_5_5.txt, FtheVision_v1_5_5.txt, AGENTS.md, and playbooks.
+For implementation details, see `BtheVision_v1_5_5.txt`, `FtheVision_v1_5_5.txt`, `AGENTS.md`, and `playbooks/`.
+

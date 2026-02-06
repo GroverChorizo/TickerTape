@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from .models import (
     FundingRate,
@@ -48,3 +48,21 @@ class Provider(ABC):
 
     def diagnostics(self) -> Optional[dict[str, Any]]:
         return None
+
+    async def stream_ticks(self, symbol: str) -> AsyncIterator[Tick]:
+        raise NotImplementedError
+
+    async def stream_orderbook(self, symbol: str) -> AsyncIterator[OrderBookSnapshot]:
+        raise NotImplementedError
+
+    async def stream_liquidations(self) -> AsyncIterator[LiquidationEvent]:
+        raise NotImplementedError
+
+    async def stream_whale_trades(self) -> AsyncIterator[WhaleTrade]:
+        raise NotImplementedError
+
+    async def stream_funding_rates(self) -> AsyncIterator[FundingRate]:
+        raise NotImplementedError
+
+    async def stream_positions(self) -> AsyncIterator[Position]:
+        raise NotImplementedError

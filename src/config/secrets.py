@@ -36,7 +36,8 @@ def resolve_secrets_path(
 def ensure_secrets_file(path: Path) -> Tuple[Path, bool]:
     """Ensure secrets file exists; return (path, created)."""
     path = Path(path).expanduser().resolve()
-    if path.exists():
+    force_create = os.environ.get("TICKERTAPE_FORCE_SECRETS_CREATE") == "1"
+    if path.exists() and not force_create:
         _ensure_permissions(path)
         return path, False
     path.parent.mkdir(parents=True, exist_ok=True)

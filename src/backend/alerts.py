@@ -7,24 +7,16 @@
 from __future__ import annotations
 import asyncio
 import json
-from dataclasses import dataclass, asdict
+from dataclasses import asdict
 from typing import Any, Dict, List, Optional
 import logging
 import time
 
+from tickertape.core.alerts import AlertEvent, AlertSeverity, AlertService
+
 logger = logging.getLogger(__name__)
 
-
-@dataclass
-class Alert:
-    alert_type: str
-    severity: str
-    source_feed: str
-    timestamp_ms: int
-    payload: Dict[str, Any]
-
-    def to_json(self) -> str:
-        return json.dumps(asdict(self), separators=(",", ":"))
+Alert = AlertEvent
 
 
 class SocketNotifier:
@@ -80,8 +72,8 @@ class SocketNotifier:
                 pass
         self._clients = []
 
-    async def notify(self, alert: Alert) -> None:
-        msg = alert.to_json() + "\n"
+    async def notify(self, alert: AlertEvent) -> None:
+        msg = _alert_to_json(alert) + "\n"
         to_remove: List[asyncio.StreamWriter] = []
         for w in list(self._clients):
             try:
@@ -97,28 +89,63 @@ class SocketNotifier:
                 pass
 
 
-class AlertManager:
+class AlertManager(AlertService):
     def __init__(self, notifier: SocketNotifier) -> None:
         self.notifier = notifier
-        self.alert_history: List[Alert] = []
+        self.alert_history: List[AlertEvent] = []
 
     async def emit(
-        self, alert_type: str, severity: str, source_feed: str, payload: Dict[str, Any]
+        self,
+        alert: AlertEvent | str,
+        severity: str | AlertSeverity | None = None,
+        source_feed: str | None = None,
+        payload: Dict[str, Any] | None = None,
     ) -> None:
-        alert = Alert(
-            alert_type=alert_type,
-            severity=severity,
-            source_feed=source_feed,
-            timestamp_ms=int(time.time() * 1000),
-            payload=payload,
-        )
-        self.alert_history.append(alert)
+        """Emit an alert.
+
+        Accepts either a fully-formed AlertEvent or legacy parts for compatibility.
+        """
+        if isinstance(alert, AlertEvent):
+            event = alert
+        else:
+            event = AlertEvent(
+                alert_type=alert,
+                severity=_coerce_severity(severity or AlertSeverity.INFO),
+                source_feed=source_feed or "unknown",
+                timestamp_ms=int(time.time() * 1000),
+                payload=payload or {},
+            )
+        self.alert_history.append(event)
         logger.info(
             {
                 "event": "alert_emitted",
-                "alert_type": alert_type,
-                "severity": severity,
-                "source": source_feed,
+                "alert_type": event.alert_type,
+                "severity": event.severity.value,
+                "source": event.source_feed,
             }
         )
-        await self.notifier.notify(alert)
+        await self.notifier.notify(event)
+
+    async def emit_from_parts(
+        self,
+        alert_type: str,
+        severity: str | AlertSeverity,
+        source_feed: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        await self.emit(alert_type, severity, source_feed, payload)
+
+
+def _coerce_severity(value: str | AlertSeverity) -> AlertSeverity:
+    if isinstance(value, AlertSeverity):
+        return value
+    try:
+        return AlertSeverity(value)
+    except Exception:
+        return AlertSeverity.INFO
+
+
+def _alert_to_json(alert: AlertEvent) -> str:
+    payload = asdict(alert)
+    payload["severity"] = alert.severity.value
+    return json.dumps(payload, separators=(",", ":"))

@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional, Union
 import logging
-import random
 import time
 from enum import Enum
 
@@ -131,8 +130,8 @@ class BaseFeed:
                 status = FeedStatus.ERROR
         if status == FeedStatus.OK:
             return self.poll_interval
-        jitter = random.uniform(0, 0.5)
         self._backoff = min(self._backoff * 2, self.max_backoff)
+        jitter = min(self._backoff * 0.1, 0.5)
         return self._backoff + jitter
 
     def _error_result(self, status: Union[FeedStatus, str], message: str) -> FeedResult:

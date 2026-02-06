@@ -1,0 +1,27 @@
+name: streaming-fixtures
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    paths:
+      - 'tui/**'
+      - 'tests/**'
+
+jobs:
+  streaming-fixtures:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: |
+          python -m pip install -U pip
+          pip install -r requirements.txt
+      - name: Run streaming replay tests
+        run: |
+          pytest -q tests/test_hyperliquid_streaming.py::test_binance_funding_stream_parsed_and_pushed -q
+          pytest -q tests/test_ui_streaming_e2e.py -q

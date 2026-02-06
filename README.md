@@ -28,7 +28,7 @@ This repository contains the full codebase, documentation, and supporting infras
 - **Backend:** `WhaleWatch/TickerTape/BtheVision_v1_5_5.txt`
 - **Frontend:** `WhaleWatch/TickerTape/FtheVision_v1_5_5.txt`
 - **Core Values:** `AGENTS.md`
-- **Role Playbooks:** `/playbooks/`
+- **Role Playbooks:** `playbooks/`
 - **PR Template & Data Integrity Gate:** See `/tools/` and `/tests/`
 
 ---

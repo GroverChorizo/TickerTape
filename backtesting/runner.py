@@ -7,24 +7,13 @@ Strategy contract (minimal): the strategy file must define a function
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import time
 from typing import List, Optional
 
 from .models import BacktestResult, BacktestJobMetadata
 from .job import write_metadata, write_result, new_run_dir
-
-
-def _load_strategy_from_file(path: str):
-    spec = importlib.util.spec_from_file_location("__strategy__", path)
-    if spec is None or spec.loader is None:
-        raise ImportError(f"Could not load strategy from {path}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[attr-defined]
-    if not hasattr(mod, "run"):
-        raise AttributeError("Strategy file must define a `run(prices, seed)` function")
-    return mod
+from .loader import run_strategy_file
 
 
 def run_from_file(
@@ -35,18 +24,22 @@ def run_from_file(
     seed: Optional[int] = None,
     run_id: Optional[str] = None,
     job_root: Optional[str] = None,
+    confirm_exec: bool = False,
 ) -> BacktestResult:
     started = int(time.time() * 1000)
-    mod = _load_strategy_from_file(strategy_path)
-    # Strategy signature: run(prices, seed) -> equity_curve
-    equity_curve = mod.run(prices, seed)
+    equity_curve = run_strategy_file(
+        strategy_path,
+        prices,
+        seed=seed,
+        confirm_exec=confirm_exec,
+    )
     finished = int(time.time() * 1000)
     run_id = run_id or os.path.basename(new_run_dir(job_root))
 
     metadata = BacktestJobMetadata(
         run_id=run_id,
         strategy=os.path.basename(strategy_path),
-        strategy_version=getattr(mod, "__version__", None),
+        strategy_version=None,
         dataset=dataset,
         params={},
         seed=seed,

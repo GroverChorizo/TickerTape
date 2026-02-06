@@ -39,6 +39,12 @@
       "reason": "Randomness allowed in tests only; must be seeded."
     },
     {
+      "file": "PRD.md",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "synthetic data",
+      "reason": "PRD documentation is allowed to mention synthetic data."
+    },
+    {
       "file": "WhaleWatch/TickerTape/PRD.md",
       "category": "synthetic_or_fake_data",
       "pattern_contains": "synthetic data",
@@ -49,6 +55,90 @@
       "category": "synthetic_or_fake_data",
       "pattern_contains": "synthetic data",
       "reason": "Config file may reference synthetic data patterns."
+    },
+    {
+      "file": "BtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "random.",
+      "reason": "Vision docs may include example code."
+    },
+    {
+      "file": "BtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "simulat",
+      "reason": "Vision docs may include example wording."
+    },
+    {
+      "file": "BtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "synthetic data",
+      "reason": "Vision docs may reference prohibitions."
+    },
+    {
+      "file": "docs/BtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "random.",
+      "reason": "Vision docs may include example code."
+    },
+    {
+      "file": "docs/BtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "simulat",
+      "reason": "Vision docs may include example wording."
+    },
+    {
+      "file": "docs/BtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "synthetic data",
+      "reason": "Vision docs may reference prohibitions."
+    },
+    {
+      "file": "FtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "random.",
+      "reason": "Vision docs may include example code."
+    },
+    {
+      "file": "FtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "simulat",
+      "reason": "Vision docs may include example wording."
+    },
+    {
+      "file": "FtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "synthetic data",
+      "reason": "Vision docs may reference prohibitions."
+    },
+    {
+      "file": "docs/FtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "random.",
+      "reason": "Vision docs may include example code."
+    },
+    {
+      "file": "docs/FtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "simulat",
+      "reason": "Vision docs may include example wording."
+    },
+    {
+      "file": "docs/FtheVision_v1_5_5.txt",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "synthetic data",
+      "reason": "Vision docs may reference prohibitions."
+    },
+    {
+      "file": "specs/",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "simulat",
+      "reason": "Specs may describe Monte Carlo and other testing flows."
+    },
+    {
+      "file": "IMPLEMENTATION_PLAN.md",
+      "category": "synthetic_or_fake_data",
+      "pattern_contains": "simulat",
+      "reason": "Plan may reference Monte Carlo terminology."
     }
   ]
 }

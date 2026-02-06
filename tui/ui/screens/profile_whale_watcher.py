@@ -10,12 +10,16 @@ from tui.feeds.base import FeedResult
 from tui.feeds.hyperliquid import HyperliquidClient, WhaleTradesFeed
 from tui.render.sparkline import heat_bar
 from tui.ui.screens.base import BaseScreen
+from tickertape.core.alerts import AlertSeverity
 
 
 @dataclass
 class WhaleFilter:
     side: str = "all"
     min_notional: float = 25_000.0
+
+
+WHALE_ALERT_USD = 500_000
 
 
 class WhaleWatcherScreen(BaseScreen):
@@ -55,7 +59,34 @@ class WhaleWatcherScreen(BaseScreen):
             self._next_fetch = now + self._feed.next_delay(
                 self._result.status if self._result else "error"
             )
+            self._check_alerts()
         self._render()
+
+    def _check_alerts(self) -> None:
+        if not hasattr(self, "app"):
+            return
+        if not self.app.is_alert_enabled("whale_trades"):
+            return
+        trades = _extract_trades(self._result)
+        for trade in trades[:10]:
+            symbol = _trade_symbol(trade).upper()
+            side = _trade_side(trade)
+            notional = _trade_notional(trade)
+            if notional < WHALE_ALERT_USD:
+                continue
+            self.app.emit_alert(
+                alert_type="whale_trades",
+                severity=AlertSeverity.WARNING,
+                source_feed="whales",
+                payload={
+                    "message": f"{symbol} {side} ${notional:,.0f}",
+                    "symbol": symbol,
+                    "side": side,
+                    "notional_usd": notional,
+                },
+                key=f"{symbol}:{side}",
+                min_interval_ms=30000,
+            )
 
     def _render(self) -> None:
         lines, wallets = _build_lines(self._result, self._filter)

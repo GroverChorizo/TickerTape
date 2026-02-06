@@ -12,9 +12,12 @@ from tui.feeds.hyperliquid import HyperliquidClient, LiquidationsFeed, WhaleTrad
 from tui.feeds.market_data import MarketDataFeed
 from tui.render.sparkline import sparkline
 from tui.ui.screens.base import BaseScreen
+from tickertape.core.alerts import AlertSeverity
 
 
 DEFAULT_WATCHLIST = ["BTC", "ETH", "SOL"]
+WHALE_ALERT_USD = 500_000
+ANOMALY_THRESHOLD_PCT = 0.05
 
 
 @dataclass
@@ -118,7 +121,76 @@ class DayTraderScreen(BaseScreen):
                 self._liq_result.status
             )
 
+        self._check_alerts()
         self._render()
+
+    def _check_alerts(self) -> None:
+        if not hasattr(self, "app"):
+            return
+        if self.app.is_alert_enabled("whale_trades"):
+            self._check_whale_trades()
+        if self.app.is_alert_enabled("anomaly_spikes"):
+            self._check_anomalies()
+
+    def _check_whale_trades(self) -> None:
+        result = self._whale_result
+        if not result or not isinstance(result.data, dict):
+            return
+        trades = result.data.get("trades")
+        if isinstance(trades, dict):
+            trades = trades.get("trades") or trades.get("data") or trades.get("events")
+        if not isinstance(trades, list):
+            return
+        for trade in trades[:10]:
+            if not isinstance(trade, dict):
+                continue
+            symbol = str(trade.get("symbol") or trade.get("coin") or "").upper()
+            notional = _coerce_float(
+                trade.get("notional_usd")
+                or trade.get("value_usd")
+                or trade.get("notional")
+            )
+            if notional is None or notional < WHALE_ALERT_USD:
+                continue
+            side = str(trade.get("side") or trade.get("direction") or "unknown")
+            self.app.emit_alert(
+                alert_type="whale_trades",
+                severity=AlertSeverity.WARNING,
+                source_feed="whales",
+                payload={
+                    "message": f"{symbol} {side} ${notional:,.0f}",
+                    "symbol": symbol,
+                    "side": side,
+                    "notional_usd": notional,
+                },
+                key=f"{symbol}:{side}",
+                min_interval_ms=30000,
+            )
+
+    def _check_anomalies(self) -> None:
+        for symbol, history in self._state.price_history.items():
+            if len(history) < 5:
+                continue
+            last = history[-1]
+            window = history[-10:] if len(history) >= 10 else history
+            mean = sum(window) / len(window)
+            if mean <= 0:
+                continue
+            deviation = abs(last - mean) / mean
+            if deviation >= ANOMALY_THRESHOLD_PCT:
+                self.app.emit_alert(
+                    alert_type="anomaly_spikes",
+                    severity=AlertSeverity.WARNING,
+                    source_feed="market_data",
+                    payload={
+                        "message": f"{symbol} deviation {deviation*100:.1f}%",
+                        "symbol": symbol,
+                        "deviation_pct": deviation * 100,
+                        "price": last,
+                    },
+                    key=f"{symbol}:anomaly",
+                    min_interval_ms=60000,
+                )
 
     def _update_price_history(self, result: Optional[FeedResult]) -> None:
         if not result or not isinstance(result.data, dict):
@@ -265,6 +337,13 @@ def _fmt_num(value: Any) -> str:
     if abs(num) >= 1000:
         return f"{num:,.2f}"
     return f"{num:.4f}"
+
+
+def _coerce_float(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _status_line(result: Optional[FeedResult], now_ms: int) -> str:
