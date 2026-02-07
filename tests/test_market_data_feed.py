@@ -52,6 +52,7 @@ def test_parse_candles_minimal_schema():
 
 def test_market_data_feed_disconnect_and_recovery():
     responses = {
+        ("ticks_latest", ()): [{"symbol": "BTC", "price": 1}],
         ("prices", ()): [{"symbol": "BTC", "price": 1}],
         ("price", (("symbol", "BTC"),)): {"bestBid": 1, "bestAsk": 2},
         ("orderbook", (("symbol", "BTC"),)): {"bids": [[1, 1]], "asks": [[2, 1]]},
@@ -67,7 +68,7 @@ def test_market_data_feed_disconnect_and_recovery():
     first = feed.fetch_result()
     assert first.status == "ok"
 
-    error = ConnectionError("offline")
+    error = TimeoutError("offline")
     for key in list(responses.keys()):
         responses[key] = error
     feed._last_fetch = {k: 0.0 for k in feed._last_fetch}
@@ -75,6 +76,7 @@ def test_market_data_feed_disconnect_and_recovery():
     assert disconnected.status == "disconnected"
     assert disconnected.data is not None
 
+    responses[("ticks_latest", ())] = [{"symbol": "BTC", "price": 2}]
     responses[("prices", ())] = [{"symbol": "BTC", "price": 2}]
     responses[("price", (("symbol", "BTC"),))] = {"bestBid": 2, "bestAsk": 3}
     responses[("orderbook", (("symbol", "BTC"),))] = {

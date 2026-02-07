@@ -155,6 +155,13 @@ class MoonDevClient:
                 try:
                     return response.json()
                 except Exception:
+                    text = ""
+                    try:
+                        text = str(getattr(response, "text", "") or "")
+                    except Exception:
+                        text = ""
+                    if text:
+                        return text
                     raise RuntimeError(
                         _format_json_error(method, sanitized_url, response)
                     )

@@ -21,12 +21,8 @@ BASE_URL: str = "https://api.hyperliquid.xyz"  # Source: BtheVision_v1_5_5.txt
 
 # Endpoint paths derived from Vision where available. Do not invent new endpoints.
 ENDPOINT_PATHS: Dict[str, str] = {
-    "whales": "/api/whales.json",
-    "liquidations_stats": "/api/liquidations/stats.json",
-    "funding": "/api/funding.json",
     "info": "/info",
     "candles": "/api/candleSnapshot",
-    "positions": "/api/positions.json",
     # Add or update paths from Vision only
 }
 

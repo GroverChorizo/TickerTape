@@ -50,7 +50,7 @@ def test_ws_adapter_prioritized_and_pushes():
         {
             "prices": [{"price": 100}],
             "orderbook": [{"bids": []}],
-            "hip3_ticks": [[{"t": 1}]],
+            "hip3_ticks_dex": [[{"t": 1}]],
             "info": [{"funding": {"BTC": {"latest": {}}}}],
         }
     )

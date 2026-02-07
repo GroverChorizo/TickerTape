@@ -4,10 +4,10 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from tui.feeds.base import FeedResult
-from tui.ui.screens.profile_funding_arbitrage import _build_lines
+from tui.ui.screens.profile_funding_arbitrage import _extract_arbitrage
 
 
-def test_funding_arbitrage_sections():
+def test_funding_arbitrage_extracts_arbitrage():
     payload = {
         "rows": [
             {
@@ -27,7 +27,6 @@ def test_funding_arbitrage_sections():
         ],
     }
     result = FeedResult(status="ok", data=payload, updated_ts_ms=1)
-    text = "\n".join(_build_lines(result))
-    assert "Funding Heatmap" in text
-    assert "Funding Extremes" in text
-    assert "Arbitrage Comparison" in text
+    arb = _extract_arbitrage(result)
+    assert "arbitrage" in arb
+    assert isinstance(arb["arbitrage"], list)

@@ -1,11 +1,12 @@
 import sys
 import os
+import platform
 
 sys.path.insert(
     0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 )
 from pathlib import Path
-from backend.secrets import load_secrets
+from backend.secrets import load_secrets, legacy_secrets_file_path, canonical_secrets_file_path
 
 
 def write_file(path: Path, content: str) -> None:
@@ -44,3 +45,23 @@ def test_load_secrets_default_fallback(monkeypatch, tmp_path):
 def test_load_secrets_no_file_returns_empty(tmp_path):
     data = load_secrets(path=tmp_path / "nonexistent.env")
     assert data == {}
+
+
+def test_legacy_secrets_path_detected(monkeypatch, tmp_path):
+    if "windows" not in platform.system().lower():
+        return
+    # simulate Windows legacy AppData location
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    legacy_dir = tmp_path / "TickerTape" / "secrets"
+    legacy_dir.mkdir(parents=True, exist_ok=True)
+    legacy_file = legacy_dir / "HLdontShare.env"
+    write_file(legacy_file, "MOONDEV_API_KEY=legacy\n")
+    found = legacy_secrets_file_path()
+    assert found == legacy_file.resolve()
+
+
+def test_canonical_secrets_path():
+    canonical = canonical_secrets_file_path()
+    assert str(canonical).endswith(
+        ".tickertape" + os.sep + "secrets" + os.sep + "HLdontShare.env"
+    )

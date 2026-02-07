@@ -59,6 +59,11 @@ class LiquidationsRadarFeed(BaseFeed):
         error_messages: List[str] = []
         disconnect_flags: List[bool] = []
         timeframe_stats: Dict[str, Dict[str, Any]] = {}
+        combined_stats: Dict[str, Any] = {}
+        combined_timeframes: Dict[str, Any] = {}
+        exchange_stats: Dict[str, Any] = {}
+        exchange_timeframes: Dict[str, Any] = {}
+        hip3_snapshot: Dict[str, Any] = {}
         raw_events: List[Dict[str, Any]] = []
 
         for tf in TIMEFRAMES:
@@ -79,6 +84,55 @@ class LiquidationsRadarFeed(BaseFeed):
             error_messages.append(str(exc))
             disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
 
+        try:
+            stats_payload["scan_summary"] = self.client.get_json(
+                "liquidations_scan_summary"
+            )
+        except Exception as exc:
+            error_messages.append(str(exc))
+            disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
+
+        try:
+            combined_stats = self.client.get_json("all_liquidations_stats")
+        except Exception as exc:
+            error_messages.append(str(exc))
+            disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
+
+        try:
+            combined_timeframes["1h"] = self.client.get_json(
+                "all_liquidations", timeframe="1h"
+            )
+        except Exception as exc:
+            error_messages.append(str(exc))
+            disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
+
+        for exchange_key, stats_key, tf_key in [
+            ("binance", "binance_liquidations_stats", "binance_liquidations"),
+            ("bybit", "bybit_liquidations_stats", "bybit_liquidations"),
+            ("okx", "okx_liquidations_stats", "okx_liquidations"),
+        ]:
+            try:
+                exchange_stats[exchange_key] = self.client.get_json(stats_key)
+            except Exception as exc:
+                error_messages.append(str(exc))
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
+            try:
+                exchange_timeframes[exchange_key] = self.client.get_json(
+                    tf_key, timeframe="1h"
+                )
+            except Exception as exc:
+                error_messages.append(str(exc))
+                disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
+
+        try:
+            hip3_snapshot["liqs_1h"] = self.client.get_json(
+                "hip3_liquidations", timeframe="1h"
+            )
+            hip3_snapshot["stats"] = self.client.get_json("hip3_liquidations_stats")
+        except Exception as exc:
+            error_messages.append(str(exc))
+            disconnect_flags.append(isinstance(exc, (TimeoutError, OSError)))
+
         if not raw_events:
             raw_events = _extract_largest_events(stats_payload)
         events = _normalize_events(raw_events, source="moondev")
@@ -94,6 +148,11 @@ class LiquidationsRadarFeed(BaseFeed):
 
         payload = {
             "timeframes": timeframe_stats,
+            "combined_timeframes": combined_timeframes,
+            "combined_stats": combined_stats,
+            "exchange_stats": exchange_stats,
+            "exchange_timeframes": exchange_timeframes,
+            "hip3": hip3_snapshot,
             "events": [event.__dict__ for event in events],
             "rollups": rollups,
             "series": series,

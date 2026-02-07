@@ -1,0 +1,3 @@
+[console_scripts]
+TTape = tui.app:run
+TickerTape = tui.app:run

@@ -34,7 +34,7 @@ async def _ws_factory_for_all(endpoint_key, **kwargs):
             except StopIteration:
                 raise StopAsyncIteration
 
-    if endpoint_key in ("prices", "ticks"):
+    if endpoint_key in ("prices", "ticks_latest"):
         return FakeWS([json.dumps({"tick": {"symbol": "BTC", "px": 43000}})])
     if endpoint_key == "orderbook":
         return FakeWS([json.dumps({"bids": [[43000, 1.2]], "asks": [[43010, 0.8]]})])

@@ -10,6 +10,7 @@ import time
 from backend.storage import DatasetRegistry, partition_and_write
 from .base import BaseFeed
 from .moondev_client import MoonDevClient
+from providers.hyperliquid import DirectHyperliquidClient
 
 logger = logging.getLogger(__name__)
 
@@ -29,26 +30,42 @@ class HyperliquidClient:
         base_url: str = "https://api.moondev.com",
         timeout: float = 10.0,
         retries: int = 3,
+        direct_client: Optional[DirectHyperliquidClient] = None,
+        moondev_client: Optional[MoonDevClient] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.retries = retries
-        self._client = MoonDevClient(
+        self._moondev = moondev_client or MoonDevClient(
             base_url=self.base_url, timeout=timeout, retries=retries
         )
+        self._direct = direct_client or DirectHyperliquidClient(fallback=self._moondev)
 
     def close(self) -> None:
-        self._client.close()
+        try:
+            self._moondev.close()
+        except Exception:
+            pass
+        try:
+            self._direct.close()
+        except Exception:
+            pass
 
     def get_json(
         self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> Any:
-        return self._client.get_json(endpoint_key, params=params, **kwargs)
+        return self._direct.get_json(endpoint_key, params=params, **kwargs)
 
     def post_json(
         self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any
     ) -> Any:
-        return self._client.post_json(endpoint_key, payload, **kwargs)
+        try:
+            return self._direct.get_json(endpoint_key, params=payload, **kwargs)
+        except Exception:
+            return self._moondev.post_json(endpoint_key, payload, **kwargs)
+
+    async def ws_connect(self, endpoint_key: str, **kwargs: Any):
+        return await self._moondev.ws_connect(endpoint_key, **kwargs)
 
 
 class LiquidationsFeed(BaseFeed):
@@ -105,7 +122,20 @@ class FundingRatesFeed(BaseFeed):
     def fetch(self) -> Dict[str, Any]:
         end_ms = int(time.time() * 1000)
         payloads: Dict[str, Dict[str, Any]] = {}
-        if hasattr(self.client, "post"):
+        if hasattr(self.client, "post_json"):
+            start_ms = end_ms - 60 * 60 * 1000
+            for coin in self.coins:
+                history = self.client.post_json(
+                    "info",
+                    {"type": "fundingHistory", "coin": coin, "startTime": start_ms},
+                )
+                points = _parse_funding_history(history)
+                latest = points[-1] if points else None
+                payloads[coin] = {
+                    "history": [p.__dict__ for p in points[-12:]],
+                    "latest": latest.__dict__ if latest else None,
+                }
+        elif hasattr(self.client, "post"):
             start_ms = end_ms - 60 * 60 * 1000
             for coin in self.coins:
                 history = self.client.post(

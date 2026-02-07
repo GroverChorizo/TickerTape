@@ -83,7 +83,7 @@ class MarketDataFeed(BaseFeed):
 
         if self._due(now, "prices"):
             try:
-                raw = self.client.get_json("prices")
+                raw = self.client.get_json("ticks_latest")
                 parsed = _parse_top_coins(raw)
                 if parsed:
                     self._cache["top_coins"] = parsed
@@ -94,6 +94,21 @@ class MarketDataFeed(BaseFeed):
                 logger.warning(
                     {"event": "market_data_prices_failed", "error": str(exc)}
                 )
+                try:
+                    raw = self.client.get_json("prices")
+                    parsed = _parse_top_coins(raw)
+                    if parsed:
+                        self._cache["top_coins"] = parsed
+                        updated_any = True
+                except Exception as exc2:
+                    errors.append(f"prices_fallback: {exc2}")
+                    disconnect_flags.append(isinstance(exc2, (TimeoutError, OSError)))
+                    logger.warning(
+                        {
+                            "event": "market_data_prices_fallback_failed",
+                            "error": str(exc2),
+                        }
+                    )
             self._last_fetch["prices"] = now
 
         if self._due(now, "quick"):
@@ -188,6 +203,67 @@ class MarketDataFeed(BaseFeed):
         self._persist_snapshot(payload)
         return payload
 
+    def push(self, payload: Any) -> FeedResult:
+        """Merge pushed payloads into the cached market snapshot.
+
+        Streaming endpoints may deliver partial payloads (prices, orderbook,
+        ticks). We normalize and merge those into the cache, then emit a
+        full MarketData payload for panels to render.
+        """
+        updated = False
+        if isinstance(payload, dict):
+            # Full payloads can be pushed directly.
+            if isinstance(payload.get("top_coins"), list):
+                self._cache["top_coins"] = payload.get("top_coins")
+                updated = True
+            if isinstance(payload.get("quick"), dict):
+                self._cache["quick"] = payload.get("quick")
+                updated = True
+            if isinstance(payload.get("orderbook"), dict):
+                self._cache["orderbook"] = payload.get("orderbook")
+                updated = True
+            if isinstance(payload.get("candles_1h"), list):
+                self._cache["candles_1h"] = payload.get("candles_1h")
+                updated = True
+            if isinstance(payload.get("candles_1m"), list):
+                self._cache["candles_1m"] = payload.get("candles_1m")
+                updated = True
+
+            # Try to parse known shapes (prices, orderbook, ticks)
+            top = _parse_top_coins(payload)
+            if top:
+                self._cache["top_coins"] = top
+                updated = True
+            orderbook = _parse_orderbook(payload, depth=10)
+            if orderbook:
+                self._cache["orderbook"] = orderbook
+                updated = True
+
+            symbol = _coerce_str(
+                payload.get("symbol")
+                or payload.get("coin")
+                or (payload.get("tick") or {}).get("symbol")
+            )
+            if symbol and symbol.upper() == self.selected_coin:
+                quick = _parse_quick_price(payload, self.selected_coin)
+                if quick:
+                    self._cache["quick"] = quick
+                    updated = True
+
+        if not updated:
+            return self.latest()
+        payload_out = {
+            "ts_ms": int(time.time() * 1000),
+            "selected_coin": self.selected_coin,
+            "top_coins": self._cache.get("top_coins"),
+            "quick": self._cache.get("quick"),
+            "orderbook": self._cache.get("orderbook"),
+            "candles_1h": self._cache.get("candles_1h"),
+            "candles_1m": self._cache.get("candles_1m"),
+            "errors": [],
+        }
+        return super().push(payload_out)
+
     def _due(self, now: float, key: str) -> bool:
         return (now - self._last_fetch[key]) >= self._intervals[key]
 
@@ -231,6 +307,8 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
             raw.get("data")
             or raw.get("prices")
             or raw.get("coins")
+            or raw.get("ticks")
+            or raw.get("latest")
             or raw.get("result")
             or raw.get("snapshot")
         )
@@ -246,18 +324,38 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
         )
         parsed: List[Dict[str, Any]] = []
         for symbol, price in items.items():
+            entry = price if isinstance(price, dict) else {}
             parsed.append(
                 {
                     "symbol": _coerce_str(symbol) or "?",
-                    "last": _coerce_float(price),
-                    "mid": None,
-                    "funding": _coerce_float(funding_map.get(symbol))
-                    if isinstance(funding_map, dict)
-                    else None,
-                    "open_interest": _coerce_float(oi_map.get(symbol))
-                    if isinstance(oi_map, dict)
-                    else None,
-                    "timestamp_ms": ts,
+                    "last": _coerce_float(
+                        entry.get("price")
+                        or entry.get("latest_price")
+                        or entry.get("latestPrice")
+                        or price
+                    ),
+                    "mid": _coerce_float(
+                        entry.get("mid") or entry.get("mid_price") or entry.get("midPrice")
+                    ),
+                    "funding": _coerce_float(
+                        (funding_map.get(symbol) if isinstance(funding_map, dict) else None)
+                        or entry.get("funding")
+                        or entry.get("funding_rate")
+                        or entry.get("fundingRate")
+                        or entry.get("fundingRateHourly")
+                    ),
+                    "open_interest": _coerce_float(
+                        (oi_map.get(symbol) if isinstance(oi_map, dict) else None)
+                        or entry.get("open_interest")
+                        or entry.get("openInterest")
+                        or entry.get("openInterestUsd")
+                    ),
+                    "timestamp_ms": _coerce_int(
+                        entry.get("timestamp_ms")
+                        or entry.get("timestamp")
+                        or entry.get("time")
+                        or ts
+                    ),
                 }
             )
         return parsed
@@ -268,7 +366,10 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
         if not isinstance(entry, dict):
             continue
         symbol = _coerce_str(
-            entry.get("symbol") or entry.get("coin") or entry.get("asset")
+            entry.get("symbol")
+            or entry.get("coin")
+            or entry.get("asset")
+            or entry.get("ticker")
         )
         if not symbol:
             continue
@@ -276,7 +377,12 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
             {
                 "symbol": symbol,
                 "last": _coerce_float(
-                    entry.get("last") or entry.get("price") or entry.get("mark")
+                    entry.get("last")
+                    or entry.get("price")
+                    or entry.get("latest_price")
+                    or entry.get("latestPrice")
+                    or entry.get("mark")
+                    or entry.get("mid")
                 ),
                 "mid": _coerce_float(
                     entry.get("mid") or entry.get("mid_price") or entry.get("midPrice")
@@ -285,11 +391,13 @@ def _parse_top_coins(raw: Any) -> List[Dict[str, Any]]:
                     entry.get("funding")
                     or entry.get("funding_rate")
                     or entry.get("fundingRate")
+                    or entry.get("fundingRateHourly")
                 ),
                 "open_interest": _coerce_float(
                     entry.get("open_interest")
                     or entry.get("openInterest")
                     or entry.get("oi")
+                    or entry.get("openInterestUsd")
                 ),
                 "timestamp_ms": _coerce_int(
                     entry.get("timestamp_ms")

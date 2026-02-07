@@ -115,7 +115,7 @@ def test_ws_adapter_publishes_messages_to_feeds():
 
 def test_ticks_stream_pushes_to_market_feed():
     async def ws_connect_factory(endpoint_key, **kwargs):
-        if endpoint_key == "ticks":
+        if endpoint_key == "ticks_latest":
             return FakeWS([json.dumps({"symbol": "BTC", "price": 43000})])
         return FakeWS([])
 
@@ -148,7 +148,7 @@ def test_market_throttling_limits_pushes():
                 await asyncio.sleep(0)
                 return json.dumps({"tick": {"symbol": "BTC", "px": 43000}})
 
-        if endpoint_key == "ticks":
+        if endpoint_key == "ticks_latest":
             # produce many ticks in the same loop cycle
             return FastWS(20)
         return FastWS(0)

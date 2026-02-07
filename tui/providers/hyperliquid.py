@@ -1,16 +1,25 @@
-"""Hyperliquid provider backed by MoonDev API."""
+"""Hyperliquid provider with direct HL primary + MoonDev fallback."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from tui.feeds.moondev_client import MoonDevClient
+from tui.feeds.hyperliquid import HyperliquidClient
 from tui.models.liquidations import LiquidationSnapshot
 from tui.models.market import MarketContext
 from tui.feeds.base import FeedResult
 from tui.feeds.liquidations import LiquidationsRadarFeed
 from tui.feeds.market_data import MarketDataFeed
 from tui.feeds.hyperliquid import FundingRatesFeed, WhaleTradesFeed, EventStreamFeed
+from tui.feeds.smart_money import SmartMoneyFeed
+from tui.feeds.hlp import HlpFeed
+from tui.feeds.orderflow import OrderflowFeed
+from tui.feeds.user_data import UserDataFeed
+from tui.feeds.events_contracts import EventsContractsFeed
+from tui.feeds.hip3 import Hip3Feed
+from tui.feeds.whale_insights import WhaleInsightsFeed
+from tui.feeds.positions import PositionsFeed
+from tui.feeds.orderbook_depth import OrderbookDepthFeed
 from backend.storage import DatasetRegistry
 
 
@@ -19,11 +28,11 @@ class HyperliquidProvider:
         self,
         base_url: str = "https://api.moondev.com",
         *,
-        client: Optional[MoonDevClient] = None,
+        client: Optional[HyperliquidClient] = None,
         registry: Optional[DatasetRegistry] = None,
         offline: bool = False,
     ) -> None:
-        self._client = client or MoonDevClient(base_url=base_url)
+        self._client = client or HyperliquidClient(base_url=base_url)
         self._registry = registry or DatasetRegistry()
         self._liquidations_feed = LiquidationsRadarFeed(
             self._client, registry=self._registry, offline=offline
@@ -37,6 +46,30 @@ class HyperliquidProvider:
         )
         self._whales_feed = WhaleTradesFeed(self._client, offline=offline)
         self._events_feed = EventStreamFeed(self._client, offline=offline)
+        # Extended MoonDev feeds (polling-based)
+        self._smart_money_feed = SmartMoneyFeed(
+            self._client, registry=self._registry, offline=offline
+        )
+        self._hlp_feed = HlpFeed(self._client, registry=self._registry, offline=offline)
+        self._orderflow_feed = OrderflowFeed(
+            self._client, registry=self._registry, offline=offline
+        )
+        self._user_data_feed = UserDataFeed(
+            self._client, registry=self._registry, offline=offline
+        )
+        self._events_contracts_feed = EventsContractsFeed(
+            self._client, registry=self._registry, offline=offline
+        )
+        self._hip3_feed = Hip3Feed(self._client, registry=self._registry, offline=offline)
+        self._whale_insights_feed = WhaleInsightsFeed(
+            self._client, registry=self._registry, offline=offline
+        )
+        self._positions_feed = PositionsFeed(
+            self._client, registry=self._registry, offline=offline
+        )
+        self._orderbook_depth_feed = OrderbookDepthFeed(
+            self._client, registry=self._registry, offline=offline
+        )
 
     def close(self) -> None:
         self._client.close()
@@ -76,6 +109,70 @@ class HyperliquidProvider:
     def funding_next_delay(self, status: str) -> float:
         return self._funding_feed.next_delay(status)
 
+    def smart_money_next_delay(self, status: str) -> float:
+        return self._smart_money_feed.next_delay(status)
+
+    def hlp_next_delay(self, status: str) -> float:
+        return self._hlp_feed.next_delay(status)
+
+    def orderflow_next_delay(self, status: str) -> float:
+        return self._orderflow_feed.next_delay(status)
+
+    def user_data_next_delay(self, status: str) -> float:
+        return self._user_data_feed.next_delay(status)
+
+    def events_contracts_next_delay(self, status: str) -> float:
+        return self._events_contracts_feed.next_delay(status)
+
+    def hip3_next_delay(self, status: str) -> float:
+        return self._hip3_feed.next_delay(status)
+
+    def whale_insights_next_delay(self, status: str) -> float:
+        return self._whale_insights_feed.next_delay(status)
+
+    def positions_next_delay(self, status: str) -> float:
+        return self._positions_feed.next_delay(status)
+
+    def orderbook_depth_next_delay(self, status: str) -> float:
+        return self._orderbook_depth_feed.next_delay(status)
+
+    def get_smart_money(self) -> FeedResult:
+        return self._smart_money_feed.fetch_result()
+
+    def get_hlp(self) -> FeedResult:
+        return self._hlp_feed.fetch_result()
+
+    def get_orderflow(self, symbol: str | None = None) -> FeedResult:
+        if symbol:
+            self._orderflow_feed.set_symbol(symbol)
+        return self._orderflow_feed.fetch_result()
+
+    def get_user_data(self, address: str | None = None) -> FeedResult:
+        if address is not None:
+            self._user_data_feed.set_address(address)
+        return self._user_data_feed.fetch_result()
+
+    def get_events_contracts(self, address: str | None = None) -> FeedResult:
+        if address is not None:
+            self._events_contracts_feed.set_address(address)
+        return self._events_contracts_feed.fetch_result()
+
+    def get_hip3(self) -> FeedResult:
+        return self._hip3_feed.fetch_result()
+
+    def get_whale_insights(self) -> FeedResult:
+        return self._whale_insights_feed.fetch_result()
+
+    def get_positions_snapshot(self, symbol: str | None = None) -> FeedResult:
+        if symbol:
+            self._positions_feed.set_symbol(symbol)
+        return self._positions_feed.fetch_result()
+
+    def get_orderbook_depth(self, symbol: str | None = None) -> FeedResult:
+        if symbol:
+            self._orderbook_depth_feed.set_symbol(symbol)
+        return self._orderbook_depth_feed.fetch_result()
+
     def diagnostics(self) -> Dict[str, Any]:
         report: Dict[str, Any] = {"http": "unknown", "ws": "not configured"}
         try:
@@ -92,6 +189,15 @@ class HyperliquidProvider:
             ("market", self._market_feed),
             ("whales", self._whales_feed),
             ("funding", self._funding_feed),
+            ("smart_money", self._smart_money_feed),
+            ("hlp", self._hlp_feed),
+            ("orderflow", self._orderflow_feed),
+            ("user_data", self._user_data_feed),
+            ("events_contracts", self._events_contracts_feed),
+            ("hip3", self._hip3_feed),
+            ("whale_insights", self._whale_insights_feed),
+            ("positions_snapshot", self._positions_feed),
+            ("orderbook_depth", self._orderbook_depth_feed),
         ):
             try:
                 ts = feed.last_update_ts()
@@ -195,6 +301,11 @@ class HyperliquidStreamer:
             self._market_agg_ms = int(market_agg_ms)
 
         # Wire endpoints: liquidations (1h snapshot), whales, events, info (funding), plus market streams
+        default_symbol = "BTC"
+        try:
+            default_symbol = getattr(self.provider, "_market_feed", None).selected_coin or "BTC"
+        except Exception:
+            default_symbol = "BTC"
         endpoints = [
             ("liquidations", {"timeframe": "1h"}, self._on_liquidations),
             ("whales", None, self._on_whales),
@@ -202,9 +313,9 @@ class HyperliquidStreamer:
             ("info", None, self._on_info),
             # Market data: aggregated prices, per-symbol ticks and orderbook
             ("prices", None, self._on_market),
-            ("ticks", None, self._on_market),
-            ("hip3_ticks", None, self._on_market),
-            ("orderbook", None, self._on_market),
+            ("ticks_latest", None, self._on_market),
+            ("hip3_ticks_dex", {"dex": "hl", "ticker": "btc"}, self._on_market),
+            ("orderbook", {"symbol": default_symbol}, self._on_market),
             # Funding: prefer dedicated funding endpoint when present
             ("binance_funding", None, self._on_info),
         ]

@@ -33,8 +33,10 @@ class DummyClient:
         return None
 
 
-def test_moondev_auth_attaches_header(monkeypatch):
-    monkeypatch.setenv("MOONDEV_API_KEY", "secret-key")
+def test_moondev_auth_attaches_header(monkeypatch, tmp_path):
+    secrets_path = tmp_path / "HLdontShare.env"
+    secrets_path.write_text("MOONDEV_API_KEY=secret-key\n", encoding="utf-8")
+    monkeypatch.setenv("TICKERTAPE_SECRETS_PATH", str(secrets_path))
     dummy = DummyClient([DummyResponse(status_code=200, payload={"ok": True})])
     client = MoonDevClient(client=dummy)
 
@@ -46,9 +48,9 @@ def test_moondev_auth_attaches_header(monkeypatch):
 
 def test_moondev_missing_key_blocks_request(monkeypatch, tmp_path):
     monkeypatch.delenv("MOONDEV_API_KEY", raising=False)
-    config_path = tmp_path / "config.env"
-    config_path.write_text("# no api key\n", encoding="utf-8")
-    monkeypatch.setenv("TICKERTAPE_CONFIG_PATH", str(config_path))
+    secrets_path = tmp_path / "HLdontShare.env"
+    secrets_path.write_text("# no api key\n", encoding="utf-8")
+    monkeypatch.setenv("TICKERTAPE_SECRETS_PATH", str(secrets_path))
     dummy = DummyClient([DummyResponse(status_code=200, payload={"ok": True})])
     client = MoonDevClient(client=dummy)
 
@@ -57,8 +59,10 @@ def test_moondev_missing_key_blocks_request(monkeypatch, tmp_path):
     assert dummy.calls == []
 
 
-def test_moondev_error_redacts_secret(monkeypatch):
-    monkeypatch.setenv("MOONDEV_API_KEY", "super-secret")
+def test_moondev_error_redacts_secret(monkeypatch, tmp_path):
+    secrets_path = tmp_path / "HLdontShare.env"
+    secrets_path.write_text("MOONDEV_API_KEY=super-secret\n", encoding="utf-8")
+    monkeypatch.setenv("TICKERTAPE_SECRETS_PATH", str(secrets_path))
     dummy = DummyClient(
         [
             DummyResponse(status_code=401, text="Unauthorized"),

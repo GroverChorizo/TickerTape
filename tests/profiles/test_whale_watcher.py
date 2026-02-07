@@ -4,10 +4,14 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from tui.feeds.base import FeedResult
-from tui.ui.screens.profile_whale_watcher import WhaleFilter, _build_lines
+from tui.ui.screens.profile_whale_watcher import (
+    WhaleFilter,
+    _extract_wallets_from_result,
+    _filter_trades,
+)
 
 
-def test_whale_watcher_build_lines_sections():
+def test_whale_watcher_extracts_wallets_and_filters():
     result = FeedResult(
         status="ok",
         data={
@@ -23,10 +27,8 @@ def test_whale_watcher_build_lines_sections():
         },
         updated_ts_ms=1,
     )
-    lines, wallets = _build_lines(result, WhaleFilter())
-    text = "\n".join(lines)
-    assert "Whale Trade List" in text
-    assert "Directional Flow" in text
-    assert "Whale Heatmap" in text
-    assert "Wallets" in text
+    wallets = _extract_wallets_from_result(result)
     assert wallets == ["0xabc"]
+    trades = result.data["trades"]
+    filtered = _filter_trades(trades, side=WhaleFilter().side, min_notional=1.0)
+    assert len(filtered) == 1

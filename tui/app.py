@@ -7,6 +7,7 @@ import json
 import shlex
 import sys
 import time
+import os
 from pathlib import Path
 from typing import List, Optional
 
@@ -25,11 +26,12 @@ def ensure_src_on_path() -> Path:
 
 ROOT = ensure_src_on_path()
 
-from config.secrets import (
-    check_permissions,
-    ensure_secrets_file,
-    open_in_editor,
-    resolve_secrets_path,
+from config.secrets import check_permissions, open_in_editor
+from backend.secrets import (
+    ensure_secrets_file as ensure_env_secrets_file,
+    resolve_secrets_file_path,
+    legacy_secrets_file_path,
+    canonical_secrets_file_path,
 )
 from tui.core import cache as cache_store
 from tui.core.cache import load_cache, save_cache
@@ -37,6 +39,7 @@ from tui.core.commands import CommandRegistry
 from tui.core.router import Route, parse_route
 from tui.core.state import StateStore
 from tui.providers.hyperliquid import HyperliquidProvider
+from tui.streaming import LiveStreamManager
 from tui.state.profiles import get_profile, list_profiles
 from tui.themes.theme_manager import ThemeManager
 from tui.config import (
@@ -124,6 +127,7 @@ class TickerTapeApp(App):
             registry=DatasetRegistry(path=registry_path),
             offline=self.config.mode == "offline_demo",
         )
+        self.stream_manager = LiveStreamManager(self.provider)
         self._custom_dashboards = load_custom_dashboards()
         if self.config.profile in self._custom_dashboards:
             apply_custom_dashboard(
@@ -139,6 +143,12 @@ class TickerTapeApp(App):
         self.apply_palette(self.theme_manager.current())
         self._push_screen(HomeScreen(), route="home")
         self.alert_stream.start()
+        if self.config.mode != "offline_demo":
+            try:
+                self.stream_manager.start()
+            except Exception as exc:
+                self._record_error(f"stream_manager start failed: {exc}")
+        self._warn_legacy_secrets_path()
         if self.secrets_notice:
             self.notify(self.secrets_notice, severity="information")
         if getattr(self, "_show_wizard", False):
@@ -147,6 +157,10 @@ class TickerTapeApp(App):
             )
 
     def on_shutdown(self) -> None:
+        try:
+            self.stream_manager.stop()
+        except Exception:
+            pass
         try:
             self.provider.close()
         except Exception:
@@ -744,8 +758,8 @@ class TickerTapeApp(App):
         return f"Capture {'enabled' if enabled else 'disabled'}."
 
     def _cmd_secrets(self, _cmd: str, _args: List[str]) -> str:
-        resolved = resolve_secrets_path(self.config.secrets_path)
-        path, created = ensure_secrets_file(resolved)
+        loc = resolve_secrets_file_path()
+        path, created = ensure_env_secrets_file(loc.secrets_file)
         self.config.secrets_path = path
         save_config(self.config)
         warning = check_permissions(path)
@@ -1194,6 +1208,27 @@ class TickerTapeApp(App):
     def _record_error(self, message: str) -> None:
         self._errors.append(message)
 
+    def _warn_legacy_secrets_path(self) -> None:
+        try:
+            legacy_path = legacy_secrets_file_path()
+        except Exception:
+            legacy_path = None
+        if not legacy_path:
+            return
+        if self._cache.get("legacy_secrets_warned"):
+            return
+        canonical = canonical_secrets_file_path()
+        try:
+            self.notify(
+                "Legacy secrets file detected. Update your key at: "
+                f"{canonical} (legacy file: {legacy_path})",
+                severity="warning",
+            )
+        except Exception:
+            pass
+        self._cache["legacy_secrets_warned"] = True
+        save_cache(self._cache)
+
     def _toggle_sidebar(self) -> bool:
         self.sidebar_hidden = not self.sidebar_hidden
         self._cache["sidebar_hidden"] = self.sidebar_hidden
@@ -1325,12 +1360,13 @@ def run() -> None:
         overrides["data_root"] = args.data_root
     if args.secrets:
         overrides["secrets_path"] = args.secrets
+        os.environ["TICKERTAPE_SECRETS_PATH"] = str(args.secrets)
     if args.offline:
         overrides["mode"] = "offline_demo"
     config = load_config(overrides)
     ensure_data_root(config)
-    secrets_path = resolve_secrets_path(config.secrets_path)
-    secrets_path, created = ensure_secrets_file(secrets_path)
+    secrets_loc = resolve_secrets_file_path()
+    secrets_path, created = ensure_env_secrets_file(secrets_loc.secrets_file)
     config.secrets_path = secrets_path
     if args.profile:
         config.profile = args.profile

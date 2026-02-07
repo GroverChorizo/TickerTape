@@ -1,0 +1,10 @@
+backend
+backtesting
+commands
+config
+profiles
+providers
+tickertape
+tui
+ui
+validators

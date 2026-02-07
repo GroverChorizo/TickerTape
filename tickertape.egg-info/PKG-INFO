@@ -1,0 +1,18 @@
+Metadata-Version: 2.4
+Name: tickertape
+Version: 0.1.0
+Summary: TickerTape terminal analytics
+Requires-Dist: httpx>=0.23
+Requires-Dist: pytest>=7.0
+Requires-Dist: pyarrow>=12
+Requires-Dist: backend
+Requires-Dist: requests
+Requires-Dist: rich<15.0,>=13.7
+Requires-Dist: python-dotenv
+Requires-Dist: PyYAML
+Requires-Dist: pandas
+Requires-Dist: textual<0.80,>=0.60
+Requires-Dist: openai
+Requires-Dist: termcolor
+Dynamic: requires-dist
+Dynamic: summary

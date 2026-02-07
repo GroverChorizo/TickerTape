@@ -3,19 +3,17 @@ Secrets loader for TickerTape.
 
 Goal: make secrets handling predictable, local-first, and user-friendly.
 
-This module loads secrets from either:
-1) Environment variables (KEY=VALUE pairs), OR
-2) A secrets file located OUTSIDE the repository.
+This module loads secrets from a single secrets file located OUTSIDE the repository.
 
 Key behaviors:
-- The app uses an external "Secrets Home" directory by default (OS-appropriate),
+- The app uses an external "Secrets Home" directory by default (canonical),
   and will create it if missing.
 - Users may override the secrets directory via `TICKERTAPE_SECRETS_DIR`.
 - Users may override the secrets file path via any of:
     - HL_DONT_SHARE_PATH
     - HLDONT_SHARE_PATH
     - TICKERTAPE_SECRETS_PATH
-- Default secrets file name is: `tickertape.env` within Secrets Home.
+- Default secrets file name is: `HLdontShare.env` within Secrets Home.
 - The loader returns a dict of key/value pairs parsed from a .env-style file (KEY=VALUE lines).
 
 Security notes:
@@ -45,7 +43,7 @@ import sys
 # Environment variable for secrets directory override
 _ENV_DIR_VAR = "TICKERTAPE_SECRETS_DIR"
 # Default secrets file name
-_DEFAULT_FILENAME = "tickertape.env"
+_DEFAULT_FILENAME = "HLdontShare.env"
 # Environment variables for secrets file path override
 _ENV_PATH_VARS = ["HL_DONT_SHARE_PATH", "HLDONT_SHARE_PATH", "TICKERTAPE_SECRETS_PATH"]
 _DEFAULT_PATH = Path.home() / ".tickertape" / "secrets" / "HLdontShare.env"
@@ -129,26 +127,25 @@ def _windows_appdata_dir() -> Path:
 
 def _default_secrets_home_dir() -> Path:
     """
-    OS-appropriate default secrets home directory.
+    Canonical default secrets home directory (all OSes).
 
-    Windows: %APPDATA%\\TickerTape\\secrets
-    macOS: ~/Library/Application Support/TickerTape/secrets
-    Linux/Other: ~/.config/tickertape/secrets
+    Windows/macOS/Linux: ~/.tickertape/secrets
     """
+    return Path.home() / ".tickertape" / "secrets"
+
+
+def canonical_secrets_file_path() -> Path:
+    """Return the canonical secrets file path (no overrides)."""
+    return (Path.home() / ".tickertape" / "secrets" / _DEFAULT_FILENAME).resolve()
+
+
+def legacy_secrets_file_path() -> Optional[Path]:
+    """Return legacy AppData secrets path on Windows, if it exists."""
     system = platform.system().lower()
-
-    if "windows" in system:
-        return _windows_appdata_dir() / "TickerTape" / "secrets"
-
-    if "darwin" in system or "mac" in system:
-        return (
-            Path.home() / "Library" / "Application Support" / "TickerTape" / "secrets"
-        )
-
-    # Linux and everything else
-    xdg_config = os.environ.get("XDG_CONFIG_HOME")
-    base = Path(xdg_config) if xdg_config else (Path.home() / ".config")
-    return base / "tickertape" / "secrets"
+    if "windows" not in system:
+        return None
+    legacy = _windows_appdata_dir() / "TickerTape" / "secrets" / _DEFAULT_FILENAME
+    return legacy.resolve() if legacy.exists() else None
 
 
 def secrets_home_dir() -> Path:
@@ -273,58 +270,63 @@ def load_secrets(
     return {}
 
 
+def ensure_secrets_file(path: Optional[Path] = None) -> Tuple[Path, bool]:
+    """Ensure the canonical secrets file exists; return (path, created)."""
+    loc = resolve_secrets_file_path(path=path)
+    target = loc.secrets_file
+    if target.exists():
+        return target, False
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_placeholder_env(), encoding="utf-8")
+        return target, True
+    except Exception:
+        return target, False
+
+
 def resolve_moondev_api_key(
     *,
     config_path: Optional[Path] = None,
     dotenv_path: Optional[Path] = None,
 ) -> Tuple[Optional[str], Optional[str]]:
-    """Resolve MoonDev API key from env, config, or .env files.
-
-    Precedence:
-    1) Environment variable MOONDEV_API_KEY
-    2) Config file (override via TICKERTAPE_CONFIG_PATH)
-    3) Optional .env in the current working directory
-    """
-    env_val = os.environ.get(_MOONDEV_ENV)
-    if env_val:
-        return env_val.strip(), f"env:{_MOONDEV_ENV}"
-
-    config_candidate = config_path
-    if config_candidate is None:
-        override = os.environ.get(_CONFIG_ENV)
-        if override:
-            config_candidate = Path(override).expanduser()
-        else:
-            config_candidate = _default_config_path()
-    if config_candidate and config_candidate.exists() and config_candidate.is_file():
-        data = _parse_env_file(config_candidate)
-        val = data.get(_MOONDEV_ENV)
+    """Resolve MoonDev API key from the canonical secrets file only."""
+    _ = config_path
+    _ = dotenv_path
+    try:
+        secrets_loc = resolve_secrets_file_path()
+        secrets = load_secrets(path=secrets_loc.secrets_file)
+        val = secrets.get(_MOONDEV_ENV) or secrets.get("moondev_api_key")
         if val:
-            return val.strip(), f"config:{config_candidate}"
-
-    env_candidate = dotenv_path or Path.cwd() / ".env"
-    if env_candidate.exists() and env_candidate.is_file():
-        data = _parse_env_file(env_candidate)
-        val = data.get(_MOONDEV_ENV)
-        if val:
-            return val.strip(), f"dotenv:{env_candidate}"
-
+            return val.strip(), f"secrets:{secrets_loc.secrets_file}"
+    except Exception:
+        return None, None
     return None, None
 
 
 def moondev_config_help() -> str:
-    config_path = os.environ.get(_CONFIG_ENV) or str(_default_config_path())
+    secrets_path = str(resolve_secrets_file_path().secrets_file)
     return (
-        "MoonDev API key missing. Set MOONDEV_API_KEY or place it in:\n"
-        f"- {config_path}\n"
-        "Format: MOONDEV_API_KEY=your_key\n"
-        "You can also use a local .env for dev (gitignored)."
+        "MoonDev API key missing. Add it to:\n"
+        f"- {secrets_path}\n"
+        "Format: MOONDEV_API_KEY=your_key"
+    )
+
+
+def _placeholder_env() -> str:
+    return (
+        "# TickerTape secrets (local-only)\n"
+        "# Add your API keys below. Keep this file private.\n"
+        "MOONDEV_API_KEY=\n"
+        "HYPERLIQUID_API_KEY=\n"
     )
 
 
 __all__ = [
     "load_secrets",
+    "ensure_secrets_file",
     "_DEFAULT_PATH",
+    "canonical_secrets_file_path",
+    "legacy_secrets_file_path",
     "resolve_moondev_api_key",
     "moondev_config_help",
 ]

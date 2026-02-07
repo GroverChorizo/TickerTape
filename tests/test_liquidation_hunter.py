@@ -14,8 +14,8 @@ from tui.feeds.liquidations import (
 )
 from tui.widgets.liquidations_radar import LiquidationsRadarPanel
 from tui.ui.screens.profile_liquidation import (
-    _build_liquidation_lines,
-    _render_liquidation_distance,
+    _extract_combined_payload,
+    _extract_stats_payload,
 )
 from tui.models.liquidations import LiquidationSnapshot
 from tui.state.profiles import get_profile
@@ -108,21 +108,7 @@ def test_liquidations_feed_failure_does_not_raise(tmp_path):
     assert result.status in {"error", "disconnected"}
 
 
-def test_liquidation_distance_section():
-    positions = [
-        {
-            "symbol": "BTC",
-            "liquidation_price": 9000,
-            "mark_price": 10000,
-            "side": "long",
-        }
-    ]
-    lines = _render_liquidation_distance(positions)
-    assert lines[0] == "Liquidation Distance"
-    assert any("BTC" in line for line in lines[1:])
-
-
-def test_liquidation_hunter_build_lines_sections():
+def test_liquidation_stats_payload_sections():
     payload = {
         "events": [
             {
@@ -152,7 +138,10 @@ def test_liquidation_hunter_build_lines_sections():
         },
     }
     snapshot = LiquidationSnapshot.from_payload(payload)
-    lines = _build_liquidation_lines(snapshot, None, "BTC", None)
-    text = "\n".join(lines)
-    assert "Liquidation Heatmap" in text
-    assert "Liquidation Distance" in text
+    stats = _extract_stats_payload(snapshot.to_dict())
+    assert "rollups" in stats
+    assert "cascade" in stats
+    assert "top_symbols" in stats
+    combined = _extract_combined_payload(snapshot.to_dict())
+    assert "combined_stats" in combined
+    assert "exchange_stats" in combined

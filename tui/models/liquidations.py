@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 
@@ -94,6 +94,11 @@ class LiquidationSnapshot:
     top_symbols: Dict[str, List[Dict[str, Any]]]
     errors: List[str]
     capture: CaptureStatus
+    combined_stats: Dict[str, Any] = field(default_factory=dict)
+    combined_timeframes: Dict[str, Any] = field(default_factory=dict)
+    exchange_stats: Dict[str, Any] = field(default_factory=dict)
+    exchange_timeframes: Dict[str, Any] = field(default_factory=dict)
+    hip3: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
     def from_payload(cls, payload: Dict[str, Any]) -> "LiquidationSnapshot":
@@ -129,6 +134,11 @@ class LiquidationSnapshot:
             top_symbols=payload.get("top_symbols", {}) or {},
             errors=payload.get("errors", []) or [],
             capture=capture,
+            combined_stats=payload.get("combined_stats", {}) or {},
+            combined_timeframes=payload.get("combined_timeframes", {}) or {},
+            exchange_stats=payload.get("exchange_stats", {}) or {},
+            exchange_timeframes=payload.get("exchange_timeframes", {}) or {},
+            hip3=payload.get("hip3", {}) or {},
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -143,6 +153,11 @@ class LiquidationSnapshot:
             "top_symbols": self.top_symbols,
             "errors": list(self.errors),
             "capture": self.capture.__dict__,
+            "combined_stats": self.combined_stats,
+            "combined_timeframes": self.combined_timeframes,
+            "exchange_stats": self.exchange_stats,
+            "exchange_timeframes": self.exchange_timeframes,
+            "hip3": self.hip3,
         }
 
 

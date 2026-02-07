@@ -1,5 +1,6 @@
 Screen {
-    background: transparent;
+    background: #0b0f14;
+    color: #d7e0ea;
 }
 
 #screen_root {
@@ -11,12 +12,15 @@ Screen {
     height: 3;
     content-align: center middle;
     text-style: bold;
+    background: #0e131a;
+    color: #2dd4ff;
 }
 
 StatusBar {
     dock: top;
     height: 2;
     padding: 0 2;
+    background: #0e131a;
 }
 
 #status_line {
@@ -30,6 +34,7 @@ StatusBar {
 TabCarousel {
     height: 1;
     padding: 0 2;
+    background: #0e131a;
 }
 
 #palette_root {
@@ -61,6 +66,7 @@ Screen.layout-compact Sidebar {
 #screen_body {
     height: 1fr;
     padding: 1 2;
+    background: #0b0f14;
 }
 
 Screen.layout-ultra #screen_body {
@@ -90,20 +96,64 @@ Screen.density-comfortable #screen_body {
 TabBar {
     height: 1;
     padding: 0 2;
+    background: #0e131a;
 }
 
 CommandBar {
     height: 3;
     padding: 0 2;
+    background: #0e131a;
 }
 
 #command {
     width: 100%;
+    border: tall #b96bff;
+    background: #0c1016;
 }
 
 #command_status {
     width: 100%;
     height: 1;
+    color: #7c8794;
+}
+
+.panel {
+    background: #0f141b;
+    border: tall #1f2a36;
+    padding: 0 1;
+    margin: 0 1;
+}
+
+.dt-row {
+    height: 1fr;
+    width: 1fr;
+}
+
+.dt-row > .panel {
+    width: 1fr;
+    min-width: 24;
+}
+
+.panel-row {
+    height: 1fr;
+    width: 1fr;
+}
+
+.panel-row > .panel {
+    width: 1fr;
+    min-width: 24;
+}
+
+TabbedContent {
+    height: 1fr;
+}
+
+#profile_tabs {
+    height: 1fr;
+}
+
+TabPane {
+    height: 1fr;
 }
 
 Screen.fullscreen #screen_header,

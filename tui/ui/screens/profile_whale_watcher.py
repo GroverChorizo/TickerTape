@@ -1,4 +1,4 @@
-"""Whale Watcher profile screen."""
+"""Whale Watcher profile screen (panelized layout)."""
 
 from __future__ import annotations
 
@@ -6,11 +6,19 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 import time
 
-from tui.feeds.base import FeedResult
+from textual.containers import Horizontal, Vertical
+from textual.widgets import TabbedContent, TabPane
+
+from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from tui.feeds.hyperliquid import HyperliquidClient, WhaleTradesFeed
-from tui.render.sparkline import heat_bar
+from tui.feeds.smart_money import SmartMoneyFeed
+from tui.feeds.whale_insights import WhaleInsightsFeed
 from tui.ui.screens.base import BaseScreen
+from tui.widgets.raw_json_panel import RawJsonPanel
+from tui.widgets.wallet_panel import WalletDetailPanel, WalletPanel, WalletSelected, WalletsDiscovered
+from tui.widgets.whale_panel import WhalePanel
 from tickertape.core.alerts import AlertSeverity
+from backend.storage import DatasetRegistry
 
 
 @dataclass
@@ -31,14 +39,75 @@ class WhaleWatcherScreen(BaseScreen):
         )
         self._client = client or HyperliquidClient()
         self._feed = WhaleTradesFeed(self._client, poll_interval=4.0)
+        registry = DatasetRegistry()
+        self._smart_feed = SmartMoneyFeed(self._client, registry=registry)
+        self._insights_feed = WhaleInsightsFeed(self._client, registry=registry)
         self._next_fetch = 0.0
+        self._next_smart_fetch = 0.0
+        self._next_insights_fetch = 0.0
         self._result: Optional[FeedResult] = None
+        self._smart_result: Optional[FeedResult] = None
+        self._insights_result: Optional[FeedResult] = None
         self._filter = WhaleFilter()
+
+        self.whale_panel = WhalePanel()
+        self.wallet_panel = WalletPanel()
+        self.wallet_panel.id = "wallets"
+        self.wallet_panel.add_class("panel")
+        self.wallet_detail_panel = WalletDetailPanel()
+        self.insights_panel = RawJsonPanel("whale_insights", "Whale Insights")
+        self.smart_money_panel = RawJsonPanel("smart_money", "Smart Money")
+        self.whale_addresses_panel = RawJsonPanel(
+            "whale_insights_alt", "Whale Addresses"
+        )
+
+        self._panels = [
+            self.whale_panel,
+            self.wallet_detail_panel,
+            self.insights_panel,
+            self.smart_money_panel,
+            self.whale_addresses_panel,
+        ]
+
+        self._body = Vertical(id="screen_body")
+        self.body = self._body
+        self._core_row_top = Horizontal(id="whale_row_top", classes="panel-row")
+        self._core_row_bottom = Horizontal(id="whale_row_bottom", classes="panel-row")
+        self._signals_row_top = Horizontal(id="whale_row_signals", classes="panel-row")
+        self._tabs = TabbedContent(id="profile_tabs")
+
+    def compose(self):
+        with Vertical(id="screen_root"):
+            yield self.header
+            yield self.status
+            yield self.tab_carousel
+            with Horizontal(id="content_row"):
+                yield self.sidebar
+                with self._body:
+                    with self._tabs:
+                        with TabPane("Core", id="whale_tab_core"):
+                            with self._core_row_top:
+                                yield self.whale_panel
+                                yield self.wallet_panel
+                            with self._core_row_bottom:
+                                yield self.wallet_detail_panel
+                                yield self.insights_panel
+                        with TabPane("Signals", id="whale_tab_signals"):
+                            with self._signals_row_top:
+                                yield self.smart_money_panel
+                                yield self.whale_addresses_panel
+            yield self.tabbar
+            yield self.command_bar
 
     def on_mount(self) -> None:
         self.set_header("Whale Watcher | LIVE")
         self.set_status("Waiting for data...")
+        self._apply_panel_palette()
         self.set_interval(1.0, self._tick)
+
+    def on_show(self) -> None:
+        super().on_show()
+        self._apply_panel_palette()
 
     def on_unmount(self) -> None:
         try:
@@ -51,6 +120,18 @@ class WhaleWatcherScreen(BaseScreen):
         if side:
             self._filter.side = side
         self._filter.min_notional = max(min_notional, 0.0)
+        self.whale_panel.min_notional = self._filter.min_notional
+
+    def on_wallets_discovered(self, message: WalletsDiscovered) -> None:
+        self.wallet_panel.update_wallets(message.addresses, message.source)
+        if hasattr(self, "app"):
+            try:
+                self.app.set_wallets(message.addresses)
+            except Exception:
+                pass
+
+    def on_wallet_selected(self, message: WalletSelected) -> None:
+        self.wallet_detail_panel.update_wallet(message.address, message.source)
 
     def _tick(self) -> None:
         now = time.monotonic()
@@ -60,7 +141,45 @@ class WhaleWatcherScreen(BaseScreen):
                 self._result.status if self._result else "error"
             )
             self._check_alerts()
+        if now >= self._next_smart_fetch:
+            self._smart_result = self._smart_feed.fetch_result()
+            self._next_smart_fetch = now + self._smart_feed.next_delay(
+                self._smart_result.status if self._smart_result else "error"
+            )
+        if now >= self._next_insights_fetch:
+            self._insights_result = self._insights_feed.fetch_result()
+            self._next_insights_fetch = now + self._insights_feed.next_delay(
+                self._insights_result.status if self._insights_result else "error"
+            )
         self._render()
+
+    def _render(self) -> None:
+        filtered_result = self._filtered_result(self._result)
+        if filtered_result:
+            self.whale_panel.update_feed(filtered_result)
+            wallets = _extract_wallets_from_result(filtered_result)
+            if wallets:
+                try:
+                    self.wallet_panel.update_wallets(wallets, "whales")
+                except Exception:
+                    pass
+                if hasattr(self, "app"):
+                    try:
+                        self.app.set_wallets(wallets)
+                    except Exception:
+                        pass
+        if self._smart_result:
+            self.smart_money_panel.update_feed(self._smart_result)
+        if self._insights_result:
+            self.insights_panel.update_feed(self._insights_result)
+            addresses = _extract_whale_addresses(self._insights_result.data)
+            self.whale_addresses_panel.update_feed(
+                _clone_result(self._insights_result, {"whale_addresses": addresses})
+            )
+        else:
+            self.smart_money_panel.update_feed(FeedResult(status=FeedStatus.LOADING))
+            self.insights_panel.update_feed(FeedResult(status=FeedStatus.LOADING))
+            self.whale_addresses_panel.update_feed(FeedResult(status=FeedStatus.LOADING))
 
     def _check_alerts(self) -> None:
         if not hasattr(self, "app"):
@@ -88,133 +207,90 @@ class WhaleWatcherScreen(BaseScreen):
                 min_interval_ms=30000,
             )
 
-    def _render(self) -> None:
-        lines, wallets = _build_lines(self._result, self._filter)
-        updater = getattr(self.app, "set_wallets", None)
-        if updater:
-            updater(wallets)
-        self.body.update("\n".join(lines))
+    def _filtered_result(self, result: Optional[FeedResult]) -> Optional[FeedResult]:
+        if not result or not isinstance(result.data, dict):
+            return result
+        trades = _extract_trades(result)
+        if not trades:
+            return result
+        filtered = _filter_trades(
+            trades,
+            side=self._filter.side,
+            min_notional=self._filter.min_notional,
+        )
+        payload = dict(result.data)
+        payload["trades"] = filtered
+        return _clone_result(result, payload)
+
+    def _apply_panel_palette(self) -> None:
+        try:
+            palette = self.app.theme_manager.current()
+        except Exception:
+            palette = None
+        if not palette:
+            return
+        for panel in self._panels:
+            try:
+                panel.set_palette(palette)
+            except Exception:
+                pass
 
 
-def _build_lines(
-    result: Optional[FeedResult], whale_filter: WhaleFilter
-) -> tuple[List[str], List[str]]:
-    lines: List[str] = []
-    wallets: List[str] = []
-    lines.append("Whale Trade List")
-    trades = _extract_trades(result)
-    filtered = [
-        trade
-        for trade in trades
-        if _trade_notional(trade) >= whale_filter.min_notional
-        and _side_matches(trade, whale_filter.side)
-    ]
-    for trade in filtered[:10]:
-        symbol = _trade_symbol(trade)
-        side = _trade_side(trade)
-        size = trade.get("size") or trade.get("amount") or trade.get("qty") or "?"
-        price = trade.get("price") or trade.get("px") or "?"
-        wallet = _trade_wallet(trade)
-        if wallet:
-            wallets.append(wallet)
-        lines.append(f"{symbol} {side:<5} size={size} price={price}")
-    if not filtered:
-        lines.append("No whale trades match current filter.")
-
-    lines.append("")
-    lines.append("Directional Flow")
-    lines.extend(_render_flow_bars(filtered))
-
-    lines.append("")
-    lines.append("Whale Heatmap")
-    lines.extend(_render_heatmap(filtered))
-
-    lines.append("")
-    lines.append("Wallets")
-    unique_wallets = list(dict.fromkeys(wallets))
-    if unique_wallets:
-        for idx, addr in enumerate(unique_wallets[:8], start=1):
-            lines.append(f"{idx:>2}. {addr}")
-    else:
-        lines.append("No wallet addresses available.")
-
-    lines.append("")
-    lines.append(
-        "Commands: whalefilter side=<buy|sell|all> min=<notional> | wallet <#|address>"
+def _clone_result(result: FeedResult, data: Any) -> FeedResult:
+    return FeedResult(
+        status=result.status,
+        data=data,
+        error=result.error,
+        updated_ts_ms=result.updated_ts_ms,
+        is_lkg=result.is_lkg,
     )
-    return lines, unique_wallets
 
 
-def _render_flow_bars(trades: List[Dict[str, Any]]) -> List[str]:
-    buys = 0
-    sells = 0
-    for trade in trades:
-        side = _trade_side(trade)
-        if side in {"buy", "long"}:
-            buys += 1
-        elif side in {"sell", "short"}:
-            sells += 1
-    max_count = max(buys, sells, 1)
-    lines = [
-        f"Buys : {heat_bar(buys, max_count, width=12)} {buys}",
-        f"Sells: {heat_bar(sells, max_count, width=12)} {sells}",
-    ]
-    return lines
-
-
-def _render_heatmap(trades: List[Dict[str, Any]]) -> List[str]:
-    totals: Dict[str, float] = {}
-    for trade in trades:
-        symbol = _trade_symbol(trade)
-        totals[symbol] = totals.get(symbol, 0.0) + _trade_notional(trade)
-    if not totals:
-        return ["No whale heatmap data yet."]
-    max_val = max(totals.values())
-    lines: List[str] = []
-    for symbol, total in sorted(totals.items(), key=lambda x: x[1], reverse=True)[:8]:
-        bar = heat_bar(total, max_val, width=16)
-        lines.append(f"{symbol:<6} {bar} ${total:,.0f}")
-    return lines
-
-
-def _extract_trades(result: Optional[FeedResult]) -> List[Dict[str, Any]]:
+def _extract_trades(result: Optional[FeedResult]) -> List[dict]:
     if not result or not isinstance(result.data, dict):
         return []
     trades = result.data.get("trades")
     if isinstance(trades, dict):
         trades = trades.get("trades") or trades.get("data") or trades.get("events")
-    if isinstance(trades, list):
-        return [t for t in trades if isinstance(t, dict)]
-    return []
+    if not isinstance(trades, list):
+        return []
+    return [trade for trade in trades if isinstance(trade, dict)]
 
 
-def _trade_side(trade: Dict[str, Any]) -> str:
-    side = str(trade.get("side") or trade.get("direction") or "").lower()
-    if "buy" in side or "long" in side:
-        return "buy"
-    if "sell" in side or "short" in side:
-        return "sell"
-    return "?"
+def _filter_trades(trades: List[dict], *, side: str, min_notional: float) -> List[dict]:
+    side = (side or "all").lower()
+    filtered: List[dict] = []
+    for trade in trades:
+        notional = _trade_notional(trade)
+        if notional < min_notional:
+            continue
+        trade_side = _trade_side(trade)
+        if side != "all" and not _side_matches(trade_side, side):
+            continue
+        filtered.append(trade)
+    return filtered
 
 
-def _side_matches(trade: Dict[str, Any], side_filter: str) -> bool:
-    if side_filter == "all":
-        return True
-    side = _trade_side(trade)
-    return side == side_filter
+def _side_matches(trade_side: str, filter_side: str) -> bool:
+    trade_side = trade_side.lower()
+    filter_side = filter_side.lower()
+    if filter_side in {"buy", "long"}:
+        return trade_side in {"buy", "long"}
+    if filter_side in {"sell", "short"}:
+        return trade_side in {"sell", "short"}
+    return True
 
 
-def _trade_symbol(trade: Dict[str, Any]) -> str:
+def _trade_symbol(trade: dict) -> str:
     return str(trade.get("symbol") or trade.get("coin") or "?")
 
 
-def _trade_wallet(trade: Dict[str, Any]) -> Optional[str]:
-    wallet = trade.get("wallet") or trade.get("wallet_address") or trade.get("address")
-    return str(wallet) if isinstance(wallet, str) and wallet else None
+def _trade_side(trade: dict) -> str:
+    return str(trade.get("side") or trade.get("direction") or "unknown").lower()
 
 
-def _trade_notional(trade: Dict[str, Any]) -> float:
-    notional = trade.get("notional") or trade.get("value") or trade.get("usd_value")
+def _trade_notional(trade: dict) -> float:
+    notional = trade.get("notional_usd") or trade.get("value_usd") or trade.get("notional")
     if notional is not None:
         try:
             return float(notional)
@@ -226,3 +302,23 @@ def _trade_notional(trade: Dict[str, Any]) -> float:
         return float(size) * float(price)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _extract_wallets_from_result(result: FeedResult) -> List[str]:
+    trades = _extract_trades(result)
+    wallets: List[str] = []
+    for trade in trades:
+        for key in ("wallet", "wallet_address", "address"):
+            value = trade.get(key)
+            if isinstance(value, str) and value:
+                wallets.append(value)
+    return list(dict.fromkeys(wallets))
+
+
+def _extract_whale_addresses(payload: Any) -> List[str]:
+    if not isinstance(payload, dict):
+        return []
+    addresses = payload.get("whale_addresses")
+    if isinstance(addresses, list):
+        return [str(addr) for addr in addresses if addr]
+    return []

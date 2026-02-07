@@ -1,4 +1,4 @@
-"""Day Trader profile screen."""
+"""Day Trader profile screen (panelized streaming layout)."""
 
 from __future__ import annotations
 
@@ -7,11 +7,18 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 import time
 
-from tui.feeds.base import FeedResult
-from tui.feeds.hyperliquid import HyperliquidClient, LiquidationsFeed, WhaleTradesFeed
-from tui.feeds.market_data import MarketDataFeed
-from tui.render.sparkline import sparkline
+from textual.containers import Horizontal, Vertical
+from textual.widgets import TabbedContent, TabPane
+
+from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from tui.ui.screens.base import BaseScreen
+from tui.widgets.market_overview_panel import MarketOverviewPanel
+from tui.widgets.orderbook_panel import OrderbookPanel
+from tui.widgets.whale_trades_panel import WhaleTradesPanel
+from tui.widgets.liquidations_feed_panel import LiquidationsFeedPanel
+from tui.widgets.funding_rates_panel import FundingRatesPanel
+from tui.widgets.positions_panel import PositionsPanel
+from tui.widgets.raw_json_panel import RawJsonPanel
 from tickertape.core.alerts import AlertSeverity
 
 
@@ -27,45 +34,127 @@ class DayTraderState:
 
 
 class DayTraderScreen(BaseScreen):
-    def __init__(self, client: Optional[Any] = None) -> None:
+    def __init__(self, provider: Optional[Any] = None) -> None:
         super().__init__(
             screen_id="profile_day_trader",
             title="Day Trader",
             context="day_trader",
         )
-        self._client = client or HyperliquidClient()
-        self._market_feed: Optional[MarketDataFeed] = None
-        self._whale_feed: Optional[WhaleTradesFeed] = None
-        self._liq_feed: Optional[LiquidationsFeed] = None
+        self._provider = provider
+        self._market_feed = None
+        self._whale_feed = None
+        self._liq_feed = None
+        self._funding_feed = None
+        self._smart_money_feed = None
+        self._hlp_feed = None
+        self._orderflow_feed = None
+        self._hip3_feed = None
+        self._positions_feed = None
         self._next_market_fetch = 0.0
         self._next_whale_fetch = 0.0
         self._next_liq_fetch = 0.0
+        self._next_funding_fetch = 0.0
+        self._next_smart_money_fetch = 0.0
+        self._next_hlp_fetch = 0.0
+        self._next_orderflow_fetch = 0.0
+        self._next_hip3_fetch = 0.0
+        self._next_positions_fetch = 0.0
         self._market_result: Optional[FeedResult] = None
         self._whale_result: Optional[FeedResult] = None
         self._liq_result: Optional[FeedResult] = None
+        self._funding_result: Optional[FeedResult] = None
+        self._smart_money_result: Optional[FeedResult] = None
+        self._hlp_result: Optional[FeedResult] = None
+        self._orderflow_result: Optional[FeedResult] = None
+        self._hip3_result: Optional[FeedResult] = None
+        self._positions_result: Optional[FeedResult] = None
         self._state = DayTraderState()
+
+        self.market_panel = MarketOverviewPanel()
+        self.orderbook_panel = OrderbookPanel()
+        self.whale_panel = WhaleTradesPanel()
+        self.liquidations_panel = LiquidationsFeedPanel()
+        self.funding_panel = FundingRatesPanel()
+        self.positions_panel = PositionsPanel()
+        self.smart_money_panel = RawJsonPanel("dt_smart_money", "Smart Money")
+        self.hlp_panel = RawJsonPanel("dt_hlp", "HLP Summary")
+        self.orderflow_panel = RawJsonPanel("dt_orderflow", "Orderflow")
+        self.hip3_panel = RawJsonPanel("dt_hip3", "HIP-3 Market")
+        self.positions_snapshot_panel = RawJsonPanel(
+            "dt_positions_snapshot", "Positions Snapshot"
+        )
+        self._panels = [
+            self.market_panel,
+            self.orderbook_panel,
+            self.whale_panel,
+            self.liquidations_panel,
+            self.funding_panel,
+            self.positions_panel,
+            self.smart_money_panel,
+            self.hlp_panel,
+            self.orderflow_panel,
+            self.hip3_panel,
+            self.positions_snapshot_panel,
+        ]
+
+        self._body = Vertical(id="screen_body")
+        self.body = self._body
+        self._row_top = Horizontal(id="dt_row_top", classes="dt-row")
+        self._row_mid = Horizontal(id="dt_row_mid", classes="dt-row")
+        self._row_bottom = Horizontal(id="dt_row_bottom", classes="dt-row")
+        self._signals_row_top = Horizontal(id="dt_row_signals_top", classes="dt-row")
+        self._signals_row_mid = Horizontal(id="dt_row_signals_mid", classes="dt-row")
+        self._signals_row_bottom = Horizontal(id="dt_row_signals_bottom", classes="dt-row")
+        self._tabs = TabbedContent(id="profile_tabs")
+
+    def compose(self):
+        with Vertical(id="screen_root"):
+            yield self.header
+            yield self.status
+            yield self.tab_carousel
+            with Horizontal(id="content_row"):
+                yield self.sidebar
+                with self._body:
+                    with self._tabs:
+                        with TabPane("Core", id="dt_tab_core"):
+                            with self._row_top:
+                                yield self.market_panel
+                                yield self.orderbook_panel
+                            with self._row_mid:
+                                yield self.whale_panel
+                                yield self.liquidations_panel
+                            with self._row_bottom:
+                                yield self.funding_panel
+                                yield self.positions_panel
+                        with TabPane("Signals", id="dt_tab_signals"):
+                            with self._signals_row_top:
+                                yield self.smart_money_panel
+                                yield self.orderflow_panel
+                            with self._signals_row_mid:
+                                yield self.hlp_panel
+                                yield self.positions_snapshot_panel
+                            with self._signals_row_bottom:
+                                yield self.hip3_panel
+            yield self.tabbar
+            yield self.command_bar
 
     def on_mount(self) -> None:
         self.set_header("Day Trader | LIVE")
-        self.set_status("Waiting for data...")
+        self.set_status("Waiting for streams...")
         self._sync_watchlist()
-        self._build_feeds()
+        self._wire_provider()
+        self._apply_panel_palette()
         self.set_interval(1.0, self._tick)
 
-    def on_unmount(self) -> None:
-        try:
-            if hasattr(self._client, "close"):
-                self._client.close()
-        except Exception:
-            pass
+    def on_show(self) -> None:
+        super().on_show()
+        self._apply_panel_palette()
 
     def update_watchlist(self, watchlist: List[str]) -> None:
         if not watchlist:
             return
         self._state.watchlist = [w.upper() for w in watchlist]
-        if self._market_feed:
-            self._market_feed.coin_cycle = list(self._state.watchlist)
-            self._market_feed.selected_coin = self._state.watchlist[0]
+        self._apply_watchlist()
 
     def _sync_watchlist(self) -> None:
         getter = getattr(self.app, "get_watchlist", None)
@@ -73,56 +162,208 @@ class DayTraderScreen(BaseScreen):
             watchlist = getter()
             if watchlist:
                 self._state.watchlist = [w.upper() for w in watchlist]
+        self._apply_watchlist()
 
-    def _build_feeds(self) -> None:
-        watchlist = list(self._state.watchlist)
-        if not watchlist:
-            watchlist = list(DEFAULT_WATCHLIST)
-        self._market_feed = MarketDataFeed(
-            self._client,
-            poll_interval=1.5,
-            offline=getattr(self.app, "config", None).mode == "offline_demo",
-            selected_coin=watchlist[0],
-            coin_cycle=watchlist,
-        )
-        self._whale_feed = WhaleTradesFeed(
-            self._client,
-            poll_interval=4.0,
-            offline=getattr(self.app, "config", None).mode == "offline_demo",
-        )
-        self._liq_feed = LiquidationsFeed(
-            self._client,
-            poll_interval=5.0,
-            offline=getattr(self.app, "config", None).mode == "offline_demo",
-        )
+    def _apply_watchlist(self) -> None:
+        if self._market_feed and self._state.watchlist:
+            self._market_feed.coin_cycle = list(self._state.watchlist)
+            self._market_feed.set_selected_coin(self._state.watchlist[0])
+        if self._funding_feed and self._state.watchlist:
+            try:
+                self._funding_feed.coins = list(self._state.watchlist)
+            except Exception:
+                pass
+        if self.positions_panel:
+            self.positions_panel.set_watchlist(self._state.watchlist)
+        if self.funding_panel:
+            self.funding_panel.set_watchlist(self._state.watchlist)
+
+    def _wire_provider(self) -> None:
+        if self._provider is None:
+            self._provider = getattr(self.app, "provider", None)
+        if not self._provider:
+            return
+        self._market_feed = getattr(self._provider, "_market_feed", None)
+        self._whale_feed = getattr(self._provider, "_whales_feed", None)
+        self._liq_feed = getattr(self._provider, "_liquidations_feed", None)
+        self._funding_feed = getattr(self._provider, "_funding_feed", None)
+        self._smart_money_feed = getattr(self._provider, "_smart_money_feed", None)
+        self._hlp_feed = getattr(self._provider, "_hlp_feed", None)
+        self._orderflow_feed = getattr(self._provider, "_orderflow_feed", None)
+        self._hip3_feed = getattr(self._provider, "_hip3_feed", None)
+        self._positions_feed = getattr(self._provider, "_positions_feed", None)
+
+    def _apply_panel_palette(self) -> None:
+        try:
+            palette = self.app.theme_manager.current()
+        except Exception:
+            palette = None
+        if not palette:
+            return
+        for panel in self._panels:
+            try:
+                panel.set_palette(palette)
+            except Exception:
+                pass
 
     def _tick(self) -> None:
         now = time.monotonic()
-        if not self._market_feed or not self._whale_feed or not self._liq_feed:
+        if not self._provider:
+            self._wire_provider()
+        if not self._market_feed:
             return
+
         self._sync_watchlist()
 
-        if now >= self._next_market_fetch:
-            self._market_result = self._market_feed.fetch_result()
-            self._next_market_fetch = now + self._market_feed.next_delay(
-                self._market_result.status
-            )
-            self._update_price_history(self._market_result)
+        stream_manager = getattr(self.app, "stream_manager", None)
+        use_streams = bool(stream_manager and stream_manager.active)
 
-        if now >= self._next_whale_fetch:
-            self._whale_result = self._whale_feed.fetch_result()
-            self._next_whale_fetch = now + self._whale_feed.next_delay(
-                self._whale_result.status
-            )
+        self._market_result = self._maybe_update_feed(
+            self._market_feed,
+            self._market_result,
+            now,
+            "market",
+            use_streams,
+        )
+        self._whale_result = self._maybe_update_feed(
+            self._whale_feed,
+            self._whale_result,
+            now,
+            "whales",
+            use_streams,
+        )
+        self._liq_result = self._maybe_update_feed(
+            self._liq_feed,
+            self._liq_result,
+            now,
+            "liquidations",
+            use_streams,
+        )
+        self._funding_result = self._maybe_update_feed(
+            self._funding_feed,
+            self._funding_result,
+            now,
+            "funding",
+            use_streams,
+        )
+        if self._orderflow_feed and self._state.watchlist:
+            try:
+                self._orderflow_feed.set_symbol(self._state.watchlist[0])
+            except Exception:
+                pass
+        self._smart_money_result = self._maybe_update_feed(
+            self._smart_money_feed,
+            self._smart_money_result,
+            now,
+            "smart_money",
+            use_streams,
+        )
+        self._hlp_result = self._maybe_update_feed(
+            self._hlp_feed,
+            self._hlp_result,
+            now,
+            "hlp",
+            use_streams,
+        )
+        self._orderflow_result = self._maybe_update_feed(
+            self._orderflow_feed,
+            self._orderflow_result,
+            now,
+            "orderflow",
+            use_streams,
+        )
+        self._hip3_result = self._maybe_update_feed(
+            self._hip3_feed,
+            self._hip3_result,
+            now,
+            "hip3",
+            use_streams,
+        )
+        if self._positions_feed and self._state.watchlist:
+            try:
+                self._positions_feed.set_symbol(self._state.watchlist[0])
+            except Exception:
+                pass
+        self._positions_result = self._maybe_update_feed(
+            self._positions_feed,
+            self._positions_result,
+            now,
+            "positions",
+            use_streams,
+        )
 
-        if now >= self._next_liq_fetch:
-            self._liq_result = self._liq_feed.fetch_result()
-            self._next_liq_fetch = now + self._liq_feed.next_delay(
-                self._liq_result.status
-            )
-
+        self._update_price_history(self._market_result)
         self._check_alerts()
         self._render()
+
+    def _maybe_update_feed(
+        self,
+        feed: Any,
+        current: Optional[FeedResult],
+        now: float,
+        key: str,
+        use_streams: bool,
+    ) -> Optional[FeedResult]:
+        if feed is None:
+            return current
+
+        latest = feed.latest()
+        if use_streams:
+            current = latest
+            should_poll = (
+                current is None
+                or current.updated_ts_ms is None
+                or _as_status(current.status) in {FeedStatus.LOADING, FeedStatus.EMPTY}
+            )
+            if key == "market" and _market_missing_top_coins(current):
+                should_poll = True
+            if should_poll and now >= self._next_fetch(key):
+                current = feed.fetch_result()
+                self._set_next_fetch(key, now, feed, current)
+            return current
+
+        if now >= self._next_fetch(key):
+            current = feed.fetch_result()
+            self._set_next_fetch(key, now, feed, current)
+            return current
+        return latest
+
+    def _next_fetch(self, key: str) -> float:
+        return {
+            "market": self._next_market_fetch,
+            "whales": self._next_whale_fetch,
+            "liquidations": self._next_liq_fetch,
+            "funding": self._next_funding_fetch,
+            "smart_money": self._next_smart_money_fetch,
+            "hlp": self._next_hlp_fetch,
+            "orderflow": self._next_orderflow_fetch,
+            "hip3": self._next_hip3_fetch,
+            "positions": self._next_positions_fetch,
+        }.get(key, 0.0)
+
+    def _set_next_fetch(
+        self, key: str, now: float, feed: Any, result: Optional[FeedResult]
+    ) -> None:
+        status = result.status if result else "error"
+        delay = feed.next_delay(status)
+        if key == "market":
+            self._next_market_fetch = now + delay
+        elif key == "whales":
+            self._next_whale_fetch = now + delay
+        elif key == "liquidations":
+            self._next_liq_fetch = now + delay
+        elif key == "funding":
+            self._next_funding_fetch = now + delay
+        elif key == "smart_money":
+            self._next_smart_money_fetch = now + delay
+        elif key == "hlp":
+            self._next_hlp_fetch = now + delay
+        elif key == "orderflow":
+            self._next_orderflow_fetch = now + delay
+        elif key == "hip3":
+            self._next_hip3_fetch = now + delay
+        elif key == "positions":
+            self._next_positions_fetch = now + delay
 
     def _check_alerts(self) -> None:
         if not hasattr(self, "app"):
@@ -215,128 +456,55 @@ class DayTraderScreen(BaseScreen):
                 del history[: len(history) - 30]
 
     def _render(self) -> None:
-        now_ms = int(time.time() * 1000)
-        status = _status_line(self._market_result, now_ms)
-        self.set_status(status)
-        lines = _build_lines(
-            self._state,
-            self._market_result,
-            self._whale_result,
-            self._liq_result,
+        stream_manager = getattr(self.app, "stream_manager", None)
+        stream_summary = (
+            stream_manager.summary() if stream_manager else "WS: n/a"
         )
-        self.body.update("\n".join(lines))
+        status_line = _status_line(
+            {
+                "Mkt": self._market_result,
+                "Whale": self._whale_result,
+                "Liq": self._liq_result,
+                "Fund": self._funding_result,
+                "Smart": self._smart_money_result,
+                "HLP": self._hlp_result,
+                "Flow": self._orderflow_result,
+                "HIP3": self._hip3_result,
+                "Pos": self._positions_result,
+            },
+            stream_summary,
+        )
+        self.set_status(status_line)
 
-
-def _build_lines(
-    state: DayTraderState,
-    market_result: Optional[FeedResult],
-    whale_result: Optional[FeedResult],
-    liq_result: Optional[FeedResult],
-) -> List[str]:
-    lines: List[str] = []
-    lines.append("Price Chart")
-    lines.extend(_render_price_chart(state))
-    lines.append("")
-    lines.append("Top Positions (proxy: open interest)")
-    lines.extend(_render_positions(market_result, state.watchlist))
-    lines.append("")
-    lines.append("Whale Flow")
-    lines.extend(_render_whale_flow(whale_result))
-    lines.append("")
-    lines.append("Liquidation Stats")
-    lines.extend(_render_liquidations(liq_result))
-    return lines
-
-
-def _render_price_chart(state: DayTraderState) -> List[str]:
-    lines: List[str] = []
-    if not state.watchlist:
-        return ["No watchlist configured."]
-    for symbol in state.watchlist:
-        history = state.price_history.get(symbol, [])
-        spark = sparkline(history, width=20)
-        last = f"{history[-1]:,.2f}" if history else "n/a"
-        lines.append(f"{symbol:<6} {spark} {last}")
-    return lines
-
-
-def _render_positions(
-    market_result: Optional[FeedResult], watchlist: List[str]
-) -> List[str]:
-    if not market_result or not isinstance(market_result.data, dict):
-        return ["Positions data not available."]
-    top = market_result.data.get("top_coins")
-    if not isinstance(top, list):
-        return ["Positions data not available."]
-    watch = {w.upper() for w in watchlist}
-    lines: List[str] = ["Symbol | OI | Funding"]
-    for entry in top:
-        if not isinstance(entry, dict):
-            continue
-        symbol = str(entry.get("symbol") or "").upper()
-        if symbol not in watch:
-            continue
-        oi = _fmt_num(entry.get("open_interest"))
-        funding = _fmt_num(entry.get("funding"))
-        lines.append(f"{symbol:<6} | {oi:<8} | {funding}")
-    if len(lines) == 1:
-        lines.append("No watchlist matches in top coins.")
-    return lines
-
-
-def _render_whale_flow(result: Optional[FeedResult]) -> List[str]:
-    if not result or not isinstance(result.data, dict):
-        return ["No whale flow data yet."]
-    trades = result.data.get("trades")
-    if isinstance(trades, dict):
-        trades = trades.get("trades") or trades.get("data") or trades.get("events")
-    if not isinstance(trades, list):
-        return ["No whale trades available."]
-    buys = sells = 0
-    lines: List[str] = []
-    for entry in trades[:10]:
-        if not isinstance(entry, dict):
-            continue
-        side = str(entry.get("side") or entry.get("direction") or "?").lower()
-        if "buy" in side or "long" in side:
-            buys += 1
-        elif "sell" in side or "short" in side:
-            sells += 1
-        symbol = entry.get("symbol") or entry.get("coin") or "?"
-        size = entry.get("size") or entry.get("amount") or "?"
-        price = entry.get("price") or "?"
-        lines.append(f"{symbol} {side:<5} size={size} price={price}")
-    lines.insert(0, f"Buys: {buys} | Sells: {sells}")
-    return lines
-
-
-def _render_liquidations(result: Optional[FeedResult]) -> List[str]:
-    if not result or not isinstance(result.data, dict):
-        return ["No liquidation stats yet."]
-    snapshot = result.data.get("snapshot")
-    if not isinstance(snapshot, dict):
-        return ["No liquidation stats yet."]
-    stats = (
-        snapshot.get("stats") if isinstance(snapshot.get("stats"), dict) else snapshot
-    )
-    total = _fmt_num(stats.get("total_value_usd") or stats.get("total_usd"))
-    count = stats.get("total_count") or stats.get("count")
-    long_count = stats.get("long_count") or stats.get("longs")
-    short_count = stats.get("short_count") or stats.get("shorts")
-    return [
-        f"Total notional: {total}",
-        f"Count: {count if count is not None else 'n/a'} | Long: {long_count or 'n/a'} | Short: {short_count or 'n/a'}",
-    ]
-
-
-def _fmt_num(value: Any) -> str:
-    try:
-        num = float(value)
-    except (TypeError, ValueError):
-        return "n/a"
-    if abs(num) >= 1000:
-        return f"{num:,.2f}"
-    return f"{num:.4f}"
+        self.market_panel.update_feed(
+            self._market_result or FeedResult(status="loading")
+        )
+        self.orderbook_panel.update_feed(
+            self._market_result or FeedResult(status="loading")
+        )
+        self.whale_panel.update_feed(
+            self._whale_result or FeedResult(status="loading")
+        )
+        self.liquidations_panel.update_feed(
+            self._liq_result or FeedResult(status="loading")
+        )
+        self.funding_panel.update_feed(
+            self._funding_result or FeedResult(status="loading")
+        )
+        self.positions_panel.update_feed(
+            self._market_result or FeedResult(status="loading")
+        )
+        self.smart_money_panel.update_feed(
+            self._smart_money_result or FeedResult(status="loading")
+        )
+        self.hlp_panel.update_feed(self._hlp_result or FeedResult(status="loading"))
+        self.orderflow_panel.update_feed(
+            self._orderflow_result or FeedResult(status="loading")
+        )
+        self.hip3_panel.update_feed(self._hip3_result or FeedResult(status="loading"))
+        self.positions_snapshot_panel.update_feed(
+            self._positions_result or FeedResult(status="loading")
+        )
 
 
 def _coerce_float(value: Any) -> Optional[float]:
@@ -346,18 +514,27 @@ def _coerce_float(value: Any) -> Optional[float]:
         return None
 
 
-def _status_line(result: Optional[FeedResult], now_ms: int) -> str:
-    if result is None:
-        return "Status: loading | HTTP: pending"
-    updated = result.updated_ts_ms
-    if updated:
-        updated_str = datetime.fromtimestamp(updated / 1000, tz=timezone.utc).strftime(
-            "%Y-%m-%d %H:%M:%S UTC"
+def _market_missing_top_coins(result: Optional[FeedResult]) -> bool:
+    if not result or not isinstance(result.data, dict):
+        return True
+    top = result.data.get("top_coins")
+    return not isinstance(top, list) or not top
+
+
+def _status_line(results: Dict[str, Optional[FeedResult]], stream_summary: str) -> str:
+    parts = [stream_summary]
+    latest_ts = 0
+    for label, result in results.items():
+        if result is None:
+            status = "loading"
+        else:
+            status = _as_status(result.status).value
+            if result.updated_ts_ms:
+                latest_ts = max(latest_ts, int(result.updated_ts_ms))
+        parts.append(f"{label}:{status.upper()}")
+    if latest_ts:
+        updated_str = datetime.fromtimestamp(latest_ts / 1000, tz=timezone.utc).strftime(
+            "%H:%M:%S UTC"
         )
-    else:
-        updated_str = "unknown"
-    stale = ""
-    if result.is_lkg and updated:
-        stale_s = int((now_ms - updated) / 1000)
-        stale = f" | STALE +{stale_s}s"
-    return f"Status: {result.status} | Last update: {updated_str}{stale}"
+        parts.append(f"Last: {updated_str}")
+    return " | ".join(parts)

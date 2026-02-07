@@ -10,10 +10,13 @@ from tui.themes.palettes import Palette, cypherpunk_default
 
 class PanelBase(Static):
     def __init__(self, panel_id: str, title: str, **kwargs) -> None:
+        if "id" not in kwargs:
+            kwargs["id"] = panel_id
         super().__init__(**kwargs)
         self.panel_id = panel_id
         self.title = title
         self.border_title = title
+        self.add_class("panel")
         self.palette: Palette = cypherpunk_default
         self._status: str = "ok"
         self._focused: bool = False
