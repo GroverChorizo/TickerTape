@@ -1,103 +1,130 @@
-# Hyperliquid Quant Terminal — Institutional Research Platform
+# TickerTape — Local-First Quant Research Terminal
 
-## Repository Scope
-This repository contains the full codebase, documentation, and supporting infrastructure for the Hyperliquid Quant Terminal. It is designed as an institutional-grade, local-first quantitative research environment for crypto market analysis, backtesting, and data visualization. All code, data, and research artifacts remain local to the user's machine.
+A desktop trading-intelligence terminal for Hyperliquid markets: a Textual TUI
+over a keyless, real-data-only pipeline, with a strategy shadow layer that
+emits signals to local files — no orders, no execution, read-only phase.
 
-## Core Values
-- **Privacy-first:** All user data, research, and exports are local-only. No cloud sync, no remote execution.
-- **Precision:** Data integrity and reproducibility are enforced. No synthetic or modified history.
-- **No advice:** The system does not provide financial advice, trade recommendations, or live trading capabilities.
-- **Transparency:** All logic, metrics, and outputs are documented and reviewable.
+**This is research tooling. Nothing here is financial advice.**
 
-## High-Level Architecture
-- **Backend:** Data ingestion, engine logic, backtest/Monte Carlo, and research artifact management. No direct UI dependencies.
-- **Frontend:** Textual TUI for dashboard, visualization, navigation, and command interface. No business logic or data mutation.
+## Core values
 
-## Local-First Guarantees
-- All data, exports, and execution are performed locally.
-- No user data or IP leaves the machine.
-- All research outputs (backtests, MC, logs) are stored locally and never uploaded.
+- **Real data only.** No synthetic candles — not in backtests, tests, demos, or
+  fallbacks. A missing CSV means "fetch it," never "simulate it."
+- **Local first.** No cloud services, no telemetry. Market data comes from
+  keyless public exchange APIs; everything else stays on your machine.
+- **Deterministic & reproducible.** Same bars in, same answer out. Every
+  number traces to a real CSV and a labeled run.
+- **No live trading.** Bots run in shadow mode only: they say what they
+  *would* do. There is no order or execution code in this phase.
 
-## Development & Review Workflow
-1. **Builder:** Implements features per theVision and playbooks.
-2. **Reviewer:** Validates against Vision, PRD, and playbooks.
-3. **Security Auditor:** Checks privacy, data integrity, and compliance with prohibitions.
-4. **Data Integrity Gate:** Final check before merge/release.
+## Architecture
 
-## Canonical Specifications
-- **Backend:** `WhaleWatch/TickerTape/BtheVision_v1_5_5.txt`
-- **Frontend:** `WhaleWatch/TickerTape/FtheVision_v1_5_5.txt`
-- **Core Values:** `AGENTS.md`
-- **Role Playbooks:** `playbooks/`
-- **PR Template & Data Integrity Gate:** See `/tools/` and `/tests/`
+```
+ datadogs (ccxt, keyless) ──► data/SYMBOL-TIMEFRAME.csv ◄── data_loader.loader (THE only door)
+                                        │                          │
+              ┌─────────────────────────┼─────────────┐            │
+              ▼                         ▼             ▼            ▼
+        strategy bots             TickerTape TUI   backtesting engine
+              │ append                  ▲ read
+              ▼                         │
+        signals/signals.jsonl ──────────┤      state/KILL = kill-switch
+        state/<bot>.json ───────────────┘      (bots stop on next loop)
+```
 
----
-This README is intentionally lightweight. For implementation details, see the Vision files and supporting documentation.
+- **`datadogs/`** — keyless OHLCV + funding fetchers (Hyperliquid primary;
+  Coinbase spot for deep history, always venue-tagged, never blended).
+  Validates everything before writing; gaps are reported, never filled.
+- **`data_loader/`** — the only sanctioned CSV reader. Prints a preflight
+  (rows, range, gaps, dupes) and raises on contract violations.
+- **`tui/`** — the terminal app: profile screens (Day Trader, Liquidation
+  Hunter, Whale Watcher, Funding Arbitrage), Research screen (backtest jobs,
+  Monte Carlo), and the Ops screen (`:ops`) — data health, signal tape,
+  bot health.
+- **`bots/`** — standalone shadow bots. They never import TickerTape;
+  the only shared surfaces are the CSV store and the signal/state files.
+- **`backtesting/`** — event-driven engine, walk-forward, Monte Carlo
+  (permutation without replacement).
 
-Quick commands:
+## Quick start
 
-- Emit snapshots once (liquidations dashboard):
+```bash
+pip install -r requirements.txt
 
-    python tools/run_ingestion.py --profile liquidations_dashboard --once
+# 1. Verify the data pipeline against live exchanges (~2 min)
+python -m datadogs selftest
 
-- Start example alert client:
+# 2. Stand up the data store (real bars, keyless)
+python -m datadogs fetch-all
+python -m datadogs backfill BTC 4h --days 900
+python -m datadogs funding BTC --venue hyperliquid --days 90
+python -m datadogs health
 
-    python examples/alert_client.py
+# 3. Launch the TUI
+python -m tui.app
+```
 
-- Launch the TickerTape TUI (from repo root):
+Schedule `python -m datadogs fetch-all` every 15 minutes (Task Scheduler /
+cron) and the store maintains itself; `health` exits 1 on any STALE/ERROR so
+it can gate anything.
 
-    python -m tui.app
+## Shadow bots
 
-  Or after installation:
+The baseline strategy is **VSMA Band** (`bots/strategies.py`), ported from the
+StratSearch beta tier where it passed the alpha gate on BTC 4H. Run it:
 
-    TickerTape
-    TTape
+```bash
+python -m bots.runner --strategy vsma_band --symbol BTC --tf 4h
+```
 
-  The TUI reads local datasets from `data/parquet/`, listens for alerts on `127.0.0.1:8765`,
-  and streams live market data for liquidations, funding rates, whale trades, and event stream panels.
-  Run ingestion first to populate liquidation snapshots (used by non-live panels) and start the alert
-  notifier to stream alerts.
+- Signals append to `signals/signals.jsonl` (one JSON object per line);
+  heartbeats write atomically to `state/<bot_id>.json`.
+- Kill switch: create `state/KILL` — every bot exits cleanly on its next loop.
+- Watch it live in the TUI: `:ops` → Signal Tape / Bot Health.
+- Status vocabulary is controlled: code is `untested → runs →
+  shadow-verified → gauntlet-passed`. Alpha-stage performance numbers are
+  in-sample triage only; nothing is promoted without out-of-sample validation
+  (walk-forward ≥8 windows, Monte Carlo, parameter plateau).
 
-- Run the setup wizard:
+## Verification gates
 
-    python -m tui.app --setup
+All four must pass before a change is done:
 
-- Run ingestion once (liquidations dashboard):
+```bash
+python tools/release_gate.py     # pytest + ruff + mypy + data integrity gate
+```
 
-    python tools/run_ingestion.py --profile liquidations_dashboard --once
+## Data contract (summary)
 
-## TUI Setup, Troubleshooting, and Extension
+- Files: `data/SYMBOL-TIMEFRAME.csv` (e.g. `BTC-15m.csv`), columns
+  `ts,open,high,low,close,volume`; `ts` = bar open, epoch ms UTC, strictly
+  increasing, closed bars only. Venue-tagged research files
+  (`BTC.coinbase-15m.csv`) keep exchanges separate — different venues have
+  different liquidity and are never mixed in one series.
+- Funding stored raw with its interval (Hyperliquid hourly); annualized at
+  display only.
+- All loading goes through `data_loader.loader.load()` /
+  `load_funding()` — nothing else reads price CSVs.
 
-### Setup
-- Install dependencies: `pip install -r requirements.txt` (includes Textual for the TUI).
-- Optional: configure a research runner by setting `TICKERTAPE_BACKTEST_RUNNER` to a local command
-  template (e.g. `python /path/to/runner.py --strategy {strategy} --dataset {dataset} --timeframe {timeframe} --params '{params}' --seed {seed} --out {out}`).
+## Secrets & local configuration 🔐
 
-### Troubleshooting
-- **No liquidation snapshots:** run `python tools/run_ingestion.py --profile liquidations_dashboard --once` to populate `data/parquet/`.
-- **Alert panel disconnected:** ensure the backend alert notifier is running and listening on `127.0.0.1:8765`.
-- **Research jobs blocked:** configure `TICKERTAPE_BACKTEST_RUNNER` or accept the explicit blocked state (no synthetic results are shown).
-- **Live feeds show “Disconnected” or “No data”:** network access is unavailable or the Hyperliquid API is rate-limiting; the panels will retry with backoff and show last-known-good data when available.
+- Canonical secrets file (created on first run):
+  - POSIX: `~/.tickertape/secrets/HLdontShare.env`
+  - Windows: `%USERPROFILE%\.tickertape\secrets\HLdontShare.env`
+  - In-app: `:secrets` opens it in your editor.
+- Overrides: `TICKERTAPE_SECRETS_PATH` or `HL_DONT_SHARE_PATH`.
+- Market data needs **no keys** — the secrets file exists for future
+  authenticated features. Never commit secrets; logging is sanitized.
 
-### Adding Strategies & Datasets (Research Only)
-- Place strategy files locally and reference them via `/backtest run --strategy /path/to/strategy.py`.
-- Import datasets into `data/parquet/` using the ingestion pipeline or your own local export; the TUI reads registry entries from `data/parquet/_registry.json`.
-- Always keep strategies local and deterministic. No network access or external APIs are permitted during backtests.
+## Support the project
 
-
-## Support the Project
-
-If you find this project useful, you may support its continued development via:
-- GitHub Sponsors
-- One-time donations: BTC, XMR
-- Contributions and feedback
-
+If you find this project useful, you may support its continued development via
+GitHub Sponsors, one-time donations (BTC, XMR), or contributions and feedback.
 Donations do not grant any special rights or commercial license.
-
 
 ## Licensing
 
-This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+This project is licensed under the GNU Affero General Public License v3.0
+(AGPL-3.0).
 
 Commercial licenses are available for entities wishing to:
 - embed this software in proprietary systems
@@ -105,45 +132,3 @@ Commercial licenses are available for entities wishing to:
 - distribute modified versions without open-sourcing changes
 
 For commercial licensing inquiries, contact: elias@osgrovesolutions.com
-
-## Secrets & Local Configuration (recommended) 🔐
-
-- **Canonical secrets file (created on first run):**
-  - POSIX (Linux / macOS): `~/.tickertape/secrets/HLdontShare.env`
-  - Windows (PowerShell / CMD): `%USERPROFILE%\.tickertape\secrets\HLdontShare.env`
-  - Use the in-app command `:secrets` to open the file in your editor.
-
-- **Overrides (optional):**
-  - Set `TICKERTAPE_SECRETS_PATH` or `HL_DONT_SHARE_PATH` to point to a different `.env` file.
-
-Note: Do not commit real secrets into the repository; always keep `HLdontShare.env` outside the repo.
-
----
-
-## How to run the Data Integrity Gate & tests (nested workspace)
-
-- Run the gate (CI mode, scanning `TickerTape`):
-
-```
-python tools/data_integrity_gate.py --ci --root TickerTape
-```
-
-- Run the gate + tests (recommended canonical sequence from workspace root):
-
-```
-python tools/data_integrity_gate.py --ci --root TickerTape && (cd TickerTape && pytest -q)
-```
-
-- Or run from within the TickerTape directory:
-
-```
-python ../tools/data_integrity_gate.py --ci --root . && pytest -q
-```
-
-These commands run the gate only against the `TickerTape` project subtree (src/, tests/, docs/ and top-level files) and then run the test suite for the project.
-
-**CI enforcement:** The `Data Integrity Gate` runs as part of the repository GitHub Actions CI and blocks merges on failures via the `data_integrity_gate.yml` workflow for `WhaleWatch/TickerTape`.
-
-## Hyperliquid example mapping
-
-See `docs/hyperliquid_examples_mapping.md` for the mapping between external examples and TickerTape feeds/panels.
