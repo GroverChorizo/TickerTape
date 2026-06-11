@@ -84,6 +84,51 @@ def _vsma_reversal(o, h, lo, c, i: int, direction: str) -> bool:
     return is_bear and (is_shoot or is_engulf or prev_bull)
 
 
+def vsma_band_positions(df: pd.DataFrame, *, vsma_length: int = VSMA_LENGTH,
+                        atr_length: int = VSMA_ATR_LENGTH):
+    """Per-bar desired position (+1/-1/0) from replaying the VSMA rules.
+
+    Single source of truth for the signal core — the shadow bot reads the
+    last element, the gauntlet backtests the whole array. Parameter overrides
+    exist ONLY for the plateau scan; the bot always runs the canonical values.
+    Returns (positions, trend, atr, vsma) numpy arrays aligned to df rows.
+    """
+    import numpy as np
+
+    if len(df) < 60:
+        raise StrategyError(f"need >= 60 closed bars for VSMA warmup, got {len(df)}")
+    o = df["open"].astype(float).to_numpy()
+    h = df["high"].astype(float).to_numpy()
+    lo = df["low"].astype(float).to_numpy()
+    c = df["close"].astype(float).to_numpy()
+
+    atr = _wilder_atr(h, lo, c, atr_length)
+    vsma = _ema(c, vsma_length)
+    slope = np.gradient(vsma)
+    with np.errstate(invalid="ignore"):
+        trend = np.where((c > vsma) & (slope > 0), 1,
+                         np.where((c < vsma) & (slope < 0), -1, 0))
+
+    warmup = max(vsma_length, atr_length) + 10
+    positions = np.zeros(len(c), dtype=np.int8)
+    pos = 0
+    for i in range(warmup, len(c)):
+        # manage first, then entries — beta loop does the same per cycle
+        if pos == 1 and trend[i] == -1:
+            pos = 0
+        elif pos == -1 and trend[i] == 1:
+            pos = 0
+        if pos == 0:
+            bull = c[i] > o[i] and c[i - 1] > o[i - 1]
+            bear = c[i] < o[i] and c[i - 1] < o[i - 1]
+            if trend[i] == 1 and bull and _vsma_reversal(o, h, lo, c, i, "long"):
+                pos = 1
+            elif trend[i] == -1 and bear and _vsma_reversal(o, h, lo, c, i, "short"):
+                pos = -1
+        positions[i] = pos
+    return positions, trend, atr, vsma
+
+
 def vsma_band(df: pd.DataFrame) -> PositionView:
     """VSMA Band (StratSearch beta tier) — trend + candle-reversal entries.
 
@@ -98,41 +143,10 @@ def vsma_band(df: pd.DataFrame) -> PositionView:
     Desired position is derived by replaying these rules over the closed-bar
     frame, so the answer is a pure function of the data (G3 replay-diffable).
     """
-    import numpy as np
-
-    if len(df) < 60:
-        raise StrategyError(f"need >= 60 closed bars for VSMA warmup, got {len(df)}")
-    o = df["open"].astype(float).to_numpy()
-    h = df["high"].astype(float).to_numpy()
-    lo = df["low"].astype(float).to_numpy()
+    positions, trend, atr, vsma = vsma_band_positions(df)
     c = df["close"].astype(float).to_numpy()
-
-    atr = _wilder_atr(h, lo, c, VSMA_ATR_LENGTH)
-    vsma = _ema(c, VSMA_LENGTH)
-    slope = np.gradient(vsma)
-    with np.errstate(invalid="ignore"):
-        trend = np.where((c > vsma) & (slope > 0), 1,
-                         np.where((c < vsma) & (slope < 0), -1, 0))
-
-    warmup = max(VSMA_LENGTH, VSMA_ATR_LENGTH) + 10
-    pos = 0
-    entered_last_bar = False
-    for i in range(warmup, len(c)):
-        entered_last_bar = False
-        # manage first, then entries — beta loop does the same per cycle
-        if pos == 1 and trend[i] == -1:
-            pos = 0
-        elif pos == -1 and trend[i] == 1:
-            pos = 0
-        if pos == 0:
-            bull = c[i] > o[i] and c[i - 1] > o[i - 1]
-            bear = c[i] < o[i] and c[i - 1] < o[i - 1]
-            if trend[i] == 1 and bull and _vsma_reversal(o, h, lo, c, i, "long"):
-                pos = 1
-                entered_last_bar = i == len(c) - 1
-            elif trend[i] == -1 and bear and _vsma_reversal(o, h, lo, c, i, "short"):
-                pos = -1
-                entered_last_bar = i == len(c) - 1
+    pos = int(positions[-1])
+    entered_last_bar = pos != 0 and len(positions) > 1 and positions[-1] != positions[-2]
 
     meta = {
         "vsma": round(float(vsma[-1]), 2),
