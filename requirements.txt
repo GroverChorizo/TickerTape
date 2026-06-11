@@ -7,6 +7,8 @@ rich>=13.7,<15.0
 python-dotenv
 PyYAML
 pandas
+numpy>=1.24
+ccxt==4.5.57
 textual>=0.60,<0.80
 
 # AI Swarm Agent (requires OPENROUTER_API_KEY in .env)
