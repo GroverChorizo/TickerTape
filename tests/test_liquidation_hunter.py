@@ -40,7 +40,7 @@ def test_liquidation_event_normalization_minimal():
         "sz": 1,
         "address": "0xabc",
     }
-    event = _normalize_event(raw, "moondev")
+    event = _normalize_event(raw, "hyperliquid")
     assert event is not None
     assert event.ts_ms == 1700000000 * 1000
     assert event.symbol == "BTC"
@@ -70,7 +70,7 @@ def test_liquidation_timeframe_stats_minimal():
 def test_liquidation_panel_error_includes_http_status():
     panel = LiquidationsRadarPanel()
     error_line = (
-        "GET https://api.moondev.com/api/liquidations/1h.json -> HTTP 404: Not Found"
+        "GET https://api.hyperliquid.xyz/api/liquidations/1h.json -> HTTP 404: Not Found"
     )
     result = FeedResult(status="error", error=error_line)
 
@@ -118,7 +118,7 @@ def test_liquidation_stats_payload_sections():
                 "notional_usd": 1000,
                 "price": 100,
                 "size": 10,
-                "source": "moondev",
+                "source": "hyperliquid",
                 "liquidated_wallet": None,
             }
         ],

@@ -23,7 +23,16 @@ BASE_URL: str = "https://api.hyperliquid.xyz"  # Source: BtheVision_v1_5_5.txt
 ENDPOINT_PATHS: Dict[str, str] = {
     "info": "/info",
     "candles": "/api/candleSnapshot",
-    # Add or update paths from Vision only
+    # Legacy data-layer endpoint keys still referenced by feeds/tests; they
+    # 404 against api.hyperliquid.xyz and surface as honest feed error states
+    # until each panel is migrated to the local datadogs store.
+    "whales": "/api/whales.json",
+    "positions": "/api/positions.json",
+    "positions_all": "/api/positions/all.json",
+    "liquidations_stats": "/api/liquidations/stats.json",
+    "liquidations_1h": "/api/liquidations/1h.json",
+    "funding": "/api/binance_funding.json",
+    "prices": "/api/prices",
 }
 
 DEFAULT_TIMEOUT = 10.0  # seconds

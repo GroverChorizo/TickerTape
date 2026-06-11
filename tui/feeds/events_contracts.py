@@ -1,4 +1,4 @@
-"""Events and contracts feed for MoonDev endpoints."""
+"""Events and contracts feed (legacy data-layer endpoints)."""
 
 from __future__ import annotations
 

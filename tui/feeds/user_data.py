@@ -1,4 +1,4 @@
-"""User data feed (wallet/account) for MoonDev endpoints."""
+"""User data feed (wallet/account; legacy data-layer endpoints)."""
 
 from __future__ import annotations
 

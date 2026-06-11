@@ -32,8 +32,8 @@ def redact_url(url: str, sensitive_keys: Iterable[str] | None = None) -> str:
     - Never raises; on parse failure, returns '<redacted-url>'
 
     Example:
-        https://api.moondev.com/x?api_key=ABC&foo=1
-        -> https://api.moondev.com/x?api_key=<redacted>&foo=1
+        https://api.example.com/x?api_key=ABC&foo=1
+        -> https://api.example.com/x?api_key=<redacted>&foo=1
     """
     try:
         parts = urlsplit(url)

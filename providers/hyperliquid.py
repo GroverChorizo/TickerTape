@@ -10,7 +10,6 @@ import time
 
 from backend.network import NetworkClient
 from tui.feeds.liquidations import _normalize_event
-from tui.feeds.moondev_client import MoonDevClient
 
 from .base import Provider
 from .models import (
@@ -33,14 +32,8 @@ class CacheEntry:
 class DirectHyperliquidClient:
     """Direct HTTP client wrapper using backend.network.NetworkClient."""
 
-    def __init__(
-        self,
-        client: Optional[NetworkClient] = None,
-        *,
-        fallback: Optional[MoonDevClient] = None,
-    ) -> None:
+    def __init__(self, client: Optional[NetworkClient] = None) -> None:
         self._client = client or NetworkClient()
-        self._fallback = fallback
 
     def get_json(self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
         params = params or {}
@@ -60,12 +53,7 @@ class DirectHyperliquidClient:
         if endpoint_key == "ticks":
             symbol = params.get("symbol") or kwargs.get("symbol")
             return self._client.post("info", {"type": "recentTrades", "coin": symbol})
-        try:
-            return self._client.get(endpoint_key, params=params)
-        except Exception:
-            if self._fallback:
-                return self._fallback.get_json(endpoint_key, params=params, **kwargs)
-            raise
+        return self._client.get(endpoint_key, params=params)
 
     def close(self) -> None:
         if hasattr(self._client, "_client"):
@@ -76,29 +64,23 @@ class DirectHyperliquidClient:
 
 
 class HyperliquidProvider(Provider):
-    """Provider backed by direct Hyperliquid HTTP with MoonDev fallback."""
+    """Provider backed by direct Hyperliquid HTTP."""
 
     def __init__(
         self,
         *,
         client: Optional[Any] = None,
         direct_client: Optional[DirectHyperliquidClient] = None,
-        moondev_client: Optional[MoonDevClient] = None,
         cache_ttl_s: float = 5.0,
         stream_min_backoff: float = 0.5,
         stream_max_backoff: float = 30.0,
         stream_poll_interval: float = 2.0,
         now_fn: Optional[Callable[[], float]] = None,
-        use_moondev: bool = False,
     ) -> None:
         if client is not None:
             self._client = client
-        elif use_moondev:
-            self._client = moondev_client or MoonDevClient()
         else:
-            self._client = direct_client or DirectHyperliquidClient(
-                fallback=moondev_client
-            )
+            self._client = direct_client or DirectHyperliquidClient()
         self._cache_ttl_s = cache_ttl_s
         self._now = now_fn or time.monotonic
         self._liquidations_cache: Optional[CacheEntry] = None

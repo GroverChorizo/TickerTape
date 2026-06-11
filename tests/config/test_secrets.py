@@ -30,11 +30,11 @@ def test_ensure_secrets_file_creates_placeholders(tmp_path):
 def test_load_secrets_reads_yaml(tmp_path):
     path = tmp_path / "secrets.yaml"
     path.write_text(
-        "hyperliquid_api_key: abc\nmoondev_api_key: def\n", encoding="utf-8"
+        "hyperliquid_api_key: abc\nexchange_api_secret: def\n", encoding="utf-8"
     )
     data = load_secrets(path)
     assert data.get("hyperliquid_api_key") == "abc"
-    assert data.get("moondev_api_key") == "def"
+    assert data.get("exchange_api_secret") == "def"
 
 
 def test_check_permissions_windows_no_warning(tmp_path):

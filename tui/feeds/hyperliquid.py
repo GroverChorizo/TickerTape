@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
+import json
 import logging
 import time
 
 from backend.storage import DatasetRegistry, partition_and_write
 from .base import BaseFeed
-from .moondev_client import MoonDevClient
 from providers.hyperliquid import DirectHyperliquidClient
 
 logger = logging.getLogger(__name__)
@@ -27,25 +27,21 @@ class FundingPoint:
 class HyperliquidClient:
     def __init__(
         self,
-        base_url: str = "https://api.moondev.com",
+        base_url: str = "https://api.hyperliquid.xyz",
         timeout: float = 10.0,
         retries: int = 3,
         direct_client: Optional[DirectHyperliquidClient] = None,
-        moondev_client: Optional[MoonDevClient] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.retries = retries
-        self._moondev = moondev_client or MoonDevClient(
-            base_url=self.base_url, timeout=timeout, retries=retries
-        )
-        self._direct = direct_client or DirectHyperliquidClient(fallback=self._moondev)
+        self._direct = direct_client or DirectHyperliquidClient()
+        self._last_latency_ms: Optional[float] = None
+        self._last_request_ts_ms: Optional[int] = None
+        self._total_bytes_received = 0
+        self._last_error: Optional[str] = None
 
     def close(self) -> None:
-        try:
-            self._moondev.close()
-        except Exception:
-            pass
         try:
             self._direct.close()
         except Exception:
@@ -54,18 +50,47 @@ class HyperliquidClient:
     def get_json(
         self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any
     ) -> Any:
-        return self._direct.get_json(endpoint_key, params=params, **kwargs)
+        start = time.perf_counter()
+        try:
+            payload = self._direct.get_json(endpoint_key, params=params, **kwargs)
+        except Exception as exc:
+            self._record_network_metrics(start, error=str(exc))
+            raise
+        self._record_network_metrics(start, payload=payload)
+        return payload
 
     def post_json(
         self, endpoint_key: str, payload: Dict[str, Any], **kwargs: Any
     ) -> Any:
+        start = time.perf_counter()
         try:
-            return self._direct.get_json(endpoint_key, params=payload, **kwargs)
-        except Exception:
-            return self._moondev.post_json(endpoint_key, payload, **kwargs)
+            result = self._direct.get_json(endpoint_key, params=payload, **kwargs)
+        except Exception as exc:
+            self._record_network_metrics(start, error=str(exc))
+            raise
+        self._record_network_metrics(start, payload=result)
+        return result
 
-    async def ws_connect(self, endpoint_key: str, **kwargs: Any):
-        return await self._moondev.ws_connect(endpoint_key, **kwargs)
+    def network_metrics(self) -> Dict[str, Any]:
+        return {
+            "last_latency_ms": self._last_latency_ms,
+            "last_request_ts_ms": self._last_request_ts_ms,
+            "total_bytes_received": self._total_bytes_received,
+            "last_error": self._last_error,
+        }
+
+    def _record_network_metrics(
+        self,
+        start: float,
+        *,
+        payload: Any = None,
+        error: Optional[str] = None,
+    ) -> None:
+        self._last_latency_ms = round((time.perf_counter() - start) * 1000, 2)
+        self._last_request_ts_ms = int(time.time() * 1000)
+        self._last_error = error
+        if payload is not None:
+            self._total_bytes_received += _estimate_payload_bytes(payload)
 
 
 class LiquidationsFeed(BaseFeed):
@@ -214,6 +239,13 @@ def _format_json_error(method: str, url: str, response: Any) -> str:
     return (
         f"{method} {url} -> HTTP {response.status_code} (json decode error): {snippet}"
     )
+
+
+def _estimate_payload_bytes(payload: Any) -> int:
+    try:
+        return len(json.dumps(payload, default=str).encode("utf-8"))
+    except Exception:
+        return 0
 
 
 def _parse_funding_history(raw: Any) -> List[FundingPoint]:

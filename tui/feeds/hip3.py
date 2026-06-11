@@ -1,4 +1,4 @@
-"""HIP-3 feed for MoonDev endpoints."""
+"""HIP-3 feed (legacy data-layer endpoints)."""
 
 from __future__ import annotations
 
@@ -79,9 +79,9 @@ class Hip3Feed(BaseFeed):
             logger.warning({"event": "hip3_snapshot_write_failed", "error": str(exc)})
 
 
-def _try_fetch(client: Any, endpoint_key: str, errors: List[str]) -> Any:
+def _try_fetch(client: Any, endpoint_key: str, errors: List[str], **kwargs: Any) -> Any:
     try:
-        return client.get_json(endpoint_key)
+        return client.get_json(endpoint_key, **kwargs)
     except Exception as exc:
         errors.append(f"{endpoint_key}: {exc}")
         return None

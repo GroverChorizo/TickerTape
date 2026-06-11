@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import time
 
 from textual.containers import Horizontal, Vertical
@@ -100,22 +100,22 @@ class FundingArbitrageScreen(BaseScreen):
     def _build_feed(self) -> None:
         registry = DatasetRegistry(path=self.app.config.data_root / "_registry.json")
         exchanges = getattr(self.app.config, "funding_exchanges", None)
-        moondev_client = HyperliquidClient()
+        data_client = HyperliquidClient()
         self._feed = MultiExchangeFundingFeed(
             hyperliquid_client=NetworkClient(),
-            moondev_client=moondev_client,
+            data_client=data_client,
             registry=registry,
             exchanges=exchanges,
             offline=self.app.config.mode == "offline_demo",
         )
         self._hlp_feed = HlpFeed(
-            moondev_client,
+            data_client,
             registry=registry,
             offline=self.app.config.mode == "offline_demo",
             poll_interval=12.0,
         )
         self._orderbook_feed = OrderbookDepthFeed(
-            moondev_client,
+            data_client,
             registry=registry,
             offline=self.app.config.mode == "offline_demo",
             poll_interval=8.0,

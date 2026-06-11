@@ -7,7 +7,7 @@ import logging
 import time
 
 from backend.storage import DatasetRegistry, partition_and_write
-from .base import BaseFeed
+from .base import BaseFeed, FeedResult
 from .hyperliquid import HyperliquidClient
 
 logger = logging.getLogger(__name__)

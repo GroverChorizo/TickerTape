@@ -109,7 +109,6 @@ def _placeholder_yaml() -> str:
         "# TickerTape secrets (local-only)\n"
         "# Add your API keys below. Keep this file private.\n"
         'hyperliquid_api_key: ""\n'
-        'moondev_api_key: ""\n'
         'exchange_api_secret: ""\n'
     )
 

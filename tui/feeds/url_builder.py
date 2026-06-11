@@ -1,9 +1,17 @@
-"""Endpoint-aware URL builder for MoonDev Hyperliquid data feeds."""
+"""Endpoint-key registry for data feeds.
+
+ENDPOINT_SPECS is the catalog of endpoint keys that feeds may request and
+the allowlist that `tests/feeds/test_profile_feed_contracts.py` validates
+profile contracts against. The path templates document the legacy data-layer
+shape; URL construction now happens in `backend.network.NetworkClient`
+(direct Hyperliquid) and unmapped keys surface as honest feed error states
+until each panel is migrated to the local datadogs store.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Dict
 
 
 @dataclass(frozen=True)
@@ -104,57 +112,3 @@ ENDPOINT_SPECS: Dict[str, EndpointSpec] = {
         "/api/hip3_ticks/{dex}_{ticker}.json", ticker_case="lower", dex_case="lower"
     ),
 }
-
-
-class EndpointUrlBuilder:
-    """Builds endpoint URLs with endpoint-specific normalization rules."""
-
-    def __init__(self, base_url: str) -> None:
-        self.base_url = base_url.rstrip("/")
-
-    def build(self, endpoint_key: str, **kwargs: Any) -> str:
-        if endpoint_key not in ENDPOINT_SPECS:
-            raise ValueError(f"Endpoint '{endpoint_key}' is not in allowlist")
-        spec = ENDPOINT_SPECS[endpoint_key]
-        params = dict(kwargs)
-        if "symbol" in spec.path:
-            symbol = params.get("symbol")
-            if symbol is None:
-                raise ValueError(f"Endpoint '{endpoint_key}' requires symbol")
-            params["symbol"] = _normalize_case(symbol, spec.symbol_case)
-        if "ticker" in spec.path:
-            ticker = params.get("ticker")
-            if ticker is None:
-                raise ValueError(f"Endpoint '{endpoint_key}' requires ticker")
-            params["ticker"] = _normalize_case(ticker, spec.ticker_case)
-        if "dex" in spec.path:
-            dex = params.get("dex")
-            if dex is None:
-                raise ValueError(f"Endpoint '{endpoint_key}' requires dex")
-            params["dex"] = _normalize_case(dex, spec.dex_case)
-        if "duration" in spec.path:
-            duration = params.get("duration")
-            if duration is None:
-                raise ValueError(f"Endpoint '{endpoint_key}' requires duration")
-            params["duration"] = _normalize_case(duration, spec.duration_case)
-        if "timeframe" in spec.path:
-            timeframe = params.get("timeframe")
-            if timeframe is None:
-                raise ValueError(f"Endpoint '{endpoint_key}' requires timeframe")
-            params["timeframe"] = _normalize_case(timeframe, spec.timeframe_case)
-        if "address" in spec.path:
-            address = params.get("address")
-            if address is None:
-                raise ValueError(f"Endpoint '{endpoint_key}' requires address")
-            params["address"] = str(address).strip()
-        path = spec.path.format(**params)
-        return f"{self.base_url}{path}"
-
-
-def _normalize_case(value: Any, mode: str | None) -> str:
-    text = str(value).strip()
-    if mode == "lower":
-        return text.lower()
-    if mode == "upper":
-        return text.upper()
-    return text

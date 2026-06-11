@@ -1,8 +1,9 @@
-"""Hyperliquid provider with direct HL primary + MoonDev fallback."""
+"""Hyperliquid provider over the direct HL HTTP client."""
 
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+import time
 
 from tui.feeds.hyperliquid import HyperliquidClient
 from tui.models.liquidations import LiquidationSnapshot
@@ -26,7 +27,7 @@ from backend.storage import DatasetRegistry
 class HyperliquidProvider:
     def __init__(
         self,
-        base_url: str = "https://api.moondev.com",
+        base_url: str = "https://api.hyperliquid.xyz",
         *,
         client: Optional[HyperliquidClient] = None,
         registry: Optional[DatasetRegistry] = None,
@@ -46,7 +47,7 @@ class HyperliquidProvider:
         )
         self._whales_feed = WhaleTradesFeed(self._client, offline=offline)
         self._events_feed = EventStreamFeed(self._client, offline=offline)
-        # Extended MoonDev feeds (polling-based)
+        # Extended data-layer feeds (polling-based)
         self._smart_money_feed = SmartMoneyFeed(
             self._client, registry=self._registry, offline=offline
         )
@@ -77,7 +78,13 @@ class HyperliquidProvider:
     def get_liquidations(self) -> FeedResult:
         result = self._liquidations_feed.fetch_result()
         if isinstance(result.data, dict):
-            result.data = LiquidationSnapshot.from_payload(result.data)
+            return FeedResult(
+                status=result.status,
+                data=LiquidationSnapshot.from_payload(result.data),
+                error=result.error,
+                updated_ts_ms=result.updated_ts_ms,
+                is_lkg=result.is_lkg,
+            )
         return result
 
     def get_market_context(self, symbol: str) -> FeedResult:
@@ -85,7 +92,13 @@ class HyperliquidProvider:
             self._market_feed.set_selected_coin(symbol)
         result = self._market_feed.fetch_result()
         if isinstance(result.data, dict):
-            result.data = MarketContext.from_payload(result.data, symbol or "")
+            return FeedResult(
+                status=result.status,
+                data=MarketContext.from_payload(result.data, symbol or ""),
+                error=result.error,
+                updated_ts_ms=result.updated_ts_ms,
+                is_lkg=result.is_lkg,
+            )
         return result
 
     def get_whales(self) -> FeedResult:
@@ -342,6 +355,32 @@ class HyperliquidStreamer:
             sup.register_handler(handler)
             sup.start()
             self.supervisors[key] = sup
+
+    def stats(self) -> Dict[str, Dict[str, Any]]:
+        """Return structured per-stream telemetry from supervisors."""
+        now_ms = int(time.time() * 1000)
+        telemetry: Dict[str, Dict[str, Any]] = {}
+        for endpoint, supervisor in self.supervisors.items():
+            if not hasattr(supervisor, "stats"):
+                continue
+            snapshot = supervisor.stats()
+            last_msg = snapshot.last_message_ts_ms
+            lag_ms = None if last_msg is None else max(0, now_ms - int(last_msg))
+            telemetry[endpoint] = {
+                "running": bool(snapshot.running),
+                "connected": bool(snapshot.connected),
+                "connect_count": int(snapshot.connect_count),
+                "reconnect_count": int(snapshot.reconnect_count),
+                "messages_received": int(snapshot.messages_received),
+                "error_count": int(snapshot.error_count),
+                "last_error": snapshot.last_error,
+                "last_connect_ts_ms": snapshot.last_connect_ts_ms,
+                "last_message_ts_ms": last_msg,
+                "last_disconnect_ts_ms": snapshot.last_disconnect_ts_ms,
+                "last_backoff_s": float(snapshot.last_backoff_s),
+                "lag_ms": lag_ms,
+            }
+        return telemetry
 
     async def stop(self) -> None:
         # mark stopping so in-flight flushes avoid pushing

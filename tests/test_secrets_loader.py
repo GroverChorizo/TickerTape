@@ -16,11 +16,11 @@ def write_file(path: Path, content: str) -> None:
 
 def test_load_secrets_from_explicit_path(tmp_path):
     p = tmp_path / "HLdontShare.env"
-    write_file(p, "API_KEY=abc123\nMOONDEV_API_KEY=moon\n# comment\n")
+    write_file(p, "API_KEY=abc123\nHYPERLIQUID_API_KEY=hl\n# comment\n")
 
     data = load_secrets(path=p)
     assert data["API_KEY"] == "abc123"
-    assert data["MOONDEV_API_KEY"] == "moon"
+    assert data["HYPERLIQUID_API_KEY"] == "hl"
 
 
 def test_load_secrets_from_env_var(monkeypatch, tmp_path):
@@ -55,7 +55,7 @@ def test_legacy_secrets_path_detected(monkeypatch, tmp_path):
     legacy_dir = tmp_path / "TickerTape" / "secrets"
     legacy_dir.mkdir(parents=True, exist_ok=True)
     legacy_file = legacy_dir / "HLdontShare.env"
-    write_file(legacy_file, "MOONDEV_API_KEY=legacy\n")
+    write_file(legacy_file, "HYPERLIQUID_API_KEY=legacy\n")
     found = legacy_secrets_file_path()
     assert found == legacy_file.resolve()
 

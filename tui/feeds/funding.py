@@ -35,7 +35,7 @@ class MultiExchangeFundingFeed(BaseFeed):
         self,
         *,
         hyperliquid_client: NetworkClient,
-        moondev_client: HyperliquidClient,
+        data_client: HyperliquidClient,
         registry: DatasetRegistry,
         coins: Optional[Iterable[str]] = None,
         exchanges: Optional[Iterable[str]] = None,
@@ -46,7 +46,7 @@ class MultiExchangeFundingFeed(BaseFeed):
     ) -> None:
         super().__init__(name="funding", poll_interval=poll_interval, offline=offline)
         self.hyperliquid_client = hyperliquid_client
-        self.moondev_client = moondev_client
+        self.data_client = data_client
         self.coins = [c.upper() for c in (coins or ["BTC", "ETH", "SOL"])]
         self.exchanges = _normalize_exchanges(exchanges)
         self._registry = registry
@@ -114,7 +114,7 @@ class MultiExchangeFundingFeed(BaseFeed):
         return rows
 
     def _fetch_binance(self, now_ms: int) -> List[FundingRow]:
-        raw = self.moondev_client.get_json("binance_funding")
+        raw = self.data_client.get_json("binance_funding")
         entries = _parse_binance_funding(raw)
         rows: List[FundingRow] = []
         for entry in entries:

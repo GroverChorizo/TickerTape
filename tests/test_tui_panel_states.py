@@ -169,7 +169,7 @@ def test_panel_error_includes_http_status():
 
 def test_panel_error_preserves_raw_line():
     panel = EventStream()
-    error_line = "GET https://api.moondev.com/api/whales.json -> HTTP 404: Not Found"
+    error_line = "GET https://api.hyperliquid.xyz/api/whales.json -> HTTP 404: Not Found"
     result = FeedResult(status="error", error=error_line)
 
     app = _PanelApp(panel)

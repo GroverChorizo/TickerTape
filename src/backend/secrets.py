@@ -26,7 +26,6 @@ UX support:
   show users where to place secrets when auth fails.
 
 Typical file contents:
-    MOONDEV_API_KEY=...
     HYPERLIQUID_API_KEY=...
 """
 
@@ -48,7 +47,6 @@ _DEFAULT_FILENAME = "HLdontShare.env"
 _ENV_PATH_VARS = ["HL_DONT_SHARE_PATH", "HLDONT_SHARE_PATH", "TICKERTAPE_SECRETS_PATH"]
 _DEFAULT_PATH = Path.home() / ".tickertape" / "secrets" / "HLdontShare.env"
 _ENV_VARS = ["HL_DONT_SHARE_PATH", "HLDONT_SHARE_PATH", "TICKERTAPE_SECRETS_PATH"]
-_MOONDEV_ENV = "MOONDEV_API_KEY"
 _CONFIG_ENV = "TICKERTAPE_CONFIG_PATH"
 
 
@@ -253,7 +251,7 @@ def load_secrets(
     """
     Load secrets from environment path override or a file.
 
-    Note: This function does NOT read individual secret values from env vars (like MOONDEV_API_KEY);
+    Note: This function does NOT read individual secret values from env vars (like HYPERLIQUID_API_KEY);
     it reads a secrets FILE path from env vars, then parses that file.
     If you also want direct env var secrets, do that in a higher layer (recommended).
 
@@ -284,39 +282,10 @@ def ensure_secrets_file(path: Optional[Path] = None) -> Tuple[Path, bool]:
         return target, False
 
 
-def resolve_moondev_api_key(
-    *,
-    config_path: Optional[Path] = None,
-    dotenv_path: Optional[Path] = None,
-) -> Tuple[Optional[str], Optional[str]]:
-    """Resolve MoonDev API key from the canonical secrets file only."""
-    _ = config_path
-    _ = dotenv_path
-    try:
-        secrets_loc = resolve_secrets_file_path()
-        secrets = load_secrets(path=secrets_loc.secrets_file)
-        val = secrets.get(_MOONDEV_ENV) or secrets.get("moondev_api_key")
-        if val:
-            return val.strip(), f"secrets:{secrets_loc.secrets_file}"
-    except Exception:
-        return None, None
-    return None, None
-
-
-def moondev_config_help() -> str:
-    secrets_path = str(resolve_secrets_file_path().secrets_file)
-    return (
-        "MoonDev API key missing. Add it to:\n"
-        f"- {secrets_path}\n"
-        "Format: MOONDEV_API_KEY=your_key"
-    )
-
-
 def _placeholder_env() -> str:
     return (
         "# TickerTape secrets (local-only)\n"
         "# Add your API keys below. Keep this file private.\n"
-        "MOONDEV_API_KEY=\n"
         "HYPERLIQUID_API_KEY=\n"
     )
 
@@ -327,6 +296,4 @@ __all__ = [
     "_DEFAULT_PATH",
     "canonical_secrets_file_path",
     "legacy_secrets_file_path",
-    "resolve_moondev_api_key",
-    "moondev_config_help",
 ]

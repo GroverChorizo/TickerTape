@@ -1,8 +1,8 @@
-"""Smart money feed for MoonDev endpoints."""
+"""Smart money feed (legacy data-layer endpoints)."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 import time
 
@@ -77,9 +77,9 @@ class SmartMoneyFeed(BaseFeed):
             logger.warning({"event": "smart_money_snapshot_write_failed", "error": str(exc)})
 
 
-def _try_fetch(client: Any, endpoint_key: str, errors: List[str]) -> Any:
+def _try_fetch(client: Any, endpoint_key: str, errors: List[str], **kwargs: Any) -> Any:
     try:
-        return client.get_json(endpoint_key)
+        return client.get_json(endpoint_key, **kwargs)
     except Exception as exc:
         errors.append(f"{endpoint_key}: {exc}")
         return None

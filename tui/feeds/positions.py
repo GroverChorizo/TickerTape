@@ -1,4 +1,4 @@
-"""Positions feed for MoonDev endpoints."""
+"""Positions feed (legacy data-layer endpoints)."""
 
 from __future__ import annotations
 

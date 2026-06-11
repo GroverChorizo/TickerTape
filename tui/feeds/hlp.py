@@ -1,8 +1,8 @@
-"""Hyperliquidity Provider (HLP) feed for MoonDev endpoints."""
+"""Hyperliquidity Provider (HLP) feed (legacy data-layer endpoints)."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 import time
 

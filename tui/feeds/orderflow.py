@@ -1,8 +1,8 @@
-"""Orderflow feed (trades + flows) for MoonDev endpoints."""
+"""Orderflow feed (trades + flows; legacy data-layer endpoints)."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 import logging
 import time
 

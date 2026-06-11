@@ -135,7 +135,7 @@ class LiquidationsRadarFeed(BaseFeed):
 
         if not raw_events:
             raw_events = _extract_largest_events(stats_payload)
-        events = _normalize_events(raw_events, source="moondev")
+        events = _normalize_events(raw_events, source="hyperliquid")
         rollups = _compute_rollups(events, now_ms)
         series = _bucket_series(events, now_ms)
         cascade = _cascade_risk(rollups, series)

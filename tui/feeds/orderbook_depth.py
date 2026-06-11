@@ -1,4 +1,4 @@
-"""Orderbook depth feed for MoonDev endpoints."""
+"""Orderbook depth feed (legacy data-layer endpoints)."""
 
 from __future__ import annotations
 
