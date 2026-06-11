@@ -117,3 +117,6 @@ state/
 
 # Note: If secrets are found in the repository history, rotate them and remove them from history using
 # tools such as `git filter-repo` or the BFG Repo-Cleaner. This directory-level .gitignore favors safety over convenience.
+
+# Copilot role prompts — internal, local-only
+.github/prompts/
