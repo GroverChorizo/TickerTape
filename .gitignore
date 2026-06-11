@@ -88,20 +88,30 @@ Thumbs.db
 filesFromFable/
 filesFromFable.zip
 
+# Internal planning material — local working docs, never publish
+PROMPT_*.md
+IMPLEMENTATION_PLAN.md
+PRD.md
+AGENTS.md
+bTest_MC_logic.md
+*theVision*.txt
+docs/REQUIREMENT_TRACE.md
+docs/PR_DRAFT.md
+specs/
+playbooks/
+
 # Bot runtime surfaces (local state, append-only signal tape)
 signals/
 state/
 
-# Explicitly DO NOT ignore canonical project files (Vision, docs, playbooks, tests)
-!BtheVision_v1_5_5.txt
-!FtheVision_v1_5_5.txt
+# Explicitly DO NOT ignore canonical project files (docs, tests, tools)
+# (Vision/PRD/playbooks negations removed 2026-06-11: internal planning
+#  material stays local-only now that the repo is public.)
 !README.md
-!PRD.md
 !COMMAND_CHEATSHEET.md
 !STRATEGY_IMPLEMENTATION_GUIDE.md
 !LICENSE_NOTICE.md
 !docs/
-!playbooks/
 !tests/
 !tools/
 
