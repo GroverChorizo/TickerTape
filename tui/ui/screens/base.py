@@ -9,7 +9,7 @@ from textual.containers import Horizontal, Vertical
 
 from tui.ui.widgets.command_bar import CommandBar
 from tui.ui.layout import apply_layout
-from tui.ui.sidebar import Sidebar, SidebarEntry
+from tui.ui.sidebar import SidebarContainer, SidebarEntry
 from tui.ui.tabbar import TabBar, TabItem
 from tui.ui.tab_carousel import TabCarousel, TabEntry
 from tui.ui.status_bar import StatusBar
@@ -30,6 +30,7 @@ class BaseScreen(Screen):
         ("alt+3", "tab_index(3)", "Tab 3"),
         ("alt+4", "tab_index(4)", "Tab 4"),
         ("alt+5", "tab_index(5)", "Tab 5"),
+        ("a", "cycle_alert_category", "Cycle alerts"),
     ]
 
     def __init__(self, *, screen_id: str, title: str, context: str) -> None:
@@ -38,9 +39,12 @@ class BaseScreen(Screen):
         self.command_context = context
         self.header = Static("", id="screen_header")
         self.status = StatusBar(id="status_bar")
+        self._status_timer = None
         self.tab_carousel = TabCarousel(id="tab_carousel")
         self.body = Static("", id="screen_body")
-        self.sidebar = Sidebar(id="sidebar")
+        # SidebarContainer replaces the old Sidebar — same public interface,
+        # but now has an alert history section below the navigation list.
+        self.sidebar = SidebarContainer(id="sidebar")
         self.tabbar = TabBar(id="tabbar")
         self.command_bar = CommandBar()
 
@@ -65,6 +69,12 @@ class BaseScreen(Screen):
         layout = apply_layout(self, self.size.width)
         self._sync_navigation(layout)
         self._apply_persisted_ui_state()
+        self._start_status_timer()
+        self._wire_alert_store()
+
+    def on_hide(self) -> None:
+        if self._status_timer is not None:
+            self._status_timer.pause()
 
     def on_resize(self, event: events.Resize) -> None:
         layout = apply_layout(self, event.size.width)
@@ -73,6 +83,14 @@ class BaseScreen(Screen):
     def action_focus_command(self) -> None:
         try:
             self.command_bar.input.focus()
+        except Exception:
+            pass
+
+    def action_cycle_alert_category(self) -> None:
+        """Cycle the sidebar alert section to the next category."""
+        try:
+            cat = self.sidebar.next_alert_category()
+            self.set_status(f"Alerts: {cat}")
         except Exception:
             pass
 
@@ -125,6 +143,9 @@ class BaseScreen(Screen):
                     short=profile.label[:1].upper(),
                 )
             )
+        entries.append(SidebarEntry(key="research", label="Research", short="R"))
+        entries.append(SidebarEntry(key="ops", label="Ops", short="O"))
+
         active_key = self.command_context
         if active_key not in {entry.key for entry in entries}:
             active_key = "home"
@@ -146,6 +167,14 @@ class BaseScreen(Screen):
         self._sync_tab_carousel(screen_id)
         self._sync_breadcrumb(screen_id)
 
+    def _wire_alert_store(self) -> None:
+        """Connect the app's live AlertStore into the sidebar alert section."""
+        try:
+            store = self.app.alert_store
+            self.sidebar.set_alert_store(store)
+        except Exception:
+            pass
+
     def _apply_persisted_ui_state(self) -> None:
         self._ensure_state()
         apply_fullscreen_state(self.app, self, self._profile_name())
@@ -158,7 +187,7 @@ class BaseScreen(Screen):
             return
 
     def _profile_name(self) -> str:
-        if self.command_context in {"home", "views", "settings"}:
+        if self.command_context in {"home", "views", "settings", "research", "ops"}:
             return self.app.session_state.active_profile
         return self.command_context
 
@@ -195,6 +224,8 @@ class BaseScreen(Screen):
             breadcrumb = "home"
         elif active_key == "settings":
             breadcrumb = "home > settings"
+        elif active_key == "research":
+            breadcrumb = "home > research"
         elif active_key.startswith("view_"):
             breadcrumb = f"home > view/{active_key.replace('view_', '')}"
         elif active_key.startswith("profile_"):
@@ -204,3 +235,25 @@ class BaseScreen(Screen):
         else:
             breadcrumb = f"home > {active_key}"
         self.status.set_breadcrumb(breadcrumb)
+
+    def _start_status_timer(self) -> None:
+        self._update_status_health()
+        if self._status_timer is None:
+            self._status_timer = self.set_interval(1.0, self._update_status_health)
+        else:
+            self._status_timer.resume()
+
+    def _update_status_health(self) -> None:
+        getter = getattr(self.app, "get_status_snapshot", None)
+        if not callable(getter):
+            return
+        try:
+            snapshot = getter()
+        except Exception:
+            return
+        self.status.set_health(snapshot)
+        # Keep the sidebar alert section fresh on every tick
+        try:
+            self.sidebar.refresh_alerts()
+        except Exception:
+            pass

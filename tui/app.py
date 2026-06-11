@@ -9,7 +9,7 @@ import sys
 import time
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from textual.app import App
 from textual import events
@@ -60,6 +60,8 @@ from tui.ui.screens.profile_funding_arbitrage import FundingArbitrageScreen
 from tui.ui.screens.profile_liquidation import LiquidationHunterScreen
 from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
 from tui.ui.screens.profile_whale_watcher import WhaleWatcherScreen
+from tui.ui.screens.ops import OpsScreen
+from tui.ui.screens.research import ResearchScreen
 from tui.ui.screens.settings import SettingsScreen
 from tui.ui.screens.validation import ValidationScreen
 from tui.ui.screens.views import (
@@ -128,6 +130,8 @@ class TickerTapeApp(App):
             offline=self.config.mode == "offline_demo",
         )
         self.stream_manager = LiveStreamManager(self.provider)
+        self._status_last_messages_total = 0
+        self._status_last_measure_ts_ms: Optional[int] = None
         self._custom_dashboards = load_custom_dashboards()
         if self.config.profile in self._custom_dashboards:
             apply_custom_dashboard(
@@ -138,6 +142,7 @@ class TickerTapeApp(App):
         self._register_commands()
         self._load_cached_snapshots()
         self._open_screen_order = list(self._cache.get("open_screens_order", []))
+        self._pending_mc_result: Optional[tuple] = None
 
     def on_mount(self) -> None:
         self.apply_palette(self.theme_manager.current())
@@ -241,8 +246,25 @@ class TickerTapeApp(App):
         except Exception:
             pass
         try:
+            health = self.screen.query_one("#health_line")
+            health.styles.color = palette.text.muted
+        except Exception:
+            pass
+        try:
             breadcrumb = self.screen.query_one("#breadcrumb_line")
             breadcrumb.styles.color = palette.text.muted
+        except Exception:
+            pass
+        try:
+            diagnostics_button = self.screen.query_one("#status_diagnostics")
+            diagnostics_button.styles.background = palette.bg.panel
+            diagnostics_button.styles.color = palette.text.primary
+        except Exception:
+            pass
+        try:
+            alerts_button = self.screen.query_one("#status_alerts")
+            alerts_button.styles.background = palette.bg.panel
+            alerts_button.styles.color = palette.text.primary
         except Exception:
             pass
         try:
@@ -436,6 +458,86 @@ class TickerTapeApp(App):
         except Exception:
             pass
 
+    def get_status_snapshot(self) -> Dict[str, Any]:
+        now_ms = int(time.time() * 1000)
+        metrics = {}
+        try:
+            metrics = self.stream_manager.metrics()
+        except Exception:
+            metrics = {}
+        ws_total = len(metrics)
+        ws_live = sum(1 for item in metrics.values() if getattr(item, "active", False))
+        message_total = sum(
+            int(getattr(item, "messages_received", 0)) for item in metrics.values()
+        )
+        bandwidth_msg_s = 0.0
+        if self._status_last_measure_ts_ms is not None:
+            elapsed_s = max((now_ms - self._status_last_measure_ts_ms) / 1000.0, 0.001)
+            delta = max(0, message_total - self._status_last_messages_total)
+            bandwidth_msg_s = float(delta) / elapsed_s
+        self._status_last_measure_ts_ms = now_ms
+        self._status_last_messages_total = message_total
+
+        stream_updates = {}
+        try:
+            stream_updates = self.stream_manager.stream_last_seen()
+        except Exception:
+            stream_updates = {}
+        latest_stream_ts: Optional[int] = None
+        for value in stream_updates.values():
+            try:
+                ts = int(value) if value is not None else None
+            except Exception:
+                ts = None
+            if ts is None:
+                continue
+            latest_stream_ts = ts if latest_stream_ts is None else max(latest_stream_ts, ts)
+        freshness_ms = (
+            max(0, now_ms - latest_stream_ts) if latest_stream_ts is not None else None
+        )
+
+        client_metrics: Dict[str, Any] = {}
+        try:
+            getter = getattr(self.provider._client, "network_metrics", None)
+            if callable(getter):
+                result = getter()
+                if isinstance(result, dict):
+                    client_metrics = result
+        except Exception:
+            client_metrics = {}
+        api_latency_ms = client_metrics.get("last_latency_ms")
+        api_error = client_metrics.get("last_error")
+        if self.config.mode == "offline_demo":
+            connection = "offline"
+            api_state = "offline"
+        elif api_error:
+            connection = "degraded"
+            api_state = "error"
+        elif ws_total == 0:
+            connection = "unknown"
+            api_state = "idle"
+        elif ws_live == ws_total:
+            connection = "live"
+            api_state = "ok"
+        elif ws_live == 0:
+            connection = "offline"
+            api_state = "degraded"
+        else:
+            connection = "degraded"
+            api_state = "ok"
+
+        return {
+            "connection": connection,
+            "api_state": api_state,
+            "api_latency_ms": api_latency_ms,
+            "ws_live": ws_live,
+            "ws_total": ws_total,
+            "freshness_ms": freshness_ms,
+            "bandwidth_msg_s": bandwidth_msg_s,
+            "alert_count": len(self.alert_store.alerts),
+            "alert_muted": bool(self.alert_store.muted),
+        }
+
     def _register_commands(self) -> None:
         self.command_registry.register(
             "help", "Show commands for this screen.", self._cmd_help
@@ -568,6 +670,17 @@ class TickerTapeApp(App):
             self._cmd_wallet,
             contexts=["whale_watcher"],
         )
+        self.command_registry.register(
+            "research",
+            "Open the Research & Backtesting screen.",
+            self._cmd_research,
+            aliases=["bt", "lab"],
+        )
+        self.command_registry.register(
+            "ops",
+            "Open the Ops screen (data health, signal tape, bot health).",
+            self._cmd_ops,
+        )
 
     def _cmd_help(self, _cmd: str, _args: List[str]) -> str:
         context = getattr(self.screen, "command_context", "home")
@@ -699,8 +812,25 @@ class TickerTapeApp(App):
             return f"Diagnostics failed: {exc}"
 
     def _cmd_jobs(self, _cmd: str, args: List[str]) -> str:
+        if not args:
+            self._open_research()
+            return ""
         result = jobs_command("jobs", args)
         return result or ""
+
+    def _cmd_research(self, _cmd: str, _args: List[str]) -> Optional[str]:
+        self._open_research()
+        return None
+
+    def _open_research(self) -> None:
+        self._push_or_replace(ResearchScreen(), route="research")
+
+    def _cmd_ops(self, _cmd: str, _args: List[str]) -> Optional[str]:
+        self._open_ops()
+        return None
+
+    def _open_ops(self) -> None:
+        self._push_or_replace(OpsScreen(), route="ops")
 
     def _cmd_theme(self, _cmd: str, args: List[str]) -> str:
         themes = self.theme_manager.available()
@@ -857,7 +987,12 @@ class TickerTapeApp(App):
         return "Anomalies: " + ", ".join(result)
 
     def _cmd_backtest(self, _cmd: str, _args: List[str]) -> str:
-        return backtest_run_command(_args)
+        result = backtest_run_command(_args)
+        # After submitting a run, open the Research screen so the user can
+        # track the job and inspect results without a separate :jobs command.
+        if _args:
+            self._open_research()
+        return result or ""
 
     def _cmd_mc(self, _cmd: str, _args: List[str]) -> str:
         if not _args:
@@ -910,6 +1045,8 @@ class TickerTapeApp(App):
             else:
                 returns.append(0.0)
         mc = resample_paths(returns, runs=runs, seed=seed, starting_value=float(curve[0]))
+        self._pending_mc_result = (run_id, mc)
+        self._open_research()
         return f"MC complete: runs={runs} p50_end={mc.percentiles['p50'][-1]:.2f}"
 
     def _cmd_bt_export(self, _cmd: str, _args: List[str]) -> str:
@@ -1335,6 +1472,12 @@ class TickerTapeApp(App):
                 self._tt_screen_stack.pop()
             self._sync_open_screen_order()
             self._apply_palette_to_screen(self.theme_manager.current())
+            return
+        if screen_id == "research":
+            self._open_research()
+            return
+        if screen_id == "ops":
+            self._open_ops()
             return
         route = self._screen_routes.get(screen_id)
         if route:

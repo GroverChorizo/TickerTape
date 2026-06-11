@@ -18,13 +18,29 @@ Screen {
 
 StatusBar {
     dock: top;
-    height: 2;
+    height: 3;
     padding: 0 2;
     background: #0e131a;
 }
 
 #status_line {
     height: 1;
+}
+
+#status_health_row {
+    height: 1;
+}
+
+#health_line {
+    width: 1fr;
+    color: #7c8794;
+}
+
+#status_diagnostics,
+#status_alerts {
+    min-width: 12;
+    height: 1;
+    margin-left: 1;
 }
 
 #breadcrumb_line {
@@ -53,6 +69,19 @@ CommandPalette {
     height: 1fr;
 }
 
+/* ── sidebar ────────────────────────────────────────────────────────────── */
+
+SidebarContainer {
+    width: 20;
+    background: #0e131a;
+}
+
+Screen.layout-narrow SidebarContainer,
+Screen.layout-compact SidebarContainer {
+    width: 6;
+}
+
+/* Keep old Sidebar selector for any remaining standalone usage */
 Sidebar {
     width: 20;
     padding: 1 1;
@@ -62,6 +91,21 @@ Screen.layout-narrow Sidebar,
 Screen.layout-compact Sidebar {
     width: 6;
 }
+
+#sidebar_nav {
+    height: 1fr;
+    padding: 1 1;
+}
+
+#sidebar_alerts {
+    height: auto;
+    min-height: 10;
+    max-height: 18;
+    padding: 1 1;
+    border-top: tall #1f2a36;
+}
+
+/* ── main content ───────────────────────────────────────────────────────── */
 
 #screen_body {
     height: 1fr;
@@ -148,7 +192,9 @@ TabbedContent {
     height: 1fr;
 }
 
-#profile_tabs {
+#profile_tabs,
+#research_tabs,
+#ops_tabs {
     height: 1fr;
 }
 
@@ -156,9 +202,23 @@ TabPane {
     height: 1fr;
 }
 
+/* ── research screen ────────────────────────────────────────────────────── */
+
+#research_run_info {
+    padding: 1 2;
+    color: #7c8794;
+}
+
+#research_export_info {
+    padding: 1 2;
+}
+
+/* ── fullscreen: hide chrome ────────────────────────────────────────────── */
+
 Screen.fullscreen #screen_header,
 Screen.fullscreen StatusBar,
 Screen.fullscreen TabCarousel,
+Screen.fullscreen SidebarContainer,
 Screen.fullscreen Sidebar,
 Screen.fullscreen TabBar,
 Screen.fullscreen CommandBar {
