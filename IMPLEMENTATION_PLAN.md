@@ -1,33 +1,51 @@
 # Implementation Plan
 
-Last updated: 2026-02-05
+Last updated: 2026-03-23
 
 This plan enumerates the work required to realize the MVP of the TickerTape terminal application. It is derived from the PRD and the specifications in the `specs/` directory, then reconciled with the current codebase. Tasks are organized by Epic -> Story -> Task. Each task includes acceptance criteria, estimated complexity, likely files, and a status.
 
 ## Current State Snapshot
 
-- Multi-screen shell exists with Home, profile screens, and view screens (`tui/app.py`).
-- Command system unified: `commands/registry.py` is canonical and TUI uses it via shim.
-- Shared core models live under `src/tickertape/core/` with provider/backtest/validation shims.
-- Hyperliquid provider supports direct HTTP with optional MoonDev fallback; streaming adapters exist with deterministic backoff.
-- Backtesting engine, resampling, walk-forward, and subprocess strategy runner are implemented with determinism tests.
-- Playbooks added under `playbooks/`; PRD moved to root `PRD.md` and doc hygiene allowlisted.
-- Alerts have a local store, pop-up notifications, per-profile triggers, and `:alerts` command; backend alert service uses core types.
+- The app shell and profile screens exist, and much of the backend/TUI surface area has been scaffolded.
+- Core constraints from PRD/Vision remain valid: local-first, deterministic, no synthetic production data, no financial advice.
+- Runtime stability baseline has been restored for current test coverage.
+- Verification run on 2026-03-23:
+  - `python -m pytest -q` (algo env) -> `180 passed`.
+  - `python -m ruff check .` (algo env) -> pass.
+  - `python -m mypy .` (algo env) -> pass.
+  - User-reported Day Trader `Signals` tab crash (`NotRenderableError`) is fixed with regression tests.
+  - `python tools/data_integrity_gate.py --root .` -> PASS.
+  - Determinism/provenance guardrails added: golden checksum tests + dedicated CI workflow (`.github/workflows/backtest.yml`).
 
 ## Gap Analysis Summary (by spec)
 
-- Command System: **Done.** Palette, parser, history and built-in commands are implemented and tested.
-- UI Layout: **Done.** Responsive breakpoints, sidebar/tabbar, theming, and panel resizing are implemented.
-- Profiles: **Mostly Done.** Day Trader, Liquidation Hunter, Whale Watcher and Funding Arbitrageur profiles exist; alerts now wired; remaining polish is layout integration for alert panel.
-- Liquidation Hunter: **Mostly Done.** Heatmap, distance and cascade monitor present; cascade alert triggers wired; UI alert panel integration remains.
-- Data Ingestion: **Partial.** Provider interfaces and typed models exist; direct HTTP + optional streaming implemented, but full WS harness and live endpoint coverage remain.
-- Data Validation: **Done.** Validator framework and core validators are implemented with tests.
-- Backtesting & Resampling: **Done (core).** Engine, resampling, walk-forward and subprocess strategy runner implemented; UI panel integration pending.
-- Secrets: **Done.** YAML secrets handling, CLI integration and wizard support are implemented.
-- Alerts & Notifications: **Partial.** Alert store, popups, and per-panel triggers exist; alert panel wiring and UX refinements remain.
-- Architecture & Quality: **Partial.** Core models + shims added; linting/typing hardening and spec alignment updates are pending.
+- Stability & Reliability: **Improved.** Known runtime crash and test-suite contract breaks fixed (TT-104/105/106/108).
+- Command System: **Partial.** Core commands exist, but full Vision behavior (history/fuzzy/context and conflict handling parity) needs re-validation.
+- UI Layout: **Partial.** Breakpoints exist; status/alert affordances still below full Vision spec.
+- Profiles: **Partial.** Screens exist; broader feature parity with Vision remains incomplete.
+- Data Ingestion: **Partial.** Adapter parity and stream telemetry improved; full endpoint/fallback parity still needs completion.
+- Data Validation: **Mostly done.** Core validators exist; production-path validation coverage for new feeds remains thin.
+- Backtesting & Resampling: **Done at MVP scope.** Engine, runner, provenance storage, schema migration checks, and determinism CI are in place.
+- Secrets/Privacy: **Mostly done.** Guardrails exist and integrity gate passes; final audit checklist still needed.
+- Alerts & Notifications: **Partial.** Triggering exists, but alert panel/sidebar and UX parity are incomplete.
+- Architecture & Quality: **Partial.** Feature velocity outpaced contract discipline; missing integration tests allowed regressions.
 
-**New priorities:** Add explicit, small tasks for (1) Research job provenance and deterministic job store, (2) Alert UI integration and panel triggers, (3) Hyperliquid WebSocket streaming + test harness, and (4) Minimal backtest runner + deterministic CI tests. These are added below as TT‑095 → TT‑099.
+**Immediate priority shift (Recovery Mode):** stabilize rendering/contracts first, then close Vision parity gaps with strict test gates.
+
+## Vision Coverage Checklist
+
+This checklist traces the authoritative Vision docs (`BtheVision_v1_5_5.txt`, `docs/FtheVision_v1_5_5.txt`) to plan coverage.
+
+- Workflow + profile intent (DayTrader, LiquidationHunter, WhaleWatcher, FundingArbitrageur): covered by TT-030..TT-033 and TT-109.
+- Endpoint-driven data model (ticks, orderbook, positions, liquidations, whales, smart-money, HLP): covered by TT-010..TT-012, TT-094, TT-109, TT-110.
+- Hybrid interaction model + command palette + keybindings: covered by TT-060..TT-062 and TT-116.
+- Responsive layout + density/fullscreen + profile-specific screens: covered by TT-050..TT-056 and TT-108/TT-113.
+- Startup wizard + settings + panel customization: covered by TT-070..TT-071 and TT-055.
+- Alert semantics (whales, cascades, funding extremes, anomalies): covered by TT-090..TT-091, TT-097, TT-111, TT-114.
+- Status indicators (connection/API/WS/freshness/bandwidth/alerts): covered by TT-113.
+- MVP visualization matrix (sparklines, orderbook bars, heatmaps, flow bars, liquidation distance): covered by TT-100..TT-101 and TT-115.
+- Research/backtesting workstation (engine, MC, walk-forward, runner, provenance): covered by TT-040..TT-043, TT-095..TT-096, TT-099, TT-112.
+- Governance constraints (local-first, no synthetic production data, no financial advice/live execution defaults): enforced via PRD + AGENTS + TT-117..TT-118.
 
 ## Epics and Stories
 
@@ -134,7 +152,7 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 |----|-------|-------|--------------------|---------------|------------|--------|
 | TT-095 | Provenance & job store | 1. Define a `BacktestJob` metadata model capturing: strategy name/version, dataset(s), timeframe(s), parameters, random seed(s), start/end timestamps and result path. 2. Implement a local job store under `~/.ticker_tape/jobs/<run_id>/` that writes metadata and serialized `BacktestResult` in JSON/Parquet. 3. Add CLI commands `:jobs list` and `:jobs show <id>`. | Running a backtest writes a run folder with metadata and result files; `:jobs list` shows recent runs and `:jobs show` prints detailed metadata. Unit tests cover metadata serialization and file layout. | `backtesting/job.py`, `commands/jobs.py`, `tests/backtesting/test_jobs.py` | M | Done - job store + CLI commands implemented. |
 
-| TT-096 | Provenance tests & CI | 1. Add unit tests that assert deterministic `BacktestResult` given fixed seed and dataset fixture. 2. Include a lightweight end‑to‑end CI job that runs a sample backtest and compares output checksums to stored golden results. | Tests fail if backtest outputs change; CI job runs in <2 minutes and fails on non‑deterministic output. | `tests/backtesting/test_provenance.py`, `.github/workflows/backtest.yml` | M | Not started |
+| TT-096 | Provenance tests & CI | 1. Add unit tests that assert deterministic `BacktestResult` given fixed seed and dataset fixture. 2. Include a lightweight end‑to‑end CI job that runs a sample backtest and compares output checksums to stored golden results. | Tests fail if backtest outputs change; CI job runs in <2 minutes and fails on non‑deterministic output. | `tests/backtesting/test_provenance.py`, `.github/workflows/backtest.yml` | M | Done - added deterministic golden checksum tests and dedicated `backtest.yml` CI gate. |
 
 ---
 
@@ -171,12 +189,54 @@ This plan enumerates the work required to realize the MVP of the TickerTape term
 | TT-101 | Shared TableWidget & apply to other panels | 1. Enhance `TableWidget` to support numeric formatting and heat indicators. 2. Add unit tests for `TableWidget`. 3. Plan follow-up to replace per-panel formatting with shared widget. | `TableWidget` supports numeric_cols and heat_cols; tests verify numeric formatting and presence of heat bars. | `tui/widgets/charts.py`, `tests/widgets/test_table_widget.py` | S | Done - shared TableWidget enhanced and tests added; follow-ups planned. |
 | TT-102 | Jobs CLI & UI | 1. Add `:jobs list` and `:jobs show <id>` commands; 2. Add a minimal Jobs screen. | `:jobs list` runs and `:jobs show <id>` shows run metadata; unit tests included. | `commands/jobs.py`, `tui/ui/screens/jobs.py`, `tests/commands/test_jobs.py` | S | Done - CLI commands and tests added (UI screen stub added). |
 
-## Definition of Done (unchanged)
+---
 
-- All tasks in the MVP epics (1-10) are complete and marked as done.
-- All unit tests, type checks and linting pass (run via `pytest`, `mypy`, `ruff/flake8`).
-- The application starts, displays the startup wizard and allows the user to run through the wizard, switch profiles and load panels.
-- The command palette executes core commands without errors.
-- Backtest engine produces deterministic results on fixture strategies.
-- Multi-exchange funding panel identifies an arbitrage on test data.
-- Alert pop-ups appear for cascade, whale and funding events.
+### Epic 17 - Stabilization & Contract Recovery 🚑
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-104 | Fix render contract for mixed Rich/Text lines | 1. Normalize tuple-based lines to Rich `Text` before passing to `Group`. 2. Patch `RawJsonPanel` and any similar render paths. 3. Add regression test that mounts Day Trader screen and opens `Signals` tab. | Clicking `Signals` no longer raises `NotRenderableError`; regression test fails before fix and passes after fix. | `tui/widgets/raw_json_panel.py`, `tests/widgets/test_raw_json_panel.py` | S | Done - tuple renderable converted to Text before Group; regression tests added. |
+| TT-105 | Restore streaming supervisor contract | 1. Reconcile `tui.streaming` API with tests (`StreamSupervisor` vs `LiveStreamManager`). 2. Either reintroduce compatibility shim or migrate tests/callers. 3. Document canonical streaming entrypoint. | `pytest -q` collects all tests without import errors; streaming architecture is explicit in docs. | `tui/streaming.py`, `tests/test_stream_supervisor.py`, `tests/test_stream_manager.py` | S | Done - compatibility `StreamSupervisor` restored while keeping `LiveStreamManager`. |
+| TT-106 | Unify endpoint allowlists across backend and TUI | 1. Consolidate endpoint keys used by `src/backend/network.py` and `tui/feeds/url_builder.py`. 2. Remove stale aliases or add explicit compatibility mapping. 3. Update tests accordingly. | `tests/test_network.py` passes; no endpoint-key mismatch between backend and TUI layers. | `src/backend/network.py`, `tests/test_network.py`, `tests/test_url_builder.py` | M | Done - backend allowlist updated to include Vision-aligned keys used by tests/runtime. |
+| TT-107 | De-flake async timing tests | 1. Replace brittle wall-clock assertions with tolerance or monotonic deadline checks. 2. Add deterministic async test helper. | Timing tests pass consistently on Windows and CI without false failures. | `tests/test_profile_liquidation_nonblocking.py` | S | Done - replaced strict wall-clock bound with tolerance-based helper assertion. |
+| TT-108 | Add tab-switch smoke suite for all profiles | 1. Add UI smoke tests that open each profile and switch every `TabbedContent` tab. 2. Assert no unhandled exceptions and panel renderables are valid Rich objects. | A dedicated smoke suite catches render-time crashes like the `Signals` tab bug before merge. | `tests/ui/test_profile_tab_switch_smoke.py`, `tests/widgets/test_raw_json_panel.py` | M | Done - smoke coverage added for Day Trader, Liquidation Hunter, Whale Watcher, and Funding Arbitrage tabs. |
+
+---
+
+### Epic 18 - Vision Parity: Backend/Data ⚙️
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-109 | Profile feed coverage against Vision endpoint map | 1. Map each profile panel to explicit required endpoint(s) from `BtheVision_v1_5_5.txt`. 2. Add missing feed adapters and contract tests for DayTrader/Liquidation/Whale/Funding profiles. | Each visible panel has a verified feed contract with fixture-based tests and clear fallback behavior. | `tui/feeds/contracts.py`, `tui/feeds/*.py`, `tui/providers/hyperliquid.py`, `tests/feeds/*`, `tests/profiles/*` | M | Partial - added profile contract map, endpoint allowlist checks, adapter kwarg parity tests, and provider typed-conversion tests; remaining gap is explicit fallback-path tests per profile panel. |
+| TT-110 | WS resilience + health instrumentation | 1. Finish WS reconnect/backoff/jitter harness with replay fixtures. 2. Track active streams, lag, and reconnect counts in a structured status model. | WS tests validate reconnect behavior and health metrics; degraded/offline states are deterministic. | `providers/hyperliquid.py`, `providers/ws.py`, `tui/streaming.py`, `tests/test_provider_hyperliquid_ws.py` | M | Partial - added structured supervisor stats, streamer telemetry, manager metrics, and tests; remaining work is exposing telemetry in UI diagnostics/status surfaces. |
+| TT-111 | Watchlist anomaly engine parity | 1. Implement anomaly checks for price/volume/funding/OI consistent with Vision thresholds. 2. Add per-symbol threshold config and tests. | Watchlist anomalies use deterministic threshold logic and trigger structured alerts in tests. | `tui/ui/screens/profile_day_trader.py`, `tests/profiles/test_day_trader.py` | M | Done - implemented price/volume/funding/OI anomaly checks with per-symbol threshold overrides and deterministic alert tests. |
+| TT-112 | Determinism/provenance CI completion | 1. Complete TT-096 with golden-result checksums. 2. Wire CI gate for backtest determinism and provenance schema compatibility. | Determinism regressions fail CI; provenance schema changes require explicit migration updates. | `tests/backtesting/test_provenance.py`, `.github/workflows/backtest.yml`, `backtesting/job.py` | M | Done - schema-tagged provenance writes/reads + migration checks, deterministic timestamp injection, golden checksums, and CI workflow gate. |
+
+---
+
+### Epic 19 - Vision Parity: Frontend/TUI 🎛️
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-113 | Status bar parity with Vision | 1. Implement status components: connection, API latency, WS streams, freshness timer, bandwidth, alert count. 2. Wire click actions to diagnostics/alerts surfaces. | Status bar reflects live system health and matches documented behavior in Vision/specs. | `tui/ui/status_bar.py`, `tui/app.py`, `tui/streaming.py`, `tests/ui/*` | L | Partial - added live health line (connection/API/WS/freshness/bandwidth/alerts), periodic snapshot updates, diagnostics/alerts click actions, and tests; remaining work is richer degraded-state UX and panel-level drilldowns. |
+| TT-114 | Alert sidebar/panel completion | 1. Finalize alert panel rendering and navigation. 2. Wire mute/clear/settings flows and severity styling. 3. Add integration tests for panel-level alerts. | Alerts are visible, actionable, and test-covered across all core profiles. | `tui/widgets/alert_panel.py`, `tui/state/alerts.py`, `tui/ui/screens/*`, `tests/alerts/*` | M | Not started |
+| TT-115 | MVP visualization fidelity pass | 1. Ensure required MVP visuals are present: sparklines, orderbook depth bars, funding heatmap, whale flow bars, liquidation distance bars. 2. Add rendering tests for each visual primitive. | Each MVP visualization from Vision Phase 1 is implemented and test-verified in at least one profile panel. | `tui/widgets/*.py`, `tui/tui.css`, `tests/widgets/*`, `tests/ui/*` | L | Not started |
+| TT-116 | Command UX parity and keybinding integrity | 1. Validate reserved key behavior and conflict detection. 2. Improve context-aware suggestions/history/fuzzy behavior against Vision expectations. | Command UX behaviors are documented, test-covered, and match default keybinding contract. | `commands/parser.py`, `commands/registry.py`, `tui/ui/widgets/command_palette.py`, `tests/commands/*`, `tests/ui/test_command_palette.py` | M | Not started |
+
+---
+
+### Epic 20 - Governance, Security, and Release Readiness 🔐
+
+| ID | Story | Tasks | Acceptance Criteria | Files Touched | Complexity | Status |
+|----|-------|-------|--------------------|---------------|------------|--------|
+| TT-117 | Canonical-doc alignment and traceability | 1. Ensure canonical Vision docs are present and referenced consistently (`BtheVision_v1_5_5.txt`, `FtheVision_v1_5_5.txt`). 2. Add requirement trace matrix from Vision/specs to tests. | Contributors can trace each required feature to code/tests; no ambiguity in canonical docs pathing. | `AGENTS.md`, `README.md`, `IMPLEMENTATION_PLAN.md`, `docs/*` | S | Not started |
+| TT-118 | Release gates and "working MVP" checklist | 1. Define a release gate script for pytest + lint + mypy + integrity gate + UI smoke. 2. Add a pre-release checklist aligned with PRD non-goals and safety constraints. | "Working MVP" means reproducible gate pass plus manual profile smoke checks with no runtime exceptions. | `tools/`, `.github/workflows/*`, `README.md`, `docs/*` | M | Not started |
+
+## Definition of Done (rebaselined)
+
+- Full test suite passes from clean checkout: `pytest -q`.
+- Static quality gates pass: `ruff`, `mypy`, and `python tools/data_integrity_gate.py --root .`.
+- Profile smoke tests verify every tab/panel can be opened without runtime exceptions.
+- Status bar, alerts, and command UX match documented Vision behavior at MVP level.
+- Backtesting/provenance determinism checks pass in CI.
+- No violations of PRD/AGENTS guardrails (local-first, no synthetic production data, no financial advice/live execution defaults).

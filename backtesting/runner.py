@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 from .models import BacktestResult, BacktestJobMetadata
 from .job import write_metadata, write_result, new_run_dir
@@ -25,15 +25,17 @@ def run_from_file(
     run_id: Optional[str] = None,
     job_root: Optional[str] = None,
     confirm_exec: bool = False,
+    time_ms_fn: Callable[[], int] | None = None,
 ) -> BacktestResult:
-    started = int(time.time() * 1000)
+    _time_ms = time_ms_fn or (lambda: int(time.time() * 1000))
+    started = int(_time_ms())
     equity_curve = run_strategy_file(
         strategy_path,
         prices,
         seed=seed,
         confirm_exec=confirm_exec,
     )
-    finished = int(time.time() * 1000)
+    finished = int(_time_ms())
     run_id = run_id or os.path.basename(new_run_dir(job_root))
 
     metadata = BacktestJobMetadata(

@@ -83,3 +83,37 @@ def test_supervisor_backoff_on_connect_error():
         assert calls["count"] >= 3
 
     asyncio.run(run_test())
+
+
+def test_supervisor_reports_structured_stats():
+    async def run_test():
+        calls = {"count": 0}
+
+        async def make_connect():
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return FakeAsyncIter([], raise_on_enter=True)
+            return FakeAsyncIter(["m1", "m2"])
+
+        received = []
+
+        async def handler(msg):
+            received.append(msg)
+
+        sup = WebSocketSupervisor(
+            connect_factory=make_connect, min_backoff=0.01, max_backoff=0.02
+        )
+        sup.register_handler(handler)
+        sup.start()
+        await asyncio.sleep(0.2)
+        stats = sup.stats()
+        await sup.stop()
+
+        assert received
+        assert stats.connect_count >= 1
+        assert stats.reconnect_count >= 1
+        assert stats.messages_received >= len(received)
+        assert stats.last_message_ts_ms is not None
+        assert stats.last_backoff_s >= 0.0
+
+    asyncio.run(run_test())

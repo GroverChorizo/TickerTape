@@ -252,3 +252,42 @@ def test_orderbook_replay_parses_and_pushes():
     p = provider._market_feed.payloads[0]
     assert isinstance(p, dict)
     assert "bids" in p and "asks" in p
+
+
+def test_streamer_exposes_per_endpoint_stats():
+    async def ws_connect_factory(endpoint_key, **kwargs):
+        # First connection for orderbook fails, then succeeds.
+        if endpoint_key == "orderbook":
+            ws_connect_factory.calls += 1
+            if ws_connect_factory.calls == 1:
+                raise RuntimeError("boom")
+            return FakeWS([json.dumps({"bids": [[43000, 1]], "asks": [[43010, 1]]})])
+        if endpoint_key == "ticks_latest":
+            return FakeWS([json.dumps({"symbol": "BTC", "price": 43000})])
+        return FakeWS([])
+
+    ws_connect_factory.calls = 0
+
+    provider = type("P", (), {})()
+    provider._client = type("C", (), {})()
+    provider._client.ws_connect = ws_connect_factory
+    provider._market_feed = DummyFeed()
+    provider._liquidations_feed = DummyFeed()
+    provider._whales_feed = DummyFeed()
+    provider._events_feed = DummyFeed()
+    provider._funding_feed = DummyFeed()
+
+    async def run():
+        streamer = HyperliquidStreamer(provider)
+        streamer.start(poll_interval=0.01)
+        await asyncio.sleep(0.15)
+        stats = streamer.stats()
+        await asyncio.wait_for(streamer.stop(), timeout=1.0)
+        assert "orderbook" in stats
+        assert stats["orderbook"]["error_count"] >= 1
+        assert stats["orderbook"]["reconnect_count"] >= 0
+        assert "ticks_latest" in stats
+        assert stats["ticks_latest"]["messages_received"] >= 1
+        assert stats["ticks_latest"]["lag_ms"] is not None
+
+    asyncio.run(run())

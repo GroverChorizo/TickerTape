@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 import time
 
 from textual.containers import Horizontal, Vertical
 from textual.widgets import TabbedContent, TabPane
 
-from tui.feeds.base import FeedResult, FeedStatus, _as_status
+from tui.feeds.base import FeedResult, FeedStatus
 from tui.feeds.hyperliquid import HyperliquidClient, WhaleTradesFeed
 from tui.feeds.smart_money import SmartMoneyFeed
 from tui.feeds.whale_insights import WhaleInsightsFeed

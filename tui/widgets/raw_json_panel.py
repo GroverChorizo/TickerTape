@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable, List
+from typing import Any
 
 from rich.console import Group
 from rich.pretty import Pretty
-from rich.text import Text
 
 from tui.feeds.base import FeedResult, FeedStatus, _as_status
 from tui.render.palette import build_text, last_updated_line, muted_line, panel_header
@@ -78,7 +77,9 @@ class RawJsonPanel(PanelBase):
             else FeedStatus.OK.value,
             self.palette,
         )
-        updated = last_updated_line(updated_ts_ms, self.palette)
+        # Convert tuple-based helper output to Rich Text before grouping.
+        # Passing raw tuple values into Group triggers NotRenderableError.
+        updated = build_text([last_updated_line(updated_ts_ms, self.palette)])
         trimmed = _trim_payload(payload, self._max_items)
         body = Pretty(trimmed, max_depth=3, expand_all=False)
         self.update(Group(header, updated, body))

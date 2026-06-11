@@ -1,11 +1,5 @@
-"""Minimal Jobs screen showing recent backtest runs."""
+"""Jobs screen — alias to ResearchScreen for backward compatibility."""
 
-from __future__ import annotations
+from tui.ui.screens.research import ResearchScreen
 
-from textual.widgets import Static
-from textual.screen import Screen
-
-
-class JobsScreen(Screen):
-    def compose(self):
-        yield Static("Jobs screen (use :jobs list to view runs)", id="jobs_info")
+JobsScreen = ResearchScreen

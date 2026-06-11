@@ -25,12 +25,18 @@ from tickertape.core.alerts import AlertSeverity
 DEFAULT_WATCHLIST = ["BTC", "ETH", "SOL"]
 WHALE_ALERT_USD = 500_000
 ANOMALY_THRESHOLD_PCT = 0.05
+VOLUME_SURGE_MULTIPLIER = 3.0
+FUNDING_EXTREME_RATE = 0.0001
+OI_SPIKE_PCT = 0.20
 
 
 @dataclass
 class DayTraderState:
     watchlist: List[str] = field(default_factory=lambda: list(DEFAULT_WATCHLIST))
     price_history: Dict[str, List[float]] = field(default_factory=dict)
+    volume_history: Dict[str, List[float]] = field(default_factory=dict)
+    funding_history: Dict[str, List[float]] = field(default_factory=dict)
+    oi_history: Dict[str, List[float]] = field(default_factory=dict)
 
 
 class DayTraderScreen(BaseScreen):
@@ -69,6 +75,7 @@ class DayTraderScreen(BaseScreen):
         self._hip3_result: Optional[FeedResult] = None
         self._positions_result: Optional[FeedResult] = None
         self._state = DayTraderState()
+        self._anomaly_thresholds: Dict[str, Dict[str, float]] = {}
 
         self.market_panel = MarketOverviewPanel()
         self.orderbook_panel = OrderbookPanel()
@@ -155,6 +162,18 @@ class DayTraderScreen(BaseScreen):
             return
         self._state.watchlist = [w.upper() for w in watchlist]
         self._apply_watchlist()
+
+    def set_anomaly_thresholds(self, symbol: str, thresholds: Dict[str, float]) -> None:
+        normalized = str(symbol or "").upper().strip()
+        if not normalized:
+            return
+        current = self._anomaly_thresholds.get(normalized, {}).copy()
+        for key, value in thresholds.items():
+            try:
+                current[str(key)] = float(value)
+            except (TypeError, ValueError):
+                continue
+        self._anomaly_thresholds[normalized] = current
 
     def _sync_watchlist(self) -> None:
         getter = getattr(self.app, "get_watchlist", None)
@@ -409,29 +428,11 @@ class DayTraderScreen(BaseScreen):
             )
 
     def _check_anomalies(self) -> None:
-        for symbol, history in self._state.price_history.items():
-            if len(history) < 5:
-                continue
-            last = history[-1]
-            window = history[-10:] if len(history) >= 10 else history
-            mean = sum(window) / len(window)
-            if mean <= 0:
-                continue
-            deviation = abs(last - mean) / mean
-            if deviation >= ANOMALY_THRESHOLD_PCT:
-                self.app.emit_alert(
-                    alert_type="anomaly_spikes",
-                    severity=AlertSeverity.WARNING,
-                    source_feed="market_data",
-                    payload={
-                        "message": f"{symbol} deviation {deviation*100:.1f}%",
-                        "symbol": symbol,
-                        "deviation_pct": deviation * 100,
-                        "price": last,
-                    },
-                    key=f"{symbol}:anomaly",
-                    min_interval_ms=60000,
-                )
+        for symbol in {w.upper() for w in self._state.watchlist}:
+            self._check_price_spike(symbol)
+            self._check_volume_surge(symbol)
+            self._check_funding_extreme(symbol)
+            self._check_oi_spike(symbol)
 
     def _update_price_history(self, result: Optional[FeedResult]) -> None:
         if not result or not isinstance(result.data, dict):
@@ -454,6 +455,131 @@ class DayTraderScreen(BaseScreen):
             history.append(price)
             if len(history) > 30:
                 del history[: len(history) - 30]
+            volume = _coerce_float(entry.get("volume") or entry.get("vol"))
+            if volume is not None:
+                vol_history = self._state.volume_history.setdefault(symbol, [])
+                vol_history.append(volume)
+                if len(vol_history) > 30:
+                    del vol_history[: len(vol_history) - 30]
+            funding = _coerce_float(entry.get("funding"))
+            if funding is not None:
+                funding_history = self._state.funding_history.setdefault(symbol, [])
+                funding_history.append(funding)
+                if len(funding_history) > 30:
+                    del funding_history[: len(funding_history) - 30]
+            open_interest = _coerce_float(entry.get("open_interest"))
+            if open_interest is not None:
+                oi_history = self._state.oi_history.setdefault(symbol, [])
+                oi_history.append(open_interest)
+                if len(oi_history) > 30:
+                    del oi_history[: len(oi_history) - 30]
+
+    def _threshold(self, symbol: str, key: str, default: float) -> float:
+        custom = self._anomaly_thresholds.get(symbol, {})
+        try:
+            return float(custom.get(key, default))
+        except (TypeError, ValueError):
+            return default
+
+    def _emit_anomaly(self, symbol: str, key_suffix: str, message: str, payload: Dict[str, Any]) -> None:
+        app = getattr(self, "_app", None)
+        if app is None:
+            try:
+                app = self.app
+            except Exception:
+                return
+        body = {"message": message, "symbol": symbol}
+        body.update(payload)
+        app.emit_alert(
+            alert_type="anomaly_spikes",
+            severity=AlertSeverity.WARNING,
+            source_feed="market_data",
+            payload=body,
+            key=f"{symbol}:anomaly:{key_suffix}",
+            min_interval_ms=60000,
+        )
+
+    def _check_price_spike(self, symbol: str) -> None:
+        history = self._state.price_history.get(symbol, [])
+        if len(history) < 5:
+            return
+        last = history[-1]
+        window = history[-10:] if len(history) >= 10 else history
+        baseline = window[:-1] if len(window) > 1 else window
+        if not baseline:
+            return
+        mean = sum(baseline) / len(baseline)
+        if mean <= 0:
+            return
+        deviation = abs(last - mean) / mean
+        threshold = self._threshold(symbol, "price_spike_pct", ANOMALY_THRESHOLD_PCT)
+        if deviation >= threshold:
+            self._emit_anomaly(
+                symbol,
+                "price_spike",
+                f"{symbol} price deviation {deviation*100:.1f}%",
+                {"kind": "price_spike", "deviation_pct": deviation * 100, "price": last},
+            )
+
+    def _check_volume_surge(self, symbol: str) -> None:
+        history = self._state.volume_history.get(symbol, [])
+        if len(history) < 5:
+            return
+        last = history[-1]
+        baseline = history[-10:-1] if len(history) >= 10 else history[:-1]
+        if not baseline:
+            return
+        mean = sum(baseline) / len(baseline)
+        if mean <= 0:
+            return
+        ratio = last / mean
+        threshold = self._threshold(
+            symbol, "volume_surge_mult", VOLUME_SURGE_MULTIPLIER
+        )
+        if ratio >= threshold:
+            self._emit_anomaly(
+                symbol,
+                "volume_surge",
+                f"{symbol} volume surge {ratio:.2f}x",
+                {"kind": "volume_surge", "volume_ratio": ratio, "volume": last},
+            )
+
+    def _check_funding_extreme(self, symbol: str) -> None:
+        history = self._state.funding_history.get(symbol, [])
+        if not history:
+            return
+        last = history[-1]
+        threshold = self._threshold(
+            symbol, "funding_extreme_rate", FUNDING_EXTREME_RATE
+        )
+        if abs(last) >= threshold:
+            self._emit_anomaly(
+                symbol,
+                "funding_extreme",
+                f"{symbol} funding extreme {last:+.5f}",
+                {"kind": "funding_extreme", "funding_rate": last},
+            )
+
+    def _check_oi_spike(self, symbol: str) -> None:
+        history = self._state.oi_history.get(symbol, [])
+        if len(history) < 5:
+            return
+        last = history[-1]
+        baseline = history[-10:-1] if len(history) >= 10 else history[:-1]
+        if not baseline:
+            return
+        mean = sum(baseline) / len(baseline)
+        if mean <= 0:
+            return
+        pct = (last - mean) / mean
+        threshold = self._threshold(symbol, "oi_spike_pct", OI_SPIKE_PCT)
+        if pct >= threshold:
+            self._emit_anomaly(
+                symbol,
+                "oi_spike",
+                f"{symbol} OI spike {pct*100:.1f}%",
+                {"kind": "oi_spike", "oi_spike_pct": pct * 100, "open_interest": last},
+            )
 
     def _render(self) -> None:
         stream_manager = getattr(self.app, "stream_manager", None)

@@ -52,3 +52,33 @@ def test_stream_manager_health_and_summary():
     summary = manager.summary()
     assert "WS:" in summary
     manager.stop()
+
+
+def test_stream_manager_metrics_from_streamer_stats():
+    class DummyStreamerWithStats(DummyStreamer):
+        def stats(self):
+            return {
+                "prices": {
+                    "running": True,
+                    "connected": True,
+                    "reconnect_count": 2,
+                    "messages_received": 5,
+                    "error_count": 1,
+                    "lag_ms": 120,
+                    "last_error": "timeout",
+                }
+            }
+
+    provider = DummyProvider({"_market_feed": DummyFeed(int(time.time() * 1000))})
+    manager = LiveStreamManager(
+        provider,
+        streamer_factory=lambda p: DummyStreamerWithStats(p),
+    )
+    manager.start()
+    metrics = manager.metrics()
+    assert metrics["prices"].reconnect_count == 2
+    assert metrics["prices"].messages_received == 5
+    assert metrics["prices"].error_count == 1
+    assert metrics["prices"].lag_ms == 120
+    assert "R:" in manager.summary()
+    manager.stop()
