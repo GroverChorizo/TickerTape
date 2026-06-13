@@ -131,3 +131,6 @@ state/
 
 # Copilot role prompts — internal, local-only
 .github/prompts/
+
+# Claude Code dev skills — internal dev doctrine, local-only
+.claude/
