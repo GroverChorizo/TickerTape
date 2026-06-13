@@ -17,6 +17,17 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Build / packaging artifacts
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Test caches and local scratch
+.pytest_cache/
+_pytest_cache/
+_pytest_local_tmp/
+
 # Runtime / generated data
 data/
 outputs/
