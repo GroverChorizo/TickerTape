@@ -1,16 +1,14 @@
-httpx>=0.23
-pytest>=7.0
-pyarrow>=12
-backend
-requests
-rich>=13.7,<15.0
-python-dotenv
-PyYAML
-pandas
-numpy>=1.24
+# Runtime dependencies — pinned for reproducible installs (deterministic is a
+# core project value). Bump deliberately, then re-run the release gate.
+httpx==0.28.1
+pyarrow==23.0.0
+rich==14.3.1
+PyYAML==6.0.3
+python-dotenv==1.2.1
+pandas==3.0.0
+numpy==2.4.1
 ccxt==4.5.57
-textual>=0.60,<0.80
+textual==0.79.1
 
-# AI Swarm Agent (requires OPENROUTER_API_KEY in .env)
-openai
-termcolor
+# Test/dev
+pytest>=7.0

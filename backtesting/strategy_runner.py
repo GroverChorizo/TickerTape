@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Sequence
@@ -34,6 +35,17 @@ def _validate_equity_curve(curve: Sequence[Any], expected_len: int) -> list[floa
 
 
 def main(argv: list[str]) -> int:
+    # This module executes arbitrary user code (the strategy file). It must only
+    # run when launched through backtesting.loader.run_strategy_file, which sets
+    # this flag after an explicit confirm_exec gate. Refuse otherwise.
+    if os.environ.get("TICKERTAPE_STRATEGY_EXEC") != "1":
+        print(
+            "strategy execution not authorized "
+            "(missing TICKERTAPE_STRATEGY_EXEC; use backtesting.loader)",
+            file=sys.stderr,
+        )
+        return 2
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--strategy", required=True)
     parser.add_argument("--input", required=True)

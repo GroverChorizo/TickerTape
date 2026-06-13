@@ -28,7 +28,8 @@ def run_strategy_file(
     if path.suffix.lower() != ".py":
         raise ValueError("Strategy must be a .py file")
 
-    tmp_root = Path(__file__).resolve().parents[1] / "_pytest_local_tmp"
+    repo_root = Path(__file__).resolve().parents[1]
+    tmp_root = repo_root / "_pytest_local_tmp"
     tmp_root.mkdir(parents=True, exist_ok=True)
     run_dir = tmp_root / f"strategy_{uuid.uuid4().hex[:10]}"
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -50,11 +51,20 @@ def run_strategy_file(
             "--output",
             str(out_path),
         ]
-        env = os.environ.copy()
+        # Strategy code is user-supplied and runs in this child process. Do NOT
+        # inherit the parent environment (it may hold API keys / secrets) — pass
+        # only what the interpreter needs to start and import the runner.
+        passthrough = (
+            "PATH", "PYTHONPATH", "PYTHONHOME", "SYSTEMROOT", "WINDIR",
+            "TEMP", "TMP", "LANG", "LC_ALL", "LC_CTYPE",
+            "PYTHONUTF8", "PYTHONIOENCODING",
+        )
+        env = {k: os.environ[k] for k in passthrough if k in os.environ}
         env["TICKERTAPE_STRATEGY_EXEC"] = "1"
         result = subprocess.run(
             cmd,
             env=env,
+            cwd=str(repo_root),
             capture_output=True,
             text=True,
             timeout=timeout_s,

@@ -1432,9 +1432,20 @@ class TickerTapeApp(App):
     def _export_screen(self, panel: str, fmt: str) -> Path:
         base = self.config.data_root / "exports"
         base.mkdir(parents=True, exist_ok=True)
+        # Sanitize user-supplied args so they can't escape the exports dir
+        # (e.g. `:export ../../foo txt`) or pick an arbitrary extension.
+        safe_panel = (
+            "".join(c if c.isalnum() or c in "_-" else "_" for c in panel)[:64]
+            or "panel"
+        )
+        fmt = fmt.lower()
+        if fmt not in {"json", "csv", "txt"}:
+            fmt = "txt"
         ts = int(time.time())
-        filename = f"{panel}_{ts}.{fmt}"
-        path = base / filename
+        filename = f"{safe_panel}_{ts}.{fmt}"
+        path = (base / filename).resolve()
+        if path.parent != base.resolve():
+            raise ValueError("invalid export path")
         body = ""
         try:
             body_widget = self.screen.query_one("#screen_body")

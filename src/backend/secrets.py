@@ -32,10 +32,12 @@ Typical file contents:
 from __future__ import annotations
 
 from dataclasses import dataclass
+import getpass
 import platform
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Tuple
 import os
+import subprocess
 import sys
 
 
@@ -56,22 +58,6 @@ class SecretsLocation:
     secrets_home: Path
     secrets_file: Path
     source: str
-
-
-def _default_config_path() -> Path:
-    if sys.platform.startswith("win"):
-        base = Path(os.environ.get("APPDATA", Path.home()))
-        return base / "TickerTape" / "config.env"
-    if sys.platform == "darwin":
-        return (
-            Path.home()
-            / "Library"
-            / "Application Support"
-            / "TickerTape"
-            / "config.env"
-        )
-    base = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
-    return base / "tickertape" / "config.env"
 
 
 def _default_config_path() -> Path:
@@ -268,15 +254,39 @@ def load_secrets(
     return {}
 
 
+def _harden_permissions(path: Path) -> None:
+    """Best-effort: restrict the secrets file to the current user only.
+
+    Never raises — a permission failure must not crash the app. On POSIX this
+    is ``chmod 600``; on Windows we strip inherited ACEs and grant the current
+    user full control via ``icacls`` (no extra dependency).
+    """
+    try:
+        if os.name == "nt":
+            user = os.environ.get("USERNAME") or getpass.getuser()
+            subprocess.run(
+                ["icacls", str(path), "/inheritance:r", "/grant:r", f"{user}:F"],
+                check=False,
+                capture_output=True,
+                timeout=10,
+            )
+        else:
+            os.chmod(path, 0o600)
+    except Exception:
+        pass
+
+
 def ensure_secrets_file(path: Optional[Path] = None) -> Tuple[Path, bool]:
     """Ensure the canonical secrets file exists; return (path, created)."""
     loc = resolve_secrets_file_path(path=path)
     target = loc.secrets_file
     if target.exists():
+        _harden_permissions(target)
         return target, False
     try:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(_placeholder_env(), encoding="utf-8")
+        _harden_permissions(target)
         return target, True
     except Exception:
         return target, False

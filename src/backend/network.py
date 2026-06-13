@@ -145,7 +145,8 @@ class NetworkClient:
                     {
                         "event": "network_error",
                         "endpoint": endpoint_key,
-                        "err": str(e),
+                        # type name only: httpx error strings embed the request URL
+                        "err": type(e).__name__,
                         "attempt": attempt,
                     }
                 )
@@ -159,7 +160,8 @@ class NetworkClient:
                 raise
         # Exhausted retries
         logger.error(
-            f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}"
+            f"Failed to fetch {endpoint_key} after {self.retries} attempts: "
+            f"{type(last_exc).__name__}"
         )
         raise ConnectionError(f"Failed to fetch {endpoint_key}")
 
@@ -225,7 +227,8 @@ class NetworkClient:
                     {
                         "event": "network_error",
                         "endpoint": endpoint_key,
-                        "err": str(e),
+                        # type name only: httpx error strings embed the request URL
+                        "err": type(e).__name__,
                         "attempt": attempt,
                     }
                 )
@@ -237,7 +240,8 @@ class NetworkClient:
                 )
                 raise
         logger.error(
-            f"Failed to fetch {endpoint_key} after {self.retries} attempts: {last_exc!r}"
+            f"Failed to fetch {endpoint_key} after {self.retries} attempts: "
+            f"{type(last_exc).__name__}"
         )
         raise ConnectionError(f"Failed to fetch {endpoint_key}")
 
