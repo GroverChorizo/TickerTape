@@ -41,6 +41,7 @@ def _moondev_count(app: TickerTapeApp) -> int:
         ("_open_moondev", "moondev"),
         ("_open_ops", "ops"),
         ("_open_research", "research"),
+        ("_open_command_center", "command_center"),
     ],
 )
 def test_reopening_active_screen_does_not_crash(tmp_path, opener, screen_id):

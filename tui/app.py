@@ -64,6 +64,7 @@ from tui.ui.screens.profile_whale_watcher import WhaleWatcherScreen
 from tui.ui.screens.ops import OpsScreen
 from tui.ui.screens.research import ResearchScreen
 from tui.ui.screens.moondev import MoonDevScreen
+from tui.ui.screens.command_center import CommandCenterScreen
 from tui.ui.screens.settings import SettingsScreen
 from tui.ui.screens.validation import ValidationScreen
 from tui.ui.screens.views import (
@@ -591,6 +592,12 @@ class TickerTapeApp(App):
             aliases=["datalayer"],
         )
         self.command_registry.register(
+            "command_center",
+            "Open the Command Center (regime, correlation, funding/OI flow, health).",
+            self._cmd_command_center,
+            aliases=["cc", "command", "center"],
+        )
+        self.command_registry.register(
             "select",
             "Select symbol from Top Symbols list (symbol or #).",
             self._cmd_select,
@@ -847,6 +854,13 @@ class TickerTapeApp(App):
 
     def _open_moondev(self) -> None:
         self._push_or_replace(MoonDevScreen(), route="moondev")
+
+    def _cmd_command_center(self, _cmd: str, _args: List[str]) -> Optional[str]:
+        self._open_command_center()
+        return None
+
+    def _open_command_center(self) -> None:
+        self._push_or_replace(CommandCenterScreen(), route="command_center")
 
     def _cmd_theme(self, _cmd: str, args: List[str]) -> str:
         themes = self.theme_manager.available()
@@ -1517,6 +1531,9 @@ class TickerTapeApp(App):
             return
         if screen_id == "moondev":
             self._open_moondev()
+            return
+        if screen_id == "command_center":
+            self._open_command_center()
             return
         route = self._screen_routes.get(screen_id)
         if route:
