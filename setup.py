@@ -47,6 +47,10 @@ setup(
     install_requires=_read_requirements(),
     entry_points={
         "console_scripts": [
+            "tickertape=tui.app:run",
+            "tt=tui.app:run",
+            "tickertape-serve=tui.serve:run",
+            # Back-compat aliases
             "TickerTape=tui.app:run",
             "TTape=tui.app:run",
         ]

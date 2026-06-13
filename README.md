@@ -49,6 +49,7 @@ emits signals to local files — no orders, no execution, read-only phase.
 
 ```bash
 pip install -r requirements.txt
+pip install -e .          # registers the `tt` / `tickertape` commands
 
 # 1. Verify the data pipeline against live exchanges (~2 min)
 python -m datadogs selftest
@@ -59,9 +60,16 @@ python -m datadogs backfill BTC 4h --days 900
 python -m datadogs funding BTC --venue hyperliquid --days 90
 python -m datadogs health
 
-# 3. Launch the TUI
-python -m tui.app
+# 3. Launch
+tt                       # or `tickertape` (terminal UI; same as python -m tui.app)
+tt serve                 # serve the UI as a local desktop/web app (http://127.0.0.1:8000)
 ```
+
+Core market data (price, funding, open interest, orderbook, candles) is
+**keyless** via the Hyperliquid info API. The opt-in intel panels (whales,
+liquidations, smart-money, events) need a MoonDev key — set `MOONDEV_API_KEY`
+in your secrets file and `:reload`; without it they show "not configured" and
+everything else runs normally.
 
 Schedule `python -m datadogs fetch-all` every 15 minutes (Task Scheduler /
 cron) and the store maintains itself; `health` exits 1 on any STALE/ERROR so

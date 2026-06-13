@@ -1534,6 +1534,12 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def run() -> None:
+    # `tt serve` / `tickertape serve` -> serve the Textual UI as a desktop/web app.
+    if sys.argv[1:2] == ["serve"]:
+        from tui.serve import run as serve_run
+
+        serve_run(sys.argv[1:])
+        return
     args = _parse_args(sys.argv[1:])
     overrides = {}
     if args.profile:
