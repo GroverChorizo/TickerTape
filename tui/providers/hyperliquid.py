@@ -290,6 +290,36 @@ class HyperliquidStreamer:
         # shutdown coordination flag — prevents late/duplicate pushes during stop()
         self._stopping = False
 
+    def _datalayer_configured(self) -> bool:
+        """True when the keyed MoonDev data layer is available for intel streams."""
+        try:
+            direct = getattr(self._client, "_direct", None)
+            dl = getattr(direct, "_datalayer", None)
+            return bool(dl is not None and dl.is_configured)
+        except Exception:
+            return False
+
+    def _stream_endpoints(self, default_symbol: str) -> list[tuple]:
+        """Streams to supervise.
+
+        Core market streams are keyless (HL info API) and always run. Intel
+        streams (whales / liquidations / events) have no keyless source, so we
+        register them only when a MoonDev key is configured — otherwise the WS
+        health bar would sit permanently degraded (the old `4/9 !`).
+        """
+        endpoints: list[tuple] = [
+            ("prices", None, self._on_market),
+            ("ticks_latest", None, self._on_market),
+            ("orderbook", {"symbol": default_symbol}, self._on_market),
+        ]
+        if self._datalayer_configured():
+            endpoints += [
+                ("liquidations", {"timeframe": "1h"}, self._on_liquidations),
+                ("whales", None, self._on_whales),
+                ("events", None, self._on_events),
+            ]
+        return endpoints
+
     def start(self, *, poll_interval: float = 2.0, market_agg_ms: int | None = None, market_max_hz: float | None = None) -> None:
         """Start lightweight streaming for multiple endpoints.
 
@@ -320,19 +350,7 @@ class HyperliquidStreamer:
             default_symbol = getattr(self.provider, "_market_feed", None).selected_coin or "BTC"
         except Exception:
             default_symbol = "BTC"
-        endpoints = [
-            ("liquidations", {"timeframe": "1h"}, self._on_liquidations),
-            ("whales", None, self._on_whales),
-            ("events", None, self._on_events),
-            ("info", None, self._on_info),
-            # Market data: aggregated prices, per-symbol ticks and orderbook
-            ("prices", None, self._on_market),
-            ("ticks_latest", None, self._on_market),
-            ("hip3_ticks_dex", {"dex": "hl", "ticker": "btc"}, self._on_market),
-            ("orderbook", {"symbol": default_symbol}, self._on_market),
-            # Funding: prefer dedicated funding endpoint when present
-            ("binance_funding", None, self._on_info),
-        ]
+        endpoints = self._stream_endpoints(default_symbol)
         from providers.ws import WebSocketSupervisor
 
         for key, params, handler in endpoints:

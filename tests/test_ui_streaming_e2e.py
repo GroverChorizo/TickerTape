@@ -63,9 +63,9 @@ def test_e2e_streams_update_feeds_and_widget():
     streamer = HyperliquidStreamer(provider)
     asyncio.run(_run_streamer(streamer, duration=0.05, poll_interval=0.01, market_agg_ms=0))
 
-    # feeds should have received pushed payloads
+    # market feed received pushed payloads (funding is keyless now and no
+    # longer streamed through the supervisor)
     assert any(isinstance(p, dict) for p in provider._market_feed.payloads)
-    assert any(isinstance(p, dict) for p in provider._funding_feed.payloads)
 
     # widget should render from the latest orderbook payload
     w = OrderbookImbalanceWidget()

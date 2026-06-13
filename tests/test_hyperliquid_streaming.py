@@ -1,6 +1,7 @@
 import asyncio
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 from tui.providers.hyperliquid import HyperliquidStreamer
 
@@ -65,6 +66,11 @@ def test_hyperliquid_streamer_pushes_to_feeds():
     )
     provider = type("P", (), {})()
     provider._client = client
+    # Intel streams (liquidations/whales/events) register only when the keyed
+    # MoonDev data layer is configured.
+    client._direct = SimpleNamespace(
+        _datalayer=SimpleNamespace(is_configured=True)
+    )
     provider._liquidations_feed = DummyFeed()
     provider._whales_feed = DummyFeed()
     provider._events_feed = DummyFeed()
@@ -76,11 +82,11 @@ def test_hyperliquid_streamer_pushes_to_feeds():
 
     asyncio.run(run())
 
-    # Assertions: each feed got at least one push
+    # Each intel feed got at least one push (funding is keyless now and no
+    # longer streamed via the supervisor).
     assert len(provider._liquidations_feed.payloads) >= 1
     assert len(provider._whales_feed.payloads) >= 1
     assert len(provider._events_feed.payloads) >= 1
-    assert len(provider._funding_feed.payloads) >= 1
 
 
 def test_ws_adapter_publishes_messages_to_feeds():
@@ -110,7 +116,6 @@ def test_ws_adapter_publishes_messages_to_feeds():
     asyncio.run(run())
 
     assert any(isinstance(p, dict) for p in provider._market_feed.payloads)
-    assert len(provider._funding_feed.payloads) >= 1
 
 
 def test_ticks_stream_pushes_to_market_feed():
@@ -170,27 +175,6 @@ def test_market_throttling_limits_pushes():
     duration = 0.25
     allowed = max(1, int(duration * 5) + 3)  # allow small scheduling jitter
     assert pushes <= allowed, f"got too many pushes: {pushes} (expected <= {allowed})"
-
-
-def test_binance_funding_stream_parsed_and_pushed():
-    async def ws_connect_factory(endpoint_key, **kwargs):
-        if endpoint_key == "binance_funding":
-            return FakeWS([json.dumps({"BTC": {"latest": {"rate": 0.00012}}})])
-        return FakeWS([])
-
-    provider = type("P", (), {})()
-    provider._client = type("C", (), {})()
-    provider._client.ws_connect = ws_connect_factory
-    provider._funding_feed = DummyFeed()
-
-    async def run():
-        streamer = HyperliquidStreamer(provider)
-        await _run_streamer(streamer, duration=0.05, poll_interval=0.01)
-
-    asyncio.run(run())
-
-    assert len(provider._funding_feed.payloads) >= 1
-    assert isinstance(provider._funding_feed.payloads[0], dict)
 
 
 def test_market_aggregation_uses_last_tick_from_fixture():

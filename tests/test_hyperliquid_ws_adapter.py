@@ -73,6 +73,6 @@ def test_ws_adapter_prioritized_and_pushes():
 
     asyncio.run(run())
 
-    # each feed should have been pushed at least once
-    assert provider._market_feed.payloads or provider._liquidations_feed.payloads
-    assert provider._funding_feed.payloads
+    # core market streaming still pushes (funding is keyless now and no longer
+    # streamed through the supervisor)
+    assert provider._market_feed.payloads
