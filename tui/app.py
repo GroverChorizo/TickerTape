@@ -62,6 +62,7 @@ from tui.ui.screens.profile_placeholder import PlaceholderProfileScreen
 from tui.ui.screens.profile_whale_watcher import WhaleWatcherScreen
 from tui.ui.screens.ops import OpsScreen
 from tui.ui.screens.research import ResearchScreen
+from tui.ui.screens.moondev import MoonDevScreen
 from tui.ui.screens.settings import SettingsScreen
 from tui.ui.screens.validation import ValidationScreen
 from tui.ui.screens.views import (
@@ -582,6 +583,12 @@ class TickerTapeApp(App):
             "jobs", "List or inspect backtest jobs.", self._cmd_jobs
         )
         self.command_registry.register(
+            "moondev",
+            "Open the MoonDev Data console (external data layer / HIP3).",
+            self._cmd_moondev,
+            aliases=["datalayer"],
+        )
+        self.command_registry.register(
             "select",
             "Select symbol from Top Symbols list (symbol or #).",
             self._cmd_select,
@@ -831,6 +838,13 @@ class TickerTapeApp(App):
 
     def _open_ops(self) -> None:
         self._push_or_replace(OpsScreen(), route="ops")
+
+    def _cmd_moondev(self, _cmd: str, _args: List[str]) -> Optional[str]:
+        self._open_moondev()
+        return None
+
+    def _open_moondev(self) -> None:
+        self._push_or_replace(MoonDevScreen(), route="moondev")
 
     def _cmd_theme(self, _cmd: str, args: List[str]) -> str:
         themes = self.theme_manager.available()
@@ -1254,6 +1268,15 @@ class TickerTapeApp(App):
         self._apply_palette_to_screen(self.theme_manager.current())
 
     def _push_or_replace(self, screen, route: str | None = None) -> None:
+        target_id = screen.id or ""
+        # Re-opening the screen we're already on is a no-op. Without this guard
+        # we pop the current screen and then synchronously push a fresh instance
+        # with the same id; Textual prunes the popped screen from its child
+        # registry asynchronously, so the new id collides with the not-yet-removed
+        # one and raises DuplicateIds (e.g. running `:moondev` while on MoonDev).
+        current = self.screen_stack[-1] if self.screen_stack else None
+        if target_id and current is not None and getattr(current, "id", None) == target_id:
+            return
         if len(self._tt_screen_stack) > 1:
             try:
                 self.pop_screen()
@@ -1478,6 +1501,9 @@ class TickerTapeApp(App):
             return
         if screen_id == "ops":
             self._open_ops()
+            return
+        if screen_id == "moondev":
+            self._open_moondev()
             return
         route = self._screen_routes.get(screen_id)
         if route:
