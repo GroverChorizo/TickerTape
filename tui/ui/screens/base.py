@@ -145,6 +145,7 @@ class BaseScreen(Screen):
             )
         entries.append(SidebarEntry(key="research", label="Research", short="R"))
         entries.append(SidebarEntry(key="ops", label="Ops", short="O"))
+        entries.append(SidebarEntry(key="moondev", label="MoonDev Data", short="M"))
 
         active_key = self.command_context
         if active_key not in {entry.key for entry in entries}:
@@ -187,7 +188,7 @@ class BaseScreen(Screen):
             return
 
     def _profile_name(self) -> str:
-        if self.command_context in {"home", "views", "settings", "research", "ops"}:
+        if self.command_context in {"home", "views", "settings", "research", "ops", "moondev"}:
             return self.app.session_state.active_profile
         return self.command_context
 

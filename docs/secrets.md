@@ -1,6 +1,11 @@
 # Secrets & API Key Setup
 
-TickerTape never ships secrets in the repo. Configure your MoonDev API key locally.
+TickerTape never ships secrets in the repo. Configure your API key locally.
+
+The core feeds are **keyless** (Hyperliquid info API / ccxt). The only thing
+that needs a key is the **opt-in "MoonDev Data" console** (`:moondev`) — a
+secondary, daily-cadence page over the external data layer. Without a key, the
+app runs normally and that page shows a "not configured" notice.
 
 ## Canonical secrets file (outside repo)
 TickerTape reads API keys from a single `.env` file:
@@ -14,7 +19,11 @@ You can override the path with:
 **Secrets file format**
 ```
 MOONDEV_API_KEY=your_key_here
+# optional — override the data-layer base URL (defaults to the standard host):
+# DATALAYER_BASE_URL=https://api.moondev.com
 ```
+The base URL can also be set in `config.env` as `datalayer_base_url` or via the
+`TICKERTAPE_DATALAYER_BASE_URL` environment variable.
 
 ## Security rules
 - **Never commit keys** to the repo.

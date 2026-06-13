@@ -36,6 +36,9 @@ class TuiConfig:
     funding_exchanges: List[str] = field(
         default_factory=lambda: list(DEFAULT_FUNDING_EXCHANGES)
     )
+    # Optional base URL for the opt-in MoonDev Data console (external data
+    # layer). None → the DataLayerClient default. Never the primary feed.
+    datalayer_base_url: Optional[str] = None
 
     def to_dict(self) -> Dict:
         payload = asdict(self)
@@ -80,6 +83,12 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
         or payload.get("secrets_path")
     )
     secrets_path = _resolve_secrets_path(secrets_override) if secrets_override else None
+    datalayer_base_url = (
+        overrides.get("datalayer_base_url")
+        or os.environ.get("TICKERTAPE_DATALAYER_BASE_URL")
+        or payload.get("datalayer_base_url")
+        or None
+    )
     alerts = payload.get("alerts") or {}
     panel_overrides = payload.get("panel_overrides") or {}
     funding_exchanges = payload.get("funding_exchanges") or DEFAULT_FUNDING_EXCHANGES
@@ -101,6 +110,7 @@ def load_config(overrides: Optional[Dict[str, str]] = None) -> TuiConfig:
             if isinstance(v, list)
         },
         funding_exchanges=[str(x) for x in funding_exchanges],
+        datalayer_base_url=str(datalayer_base_url) if datalayer_base_url else None,
         config_path=path,
     )
 
