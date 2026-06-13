@@ -6,12 +6,14 @@ from dataclasses import dataclass
 from typing import Any, AsyncIterator, Callable, Dict, Optional
 import json
 import asyncio
+import re
 import time
 
 from backend.network import NetworkClient
 from tui.feeds.liquidations import _normalize_event
 
 from .base import Provider
+from .datalayer import DataLayerClient, DataLayerError
 from .models import (
     FundingRate,
     LiquidationEvent,
@@ -23,6 +25,52 @@ from .models import (
 )
 
 
+# Candle interval -> milliseconds, for keyless HL candleSnapshot windows.
+_INTERVAL_MS: Dict[str, int] = {
+    "1m": 60_000, "3m": 180_000, "5m": 300_000, "15m": 900_000,
+    "30m": 1_800_000, "1h": 3_600_000, "2h": 7_200_000, "4h": 14_400_000,
+    "8h": 28_800_000, "12h": 43_200_000, "1d": 86_400_000,
+    "3d": 259_200_000, "1w": 604_800_000,
+}
+
+# Intel endpoint keys with no keyless HL source — routed to the keyed MoonDev
+# data layer (whales / events / smart-money / every liquidation variant).
+_DATALAYER_KEYS = frozenset({
+    "whales", "events",
+    "smart_money", "smart_money_rankings",
+    "liquidations", "liquidations_stats", "liquidations_scan_summary",
+    "all_liquidations", "all_liquidations_stats",
+    "hip3_liquidations", "hip3_liquidations_stats",
+    "binance_liquidations", "binance_liquidations_stats",
+    "bybit_liquidations", "bybit_liquidations_stats",
+    "okx_liquidations", "okx_liquidations_stats",
+})
+
+
+def _fill_path(spec: Any, src: Dict[str, Any]) -> tuple[str, Dict[str, Any]]:
+    """Fill a url_builder EndpointSpec path template from feed params.
+
+    Placeholders (e.g. ``{timeframe}``) are taken from ``src`` with the spec's
+    per-field case rule applied; remaining keys become query params.
+    """
+    path = spec.path
+    used: set[str] = set()
+    for ph in re.findall(r"\{(\w+)\}", spec.path):
+        val = src.get(ph)
+        if val is None:
+            raise DataLayerError(f"missing '{ph}' for this endpoint")
+        case = getattr(spec, f"{ph}_case", None)
+        text = str(val)
+        if case == "upper":
+            text = text.upper()
+        elif case == "lower":
+            text = text.lower()
+        path = path.replace("{" + ph + "}", text)
+        used.add(ph)
+    query = {k: v for k, v in src.items() if k not in used}
+    return path, query
+
+
 @dataclass
 class CacheEntry:
     ts: float
@@ -32,8 +80,15 @@ class CacheEntry:
 class DirectHyperliquidClient:
     """Direct HTTP client wrapper using backend.network.NetworkClient."""
 
-    def __init__(self, client: Optional[NetworkClient] = None) -> None:
+    def __init__(
+        self,
+        client: Optional[NetworkClient] = None,
+        datalayer: Optional[DataLayerClient] = None,
+    ) -> None:
         self._client = client or NetworkClient()
+        # Optional keyed MoonDev data layer for the intel feeds; None until a
+        # key is configured (then those panels surface "not configured").
+        self._datalayer = datalayer
 
     def get_json(self, endpoint_key: str, params: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
         params = params or {}
@@ -57,7 +112,53 @@ class DirectHyperliquidClient:
             # Keyless market snapshot (price + funding + OI per perp) from the
             # public HL info API, replacing the dead legacy /api/*.json feeds.
             return self._market_snapshot()
+        if endpoint_key == "candles":
+            return self._candle_snapshot(params, kwargs)
+        if endpoint_key in _DATALAYER_KEYS:
+            # No keyless HL source — route to the keyed MoonDev data layer.
+            return self._datalayer_fetch(endpoint_key, params, kwargs)
         return self._client.get(endpoint_key, params=params)
+
+    def _candle_snapshot(
+        self, params: Optional[Dict[str, Any]], kwargs: Dict[str, Any]
+    ) -> Any:
+        """Keyless OHLCV via the HL info API candleSnapshot."""
+        src = {**(params or {}), **(kwargs or {})}
+        symbol = src.get("symbol") or src.get("coin")
+        interval = str(src.get("interval") or "1h").lower()
+        limit = int(src.get("limit") or 200)
+        step = _INTERVAL_MS.get(interval, _INTERVAL_MS["1h"])
+        end = int(time.time() * 1000)
+        start = end - max(1, limit) * step
+        return self._client.post(
+            "info",
+            {
+                "type": "candleSnapshot",
+                "req": {
+                    "coin": symbol,
+                    "interval": interval,
+                    "startTime": start,
+                    "endTime": end,
+                },
+            },
+        )
+
+    def _datalayer_fetch(
+        self, endpoint_key: str, params: Optional[Dict[str, Any]], kwargs: Dict[str, Any]
+    ) -> Any:
+        """Fetch an intel endpoint from the keyed MoonDev data layer."""
+        from tui.feeds.url_builder import ENDPOINT_SPECS
+
+        if self._datalayer is None:
+            raise DataLayerError(
+                f"'{endpoint_key}' needs the MoonDev data layer — set "
+                "MOONDEV_API_KEY in your secrets file, then :reload"
+            )
+        spec = ENDPOINT_SPECS.get(endpoint_key)
+        if spec is None:
+            raise DataLayerError(f"unknown endpoint {endpoint_key!r}")
+        path, query = _fill_path(spec, {**(params or {}), **(kwargs or {})})
+        return self._datalayer.get(path, query or None)
 
     def _market_snapshot(self) -> list[Dict[str, Any]]:
         """Per-perp snapshot from the keyless HL info API (metaAndAssetCtxs).

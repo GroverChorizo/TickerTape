@@ -31,11 +31,12 @@ class HyperliquidClient:
         timeout: float = 10.0,
         retries: int = 3,
         direct_client: Optional[DirectHyperliquidClient] = None,
+        datalayer: Optional[Any] = None,
     ) -> None:
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
         self.retries = retries
-        self._direct = direct_client or DirectHyperliquidClient()
+        self._direct = direct_client or DirectHyperliquidClient(datalayer=datalayer)
         self._last_latency_ms: Optional[float] = None
         self._last_request_ts_ms: Optional[int] = None
         self._total_bytes_received = 0

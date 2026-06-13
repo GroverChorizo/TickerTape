@@ -8,7 +8,10 @@ existing market-panel parser consumes the result.
 
 from __future__ import annotations
 
+import pytest
+
 from providers.hyperliquid import DirectHyperliquidClient
+from providers.datalayer import DataLayerError
 
 META_AND_CTXS = [
     {
@@ -53,6 +56,15 @@ class _FakeNet:
         raise AssertionError(f"legacy GET must not be used: {endpoint_key}")
 
 
+class _FakeDataLayer:
+    def __init__(self):
+        self.calls = []
+
+    def get(self, path, params=None):
+        self.calls.append((path, params))
+        return {"ok": path}
+
+
 def test_ticks_latest_from_keyless_meta_and_ctxs():
     net = _FakeNet(META_AND_CTXS)
     rows = DirectHyperliquidClient(client=net).get_json("ticks_latest")
@@ -83,14 +95,41 @@ def test_ticks_latest_parses_into_market_panel_records():
     assert parsed["BTC"]["open_interest"] == 32138.32482
 
 
-def test_unmapped_legacy_key_still_falls_through():
-    # Keys with no keyless equivalent (whales/liquidations/events) must still
-    # reach the network layer (where they honestly error) — not silently 404
-    # through the snapshot path.
+def test_intel_keys_route_to_datalayer_when_configured():
+    dl = _FakeDataLayer()
+    client = DirectHyperliquidClient(client=_FakeNet(META_AND_CTXS), datalayer=dl)
+    client.get_json("whales")
+    client.get_json("smart_money_rankings")
+    client.get_json("liquidations", timeframe="1H")  # placeholder + case rule
+    paths = [c[0] for c in dl.calls]
+    assert "/api/whales.json" in paths
+    assert "/api/smart_money/rankings.json" in paths
+    assert "/api/liquidations/1h.json" in paths  # timeframe lowercased
+
+
+def test_intel_key_without_datalayer_errors_honestly():
+    client = DirectHyperliquidClient(client=_FakeNet(META_AND_CTXS))  # no datalayer
+    with pytest.raises(DataLayerError) as exc:
+        client.get_json("whales")
+    assert "MOONDEV_API_KEY" in str(exc.value)
+
+
+def test_candles_use_keyless_snapshot():
     net = _FakeNet(META_AND_CTXS)
-    try:
-        DirectHyperliquidClient(client=net).get_json("whales")
-    except AssertionError as exc:
-        assert "legacy GET" in str(exc)
-    else:  # pragma: no cover
-        raise AssertionError("expected fall-through to network GET")
+    DirectHyperliquidClient(client=net).get_json(
+        "candles", symbol="BTC", params={"interval": "1h", "limit": 5}
+    )
+    info_calls = [p for (k, p) in net.calls if k == "info"]
+    assert any(
+        p.get("type") == "candleSnapshot" and p.get("req", {}).get("coin") == "BTC"
+        for p in info_calls
+    )
+
+
+def test_truly_unmapped_key_still_falls_through_to_network():
+    # A key that is neither keyless nor an intel key (e.g. positions) keeps the
+    # old network-GET path — only the named intel keys were rerouted.
+    net = _FakeNet(META_AND_CTXS)
+    with pytest.raises(AssertionError) as exc:
+        DirectHyperliquidClient(client=net).get_json("positions")
+    assert "legacy GET" in str(exc.value)

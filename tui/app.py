@@ -39,6 +39,7 @@ from tui.core.commands import CommandRegistry
 from tui.core.router import Route, parse_route
 from tui.core.state import StateStore
 from tui.providers.hyperliquid import HyperliquidProvider
+from providers.datalayer import DataLayerClient
 from tui.streaming import LiveStreamManager
 from tui.state.profiles import get_profile, list_profiles
 from tui.themes.theme_manager import ThemeManager
@@ -129,6 +130,7 @@ class TickerTapeApp(App):
         self.provider = HyperliquidProvider(
             registry=DatasetRegistry(path=registry_path),
             offline=self.config.mode == "offline_demo",
+            datalayer=DataLayerClient.from_config(self.config),
         )
         self.stream_manager = LiveStreamManager(self.provider)
         self._status_last_messages_total = 0

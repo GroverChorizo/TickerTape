@@ -32,8 +32,9 @@ class HyperliquidProvider:
         client: Optional[HyperliquidClient] = None,
         registry: Optional[DatasetRegistry] = None,
         offline: bool = False,
+        datalayer: Optional[Any] = None,
     ) -> None:
-        self._client = client or HyperliquidClient(base_url=base_url)
+        self._client = client or HyperliquidClient(base_url=base_url, datalayer=datalayer)
         self._registry = registry or DatasetRegistry()
         self._liquidations_feed = LiquidationsRadarFeed(
             self._client, registry=self._registry, offline=offline
