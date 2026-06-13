@@ -53,7 +53,48 @@ class DirectHyperliquidClient:
         if endpoint_key == "ticks":
             symbol = params.get("symbol") or kwargs.get("symbol")
             return self._client.post("info", {"type": "recentTrades", "coin": symbol})
+        if endpoint_key in {"ticks_latest", "funding"}:
+            # Keyless market snapshot (price + funding + OI per perp) from the
+            # public HL info API, replacing the dead legacy /api/*.json feeds.
+            return self._market_snapshot()
         return self._client.get(endpoint_key, params=params)
+
+    def _market_snapshot(self) -> list[Dict[str, Any]]:
+        """Per-perp snapshot from the keyless HL info API (metaAndAssetCtxs).
+
+        Each record carries both ``funding`` (for the market panels) and
+        ``rate`` (for the funding provider) so the existing parsers consume it
+        unchanged.
+        """
+        data = self._client.post("info", {"type": "metaAndAssetCtxs"})
+        if not (isinstance(data, list) and len(data) == 2):
+            return []
+        universe = (data[0] or {}).get("universe") or []
+        ctxs = data[1] or []
+        ts = int(time.time() * 1000)
+        out: list[Dict[str, Any]] = []
+        for asset, ctx in zip(universe, ctxs):
+            if not isinstance(asset, dict) or not isinstance(ctx, dict):
+                continue
+            name = asset.get("name")
+            if not name:
+                continue
+            funding = ctx.get("funding")
+            out.append(
+                {
+                    "symbol": str(name).upper(),
+                    "last": ctx.get("markPx"),
+                    "mid": ctx.get("midPx"),
+                    "oracle_px": ctx.get("oraclePx"),
+                    "prev_day_px": ctx.get("prevDayPx"),
+                    "day_ntl_vlm": ctx.get("dayNtlVlm"),
+                    "open_interest": ctx.get("openInterest"),
+                    "funding": funding,
+                    "rate": funding,
+                    "timestamp_ms": ts,
+                }
+            )
+        return out
 
     def close(self) -> None:
         if hasattr(self._client, "_client"):
